@@ -118,6 +118,26 @@ await guest.page.locator('.tabs button', { hasText: 'Entrar en una' }).click();
 await guest.page.locator('.form input.input--code').fill(code);
 await guest.page.locator('.form input[type=password]').fill(PASSWORD);
 await guest.page.locator('.form button[type=submit]').click();
+
+// Con ediciones distintas la regla es rechazar, asi que la prueba termina aqui.
+if (ROM_HOST !== ROM_GUEST) {
+  const message = await guest.page
+    .locator('.alert')
+    .textContent({ timeout: 10_000 })
+    .catch(() => null);
+  check('una edicion distinta se rechaza al entrar', message !== null, (message ?? '').trim());
+  check(
+    'y el motivo se explica sin tecnicismos',
+    /mismo juego|idiomas distintos|no es un juego/i.test(message ?? ''),
+  );
+  await guest.page.screenshot({ path: `${SHOTS}/ui-rechazo-edicion.png` });
+  await browser.close();
+  console.log(
+    failures === 0 ? '\nREGLA DE EDICION CORRECTA' : `\n${failures} COMPROBACIONES FALLIDAS`,
+  );
+  process.exit(failures === 0 ? 0 : 1);
+}
+
 await guest.page.keyboard.press('Escape');
 
 // --- esperamos a que aparezca la ventana pequena en ambos lados ---
@@ -147,18 +167,6 @@ const hostVideo = await videoOf(host.page);
 const guestVideo = await videoOf(guest.page);
 check('el anfitrion recibe el video del invitado', hostVideo.width > 0, JSON.stringify(hostVideo));
 check('el invitado recibe el video del anfitrion', guestVideo.width > 0, JSON.stringify(guestVideo));
-
-// --- informe de compatibilidad entre las dos ROMs ---
-if (ROM_HOST !== ROM_GUEST) {
-  await host.page.locator('.roomchip').click();
-  const compat = await host.page.locator('.compat').textContent().catch(() => null);
-  check('se muestra un informe de compatibilidad', compat !== null);
-  console.log(`     informe: ${(compat ?? '').replace(/\s+/g, ' ').slice(0, 220)}`);
-  const tradesOk = await host.page.locator('.compat--ok').count();
-  check('las dos versiones se declaran aptas para intercambiar', tradesOk === 1);
-  await host.page.screenshot({ path: `${SHOTS}/ui-compatibilidad.png` });
-  await host.page.keyboard.press('Escape');
-}
 
 // --- intercambiar pantalla grande y pequena ---
 await host.page.locator('.slot--pip .slot__action').click();

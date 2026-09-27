@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "ws": "^8.18.3",
-    "@emupoke/protocol": "*"
+    "@emupoke/protocol": "*",
+    "@emupoke/pokemon": "*"
   },
   "devDependencies": {
     "@types/node": "^24.7.0",

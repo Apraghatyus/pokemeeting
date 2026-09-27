@@ -1007,8 +1007,8 @@ button.is-active {
   border-left-color: var(--ok);
 }
 
-.compat--limitada {
-  border-left-color: var(--wait);
+.compat--bloqueo {
+  border-left-color: var(--danger);
 }
 
 .compat__head {

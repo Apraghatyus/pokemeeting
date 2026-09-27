@@ -19,6 +19,7 @@ export type ErrorCode =
   | 'sala-no-encontrada'
   | 'contrasena-incorrecta'
   | 'sala-llena'
+  | 'rom-incompatible'
   | 'peticion-invalida'
   | 'demasiados-intentos';
 

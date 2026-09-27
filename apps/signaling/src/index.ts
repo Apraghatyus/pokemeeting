@@ -8,6 +8,7 @@
 
 import { createServer } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
+import { compareRoms } from '@emupoke/pokemon';
 import {
   isValidRoomCode,
   type ClientMessage,
@@ -82,11 +83,16 @@ const handleJoin = async (socket: WebSocket, message: Extract<ClientMessage, { t
     return;
   }
 
-  // El servidor no opina sobre las ROMs. Si dos personas quieren compartir
-  // sala jugando a cosas distintas, es asunto suyo: ver la pantalla del otro
-  // no exige nada en comun. Que se puede intercambiar lo decide el cliente,
-  // que si conoce el dominio.
+  // La regla de edicion se comprueba aqui y no solo en el cliente: el cliente
+  // la usa para explicarla bien, pero quien la hace cumplir es el servidor.
   const other = room.host ?? room.guest;
+  if (other) {
+    const compatibility = compareRoms(message.rom, other.rom);
+    if (!compatibility.canPlayTogether) {
+      fail(socket, 'rom-incompatible', [compatibility.headline, ...compatibility.notes].join(' '));
+      return;
+    }
+  }
 
   // El intento correcto limpia el contador: quien acierta no debe arrastrar los
   // fallos de tecleo anteriores.

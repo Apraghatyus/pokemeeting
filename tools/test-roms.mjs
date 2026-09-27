@@ -39,43 +39,30 @@ check('BPRS es el MISMO juego en espanol',
 check('BPGE se reconoce como Verde Hoja', parseGameCode('BPGE').game?.label === 'Verde Hoja');
 check('un juego que no es Pokemon no se reconoce', parseGameCode('AZLE').game === null);
 
-// --- el caso que motivo todo: Rojo Fuego y Verde Hoja ---
-const frVsLg = compareRoms(rom('BPRE', 'aaa'), rom('BPGE', 'bbb'));
-check('Rojo Fuego y Verde Hoja pueden jugar juntos', frVsLg.canPlayTogether);
-check('Rojo Fuego y Verde Hoja pueden intercambiar', frVsLg.canTrade);
-check('y se explica que son pareja de versiones',
-  frVsLg.notes.some((n) => /pareja de versiones/.test(n)));
+// --- la regla: misma edicion, es decir mismo juego y mismo idioma ---
+const frVsLg = compareRoms(rom('BPRS', 'aaa'), rom('BPGS', 'bbb'));
+check('Rojo Fuego y Verde Hoja NO comparten sala', !frVsLg.canPlayTogether);
+check('y se explica que hace falta el mismo juego',
+  frVsLg.notes.some((n) => /el mismo juego/.test(n)), frVsLg.headline);
 
-// --- mismo juego en idiomas distintos ---
 const idiomas = compareRoms(rom('BPRE', 'aaa'), rom('BPRS', 'aaa'));
-check('mismo juego en dos idiomas se permite', idiomas.canTrade);
-check('y se avisa del idioma', idiomas.notes.some((n) => /idiomas distintos/.test(n)));
+check('el mismo juego en idiomas distintos NO comparte sala', !idiomas.canPlayTogether);
+check('y se nombran los dos idiomas',
+  idiomas.notes.some((n) => /ingles/.test(n) && /espanol/.test(n)), idiomas.headline);
 
-// --- copias randomizadas distintas ---
-const random = compareRoms(rom('BPRE', 'aaa'), rom('BPRE', 'bbb'));
-check('dos aleatorizaciones del mismo juego se permiten', random.canTrade);
-check('y se avisa de que un Pokemon puede llegar como otra especie',
+const otro = compareRoms(rom('BPRS', 'aaa'), rom('AZLE', 'ccc'));
+check('una ROM que no es Pokemon NO comparte sala', !otro.canPlayTogether);
+
+// --- lo que si se permite: dos aleatorizaciones de la misma edicion ---
+const random = compareRoms(rom('BPRS', 'aaa'), rom('BPRS', 'bbb'));
+check('dos aleatorizaciones de la misma edicion se permiten', random.canPlayTogether);
+check('y se pueden intercambiar', random.canTrade);
+check('avisando de que un Pokemon puede llegar como otra especie',
   random.notes.some((n) => /otra especie/.test(n)));
 
-// --- revisiones distintas ya no bloquean ---
-const revs = compareRoms(rom('BPRE', 'aaa', 0), rom('BPRE', 'aaa', 1));
-check('una revision distinta ya no impide nada', revs.canTrade);
-
-// --- la misma copia exacta ---
-const iguales = compareRoms(rom('BPRE', 'aaa'), rom('BPRE', 'aaa'));
+const iguales = compareRoms(rom('BPRS', 'aaa'), rom('BPRS', 'aaa'));
 check('la misma copia se reconoce como identica', iguales.level === 'identica');
 check('y no genera avisos', iguales.notes.length === 0);
-
-// --- algo que no es un juego de Pokemon ---
-const otro = compareRoms(rom('BPRE', 'aaa'), rom('AZLE', 'ccc'));
-check('con una ROM desconocida se puede acompanar', otro.canPlayTogether);
-check('pero no intercambiar', !otro.canTrade);
-
-// --- Esmeralda: compatible pero sin probar ---
-const esmeralda = compareRoms(rom('BPRE', 'aaa'), rom('BPEE', 'ddd'));
-check('Esmeralda se admite para intercambios', esmeralda.canTrade);
-check('advirtiendo de que no esta probado',
-  esmeralda.notes.some((n) => /no lo hemos podido probar/.test(n)));
 
 console.log(failures === 0 ? '\nCOMPATIBILIDAD CORRECTA' : `\n${failures} COMPROBACIONES FALLIDAS`);
 process.exit(failures === 0 ? 0 : 1);

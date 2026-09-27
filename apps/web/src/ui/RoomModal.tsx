@@ -127,12 +127,11 @@ const Compatibility = ({ report }: { report: RomCompatibility }) => {
   if (report.level === 'identica') return null;
 
   return (
-    <div className={`compat compat--${report.canTrade ? 'ok' : 'limitada'}`}>
+    <div className={`compat compat--${report.canPlayTogether ? 'ok' : 'bloqueo'}`}>
       <p className="compat__head">
-        <span className={`dot dot--${report.canTrade ? 'on' : 'wait'}`} />
+        <span className={`dot dot--${report.canPlayTogether ? 'on' : 'off'}`} />
         {report.headline}
       </p>
-      {!report.canTrade && <p className="compat__note">Los intercambios no estaran disponibles.</p>}
       {report.notes.map((note) => (
         <p className="compat__note" key={note}>
           {note}

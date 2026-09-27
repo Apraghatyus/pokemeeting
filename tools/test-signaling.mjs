@@ -5,7 +5,7 @@ import { WebSocket } from 'ws';
 const URL = process.env.SIGNALING_URL ?? 'ws://localhost:8787';
 const rom = (crc32) => ({
   title: 'POKEMON FIRE',
-  gameCode: 'BPRE',
+  gameCode: 'BPRS',
   version: 0,
   crc32,
   fileName: 'test.gba',
@@ -49,21 +49,23 @@ const rejected = await next(intruder);
 check('contrasena incorrecta se rechaza', rejected.type === 'error' && rejected.code === 'contrasena-incorrecta');
 intruder.close();
 
-// --- 3. otro juego de la familia NO se bloquea ---
+// --- 3. otra edicion se rechaza ---
 //
-// El servidor no opina sobre las ROMs: ver la pantalla del otro no exige nada
-// en comun, y Rojo Fuego con Verde Hoja es justo la pareja de siempre. Que se
-// puede intercambiar lo decide el cliente.
+// La regla es misma edicion: mismo juego y mismo idioma. Verde Hoja no entra
+// en una sala de Rojo Fuego, ni la version inglesa en una espanola.
 const leafGreen = await open();
-const hostSeesLeafGreen = next(host);
-say(leafGreen, { type: 'join-room', roomCode: code, password: 'pikachu', rom: { ...rom('bbbb2222'), gameCode: 'BPGE' } });
-const accepted = await next(leafGreen);
-check('Verde Hoja puede entrar en una sala de Rojo Fuego', accepted.type === 'room-joined',
-  accepted.type === 'error' ? accepted.message : 'entra');
-await hostSeesLeafGreen;
-const hostSeesLeafGreenLeave = next(host);
+say(leafGreen, { type: 'join-room', roomCode: code, password: 'pikachu', rom: { ...rom('bbbb2222'), gameCode: 'BPGS' } });
+const rejectedGame = await next(leafGreen);
+check('Verde Hoja no entra en una sala de Rojo Fuego',
+  rejectedGame.type === 'error' && rejectedGame.code === 'rom-incompatible', rejectedGame.message);
 leafGreen.close();
-await hostSeesLeafGreenLeave;
+
+const english = await open();
+say(english, { type: 'join-room', roomCode: code, password: 'pikachu', rom: { ...rom('cccc3333'), gameCode: 'BPRE' } });
+const rejectedLang = await next(english);
+check('otro idioma del mismo juego tampoco entra',
+  rejectedLang.type === 'error' && rejectedLang.code === 'rom-incompatible', rejectedLang.message);
+english.close();
 
 // --- 4. union correcta con CRC distinto (caso randomizado) ---
 const guestRom = rom('bbbb2222');
