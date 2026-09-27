@@ -1,6 +1,7 @@
 # Flujo de una partida compartida
 
-Estado: diseno acordado. Implementado hasta el paso 1.
+Estado: implementados los pasos 1 a 6 salvo la biblioteca local de ROMs.
+Pendientes: Soul Link e intercambios.
 
 ## Roles
 
@@ -18,7 +19,8 @@ de que el jugador elija nada, para que el coste del wasm ya este pagado.
 El jugador elige su ROM de dos maneras:
 
 - **Fichero nuevo**: la arrastra o la selecciona.
-- **Mi biblioteca**: ROMs que ya uso antes en este navegador.
+- **Mi biblioteca**: ROMs que ya uso antes en este navegador. *(Pendiente:
+  hoy hay que volver a elegir el fichero en cada sesion.)*
 
 ### Por que la biblioteca es local y no del servidor
 
@@ -93,6 +95,8 @@ tanto se encolan y se envian al reconectar.
 
 ## Pendiente de este flujo
 
-- Pasos 2 a 6 completos.
-- Soul Link sobre el canal de datos (ver `soul-link.md` cuando exista).
+- Biblioteca local de ROMs en IndexedDB, para no reelegir el fichero cada vez.
+- Reconexion automatica: hoy, si se cae el enlace, hay que volver a entrar.
+- Servidor TURN para los casos de NAT simetrica, donde STUN no basta.
+- Soul Link sobre el canal de datos, que ya esta abierto y sin usar.
 - Intercambios (ver `intercambios.md`).

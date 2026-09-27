@@ -1,25 +1,45 @@
-import { useEmulator } from './core/useEmulator';
-import { PartnerPanel } from './ui/PartnerPanel';
-import { RomDropZone } from './ui/RomDropZone';
-import { RomInfoCard } from './ui/RomInfoCard';
-import { Toolbar } from './ui/Toolbar';
+import { useEffect, useRef } from 'react';
+import type { RomFingerprint } from '@emupoke/protocol';
 import { DEFAULT_KEY_BINDINGS } from './core/mgbaCore';
+import { useEmulator } from './core/useEmulator';
+import { useSession } from './net/useSession';
+import { PartnerPanel } from './ui/PartnerPanel';
+import { RoomDropZoneHint, RomDropZone } from './ui/RomDropZone';
+import { RomInfoCard } from './ui/RomInfoCard';
+import { RoomPanel } from './ui/RoomPanel';
+import { Toolbar } from './ui/Toolbar';
 
-const bootHint = (status: string): string => {
-  switch (status) {
-    case 'booting':
-      return 'Arrancando el nucleo del emulador...';
-    case 'error':
-      return 'El nucleo no ha podido arrancar.';
-    default:
-      return 'Formato admitido: .gba';
-  }
+const PARTNER_STATUS: Record<string, string> = {
+  'sin-sala': 'Sin conexion',
+  'esperando-companero': 'Esperando a que entre tu companero',
+  conectando: 'Estableciendo conexion...',
+  conectada: 'Conectado',
+  perdida: 'Conexion perdida',
 };
 
 export const App = () => {
   const emulator = useEmulator();
   const { state } = emulator;
   const hasRom = state.header !== null && state.platform !== null;
+
+  // La huella de la ROM va en una ref y no en el estado de la sesion porque los
+  // callbacks de la senalizacion viven mas que el render que los creo: leerla
+  // por ref evita capturar un valor viejo.
+  const romRef = useRef<RomFingerprint | null>(null);
+  useEffect(() => {
+    romRef.current =
+      state.header && state.romName
+        ? {
+            title: state.header.title,
+            gameCode: state.header.gameCode,
+            version: state.header.version,
+            crc32: state.header.crc32,
+            fileName: state.romName,
+          }
+        : null;
+  }, [state.header, state.romName]);
+
+  const session = useSession(emulator.canvasRef, romRef);
 
   return (
     <div className="app">
@@ -41,7 +61,7 @@ export const App = () => {
                 <RomDropZone
                   onRom={emulator.openRom}
                   disabled={state.status !== 'ready'}
-                  hint={bootHint(state.status)}
+                  hint={RoomDropZoneHint(state.status)}
                 />
               </div>
             )}
@@ -66,14 +86,26 @@ export const App = () => {
           )}
           {state.lastSaveAt && (
             <p className="note">
-              El juego ha guardado en{' '}
-              {new Date(state.lastSaveAt).toLocaleTimeString('es')} y la partida se ha persistido en
-              este navegador.
+              El juego ha guardado en {new Date(state.lastSaveAt).toLocaleTimeString('es')} y la
+              partida se ha persistido en este navegador.
             </p>
           )}
         </div>
 
         <aside className="sidebar">
+          <RoomPanel
+            state={session.state}
+            romReady={hasRom}
+            onCreate={(password) => void session.createRoom(password)}
+            onJoin={(code, password) => void session.joinRoom(code, password)}
+            onLeave={session.leave}
+          />
+
+          <PartnerPanel
+            stream={session.state.remoteStream}
+            status={PARTNER_STATUS[session.state.phase] ?? 'Sin conexion'}
+          />
+
           {hasRom && (
             <RomInfoCard
               header={state.header!}
@@ -81,8 +113,6 @@ export const App = () => {
               romName={state.romName!}
             />
           )}
-
-          <PartnerPanel />
 
           <section className="panel">
             <h2>Controles</h2>

@@ -1,22 +1,39 @@
+import { useEffect, useRef } from 'react';
+
+type Props = {
+  /** Video en directo de la partida del companero, o null si no hay conexion. */
+  stream: MediaStream | null;
+  status: string;
+};
+
 /**
- * Hueco de la partida del companero.
+ * Pantalla del companero.
  *
- * Todavia no hay conexion: este panel deja el sitio reservado y, sobre todo,
- * documenta en la propia interfaz que falta por construir, para que no parezca
- * que algo esta roto.
+ * El video llega por WebRTC directamente de su navegador. Lleva entre 100 y
+ * 300 ms de retraso: sirve para acompanarle, no para reaccionar a su partida.
  */
-export const PartnerPanel = () => (
-  <section className="panel panel--partner">
-    <h2>Partida del companero</h2>
-    <div className="partner__screen">
-      <p>Sin conexion</p>
-    </div>
-    <ul className="roadmap">
-      <li className="roadmap__done">Emulador local funcionando</li>
-      <li>Sala compartida por codigo (servidor de senalizacion)</li>
-      <li>Ver su pantalla en directo (video por WebRTC)</li>
-      <li>Soul Link: vincular capturas y debilitados</li>
-      <li>Intercambios entre las dos partidas</li>
-    </ul>
-  </section>
-);
+export const PartnerPanel = ({ stream, status }: Props) => {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.srcObject = stream;
+    if (stream) void video.play().catch(() => {});
+  }, [stream]);
+
+  return (
+    <section className="panel panel--partner">
+      <h2>Partida del companero</h2>
+      <div className="partner__screen">
+        <video
+          ref={videoRef}
+          className={stream ? 'partner__video' : 'partner__video is-hidden'}
+          playsInline
+          muted
+        />
+        {!stream && <p>{status}</p>}
+      </div>
+    </section>
+  );
+};

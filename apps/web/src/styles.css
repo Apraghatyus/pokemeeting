@@ -288,3 +288,78 @@ button.is-active {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ---------- sala ---------- */
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.tabs button {
+  flex: 1;
+  font-size: 12.5px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.form input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+  padding: 7px 9px;
+}
+
+.form input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.room-code {
+  font-size: 18px;
+  letter-spacing: 0.18em;
+  color: var(--accent);
+}
+
+.warn {
+  margin: 10px 0;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: rgba(214, 168, 74, 0.12);
+  border: 1px solid #8a6d2f;
+  font-size: 12.5px;
+}
+
+/* ---------- video del companero ---------- */
+
+.partner__screen {
+  position: relative;
+  overflow: hidden;
+}
+
+.partner__video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  background: #000;
+}
+
+.partner__video.is-hidden {
+  display: none;
+}

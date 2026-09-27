@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "ws": "^8.18.3"
+    "ws": "^8.18.3",
+    "@emupoke/protocol": "*"
   },
   "devDependencies": {
     "@types/node": "^24.7.0",

@@ -12,7 +12,10 @@
     "dev:signaling": "npm run dev --workspace=@emupoke/signaling",
     "build": "npm run build --workspace=@emupoke/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "smoke": "node tools/smoke.mjs"
+    "smoke": "node tools/smoke.mjs",
+    "dev:all": "node tools/dev.mjs",
+    "test:signaling": "node tools/test-signaling.mjs",
+    "test:session": "node tools/test-session.mjs"
   },
   "engines": {
     "node": ">=20"

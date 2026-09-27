@@ -54,3 +54,15 @@ export const RomDropZone = ({ onRom, disabled, hint }: Props) => {
     </div>
   );
 };
+
+/** Mensaje bajo el titulo de la zona de carga, segun el estado del nucleo. */
+export const RoomDropZoneHint = (status: string): string => {
+  switch (status) {
+    case 'booting':
+      return 'Arrancando el nucleo del emulador...';
+    case 'error':
+      return 'El nucleo no ha podido arrancar.';
+    default:
+      return 'Formato admitido: .gba';
+  }
+};

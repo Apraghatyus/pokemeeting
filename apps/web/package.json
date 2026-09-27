@@ -15,7 +15,8 @@
   "dependencies": {
     "@thenick775/mgba-wasm": "^2.5.1",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "@emupoke/protocol": "*"
   },
   "devDependencies": {
     "@types/react": "^19.2.0",
