@@ -1,0 +1,34 @@
+# ---- Legal: NUNCA subir ROMs ni saves ----
+# Este proyecto es un emulador. No distribuye juegos.
+*.gba
+*.gbc
+*.gb
+*.sav
+*.srm
+*.ss[0-9]
+*.state
+roms/
+saves/
+
+# Dependencias y build
+node_modules/
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# Entorno
+.env
+.env.local
+.env.*.local
+
+# Logs y editor
+*.log
+npm-debug.log*
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Excepcion: si documentamos la carpeta de ROMs, ese README si se versiona
+!roms/README.md

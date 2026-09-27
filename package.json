@@ -1,0 +1,23 @@
+{
+  "name": "emupoke-together",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Emulador de GBA en el navegador, exclusivo para Pokemon, con partida compartida y Soul Link. No distribuye ROMs.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=@emupoke/web",
+    "dev:signaling": "npm run dev --workspace=@emupoke/signaling",
+    "build": "npm run build --workspace=@emupoke/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "smoke": "node tools/smoke.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "playwright": "^1.63.0"
+  }
+}
