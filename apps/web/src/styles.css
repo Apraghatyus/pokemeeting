@@ -20,6 +20,9 @@
 
 body {
   margin: 0;
+  /* Sin rebote elastico ni seleccion accidental al arrastrar sobre el mando. */
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
   background: var(--bg);
   color: var(--text);
   font:
@@ -31,6 +34,8 @@ body {
 
 .app {
   min-height: 100vh;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* ---------- barra superior ---------- */
@@ -699,5 +704,291 @@ button.is-active {
     right: 10px;
     bottom: 10px;
     width: 40%;
+  }
+}
+
+/* ---------- mando tactil ---------- */
+
+.pad {
+  display: grid;
+  grid-template-areas:
+    "hombros hombros"
+    "cruceta cara"
+    "menu    menu";
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 10px;
+  margin: 14px auto 0;
+  max-width: 560px;
+  /* El navegador no debe interpretar estos gestos como scroll ni como zoom. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pad__shoulders {
+  grid-area: hombros;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pad__face {
+  grid-area: cara;
+  position: relative;
+  justify-self: center;
+  align-self: center;
+  width: 150px;
+  height: 150px;
+}
+
+.pad__menu {
+  grid-area: menu;
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+}
+
+.btn {
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  touch-action: none;
+}
+
+.btn.is-held {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* A y B en diagonal, como en la consola. */
+.btn--a {
+  position: absolute;
+  right: 0;
+  top: 26px;
+}
+
+.btn--b {
+  position: absolute;
+  left: 0;
+  bottom: 26px;
+}
+
+.btn--wide {
+  width: 92px;
+  height: 42px;
+  border-radius: 12px;
+}
+
+.btn--small {
+  width: auto;
+  min-width: 84px;
+  height: 36px;
+  border-radius: 999px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+/* Cruceta: una sola zona continua, no ocho botones, para poder deslizar
+   entre direcciones y encadenar diagonales sin levantar el dedo. */
+.dpad {
+  grid-area: cruceta;
+  position: relative;
+  justify-self: center;
+  align-self: center;
+  width: 150px;
+  height: 150px;
+  touch-action: none;
+}
+
+.dpad__arm {
+  position: absolute;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+}
+
+.dpad__arm.is-held {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.dpad__arm--up,
+.dpad__arm--down {
+  left: 50px;
+  width: 50px;
+  height: 52px;
+}
+
+.dpad__arm--up {
+  top: 0;
+  border-radius: 10px 10px 0 0;
+  border-bottom: none;
+}
+
+.dpad__arm--down {
+  bottom: 0;
+  border-radius: 0 0 10px 10px;
+  border-top: none;
+}
+
+.dpad__arm--left,
+.dpad__arm--right {
+  top: 50px;
+  width: 52px;
+  height: 50px;
+}
+
+.dpad__arm--left {
+  left: 0;
+  border-radius: 10px 0 0 10px;
+  border-right: none;
+}
+
+.dpad__arm--right {
+  right: 0;
+  border-radius: 0 10px 10px 0;
+  border-left: none;
+}
+
+.dpad__hub {
+  position: absolute;
+  left: 50px;
+  top: 50px;
+  width: 50px;
+  height: 50px;
+  background: var(--bg-raised);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+/* ---------- movil ---------- */
+
+@media (max-width: 560px) {
+  .app__main {
+    padding: 10px;
+  }
+
+  .stage {
+    border-radius: 10px;
+    /* En vertical, la pantalla deja sitio al mando en lugar de comerse
+       todo el alto disponible. */
+    max-height: 42vh;
+  }
+
+  .brand__sub,
+  .status {
+    display: none;
+  }
+
+  /* En una pantalla pequena la etiqueta se come el juego, y ahi no hace falta
+     aclarar cual de las dos partidas es la tuya: es la grande. */
+  .slot--main > .slot__label {
+    display: none;
+  }
+
+  .topbar {
+    gap: 10px;
+    padding: 8px 12px;
+  }
+
+  .pad {
+    gap: 10px 8px;
+  }
+
+  .btn {
+    width: 58px;
+    height: 58px;
+  }
+
+  .dpad,
+  .pad__face {
+    width: 138px;
+    height: 138px;
+  }
+
+  .dpad__arm--up,
+  .dpad__arm--down {
+    left: 46px;
+    width: 46px;
+    height: 48px;
+  }
+
+  .dpad__arm--left,
+  .dpad__arm--right {
+    top: 46px;
+    width: 48px;
+    height: 46px;
+  }
+
+  .dpad__hub {
+    left: 46px;
+    top: 46px;
+    width: 46px;
+    height: 46px;
+  }
+}
+
+/* Movil en horizontal: el alto escasea, asi que el mando se reparte a los
+   lados de la pantalla en vez de quedar debajo. */
+@media (max-height: 480px) and (orientation: landscape) {
+  .app__main {
+    display: grid;
+    grid-template-columns: 1fr;
+    padding: 6px;
+  }
+
+  .stage {
+    max-height: calc(100vh - 20px);
+  }
+
+  .pad {
+    position: fixed;
+    inset: 0;
+    margin: 0;
+    max-width: none;
+    display: block;
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  .pad > * {
+    pointer-events: auto;
+  }
+
+  .dpad {
+    position: absolute;
+    left: 12px;
+    bottom: 12px;
+    opacity: 0.85;
+  }
+
+  .pad__face {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    opacity: 0.85;
+  }
+
+  .pad__shoulders {
+    position: absolute;
+    top: 8px;
+    left: 12px;
+    right: 12px;
+  }
+
+  .pad__menu {
+    position: absolute;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%);
   }
 }

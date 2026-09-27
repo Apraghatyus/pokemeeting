@@ -34,7 +34,11 @@ const browser = await chromium.launch({
 /** Abre una pestana con el emulador ya corriendo la ROM. */
 const openPlayer = async (label) => {
   // Contextos separados: dos jugadores distintos, sin estado compartido.
-  const context = await browser.newContext({ viewport: { width: 1360, height: 900 } });
+  const context = await browser.newContext({
+    viewport: { width: 1360, height: 900 },
+    // El modo HTTPS de desarrollo usa un certificado autofirmado.
+    ignoreHTTPSErrors: true,
+  });
   const page = await context.newPage();
   page.on('pageerror', (e) => console.log(`[${label} pageerror] ${e.message}`.slice(0, 200)));
   await page.goto(URL, { waitUntil: 'load' });

@@ -93,9 +93,31 @@ Si a alguien se le cae la conexion, su emulacion **sigue corriendo**. Solo se
 cae el video y el canal de datos; los eventos de Soul Link ocurridos mientras
 tanto se encolan y se envian al reconectar.
 
+## Jugar desde el movil
+
+Funciona, con una condicion tecnica que conviene entender porque no es evidente:
+
+**hay que servir la pagina por HTTPS.** mGBA necesita `SharedArrayBuffer`, que
+el navegador solo concede en un contexto seguro. `localhost` cuenta como seguro,
+pero una IP de red local por HTTP no: el emulador ni siquiera arrancaria.
+
+Por eso existe `npm run dev:https`, que levanta Vite con un certificado
+autofirmado. El movil avisara de que no es de confianza y hay que aceptarlo una
+vez; a partir de ahi el contexto ya es seguro.
+
+El servidor de salas se alcanza por la ruta `/signaling` del mismo origen, no
+por su puerto. Con la pagina en HTTPS, un WebSocket en claro hacia otro puerto
+seria contenido mixto y el navegador lo bloquearia.
+
+En el telefono el mando tactil aparece solo. La cruceta es una zona continua y
+no ocho botones, para poder deslizar entre direcciones y encadenar diagonales
+sin levantar el dedo. En horizontal el mando pasa a flotar sobre la pantalla,
+porque el alto escasea.
+
 ## Pendiente de este flujo
 
 - Biblioteca local de ROMs en IndexedDB, para no reelegir el fichero cada vez.
+- Apodo de jugador: la ventana del companero muestra el nombre de su fichero.
 - Reconexion automatica: hoy, si se cae el enlace, hay que volver a entrar.
 - Servidor TURN para los casos de NAT simetrica, donde STUN no basta.
 - Soul Link sobre el canal de datos, que ya esta abierto y sin usar.

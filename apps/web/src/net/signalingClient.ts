@@ -11,16 +11,19 @@ export type SignalingHandlers = {
 };
 
 /**
- * Por defecto el servidor de senalizacion vive en el mismo equipo que sirve la
- * pagina, en el puerto 8787. Se deduce del host actual y no se fija a
- * "localhost" para que al abrir la pagina desde otra maquina de la red el
- * cliente apunte al sitio correcto.
+ * El servidor de salas se alcanza por el MISMO origen que sirve la pagina, en
+ * la ruta /signaling, que el servidor de desarrollo redirige al puerto 8787.
+ *
+ * Es deliberado y no un rodeo: con la pagina en HTTPS (obligatorio para jugar
+ * desde el movil), un WebSocket en claro hacia otro puerto seria contenido
+ * mixto y el navegador lo bloquearia. Yendo por el mismo origen hereda su
+ * certificado y funciona igual en local, en red local y en internet.
  */
 const defaultUrl = (): string => {
   const fromEnv = import.meta.env['VITE_SIGNALING_URL'] as string | undefined;
   if (fromEnv) return fromEnv;
   const protocol = globalThis.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return protocol + '//' + globalThis.location.hostname + ':8787';
+  return protocol + '//' + globalThis.location.host + '/signaling';
 };
 
 export class SignalingClient {

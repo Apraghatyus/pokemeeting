@@ -15,7 +15,9 @@
     "smoke": "node tools/smoke.mjs",
     "dev:all": "node tools/dev.mjs",
     "test:signaling": "node tools/test-signaling.mjs",
-    "test:session": "node tools/test-session.mjs"
+    "test:session": "node tools/test-session.mjs",
+    "dev:https": "npm run dev:https --workspace=@emupoke/web",
+    "test:mobile": "node tools/test-mobile.mjs"
   },
   "engines": {
     "node": ">=20"

@@ -9,6 +9,7 @@ import { RomInfoCard } from './ui/RomInfoCard';
 import { RoomModal } from './ui/RoomModal';
 import { Stage } from './ui/Stage';
 import { Toolbar } from './ui/Toolbar';
+import { TouchControls } from './ui/TouchControls';
 import { TopBar } from './ui/TopBar';
 
 export const App = () => {
@@ -18,6 +19,12 @@ export const App = () => {
 
   const [roomOpen, setRoomOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // En movil los controles tactiles salen solos; en escritorio se pueden
+  // encender desde el menu, que tambien sirve para probarlos.
+  const [touchPad, setTouchPad] = useState(
+    () => globalThis.matchMedia?.('(pointer: coarse)').matches ?? false,
+  );
 
   // Con el modal o el menu abiertos el teclado es de la interfaz aunque el foco
   // este en un boton: si no, las flechas moverian al personaje por detras.
@@ -66,6 +73,8 @@ export const App = () => {
             />
           }
         />
+
+        {touchPad && hasRom && <TouchControls coreRef={emulator.coreRef} />}
 
         {state.error && (
           <p className="alert" role="alert">
@@ -117,6 +126,13 @@ export const App = () => {
               <p className="hint">
                 Mientras escribes en un campo, el juego suelta el teclado y lo recupera al salir.
               </p>
+              <button
+                type="button"
+                className={touchPad ? 'is-active' : undefined}
+                onClick={() => setTouchPad((v) => !v)}
+              >
+                {touchPad ? 'Ocultar mando tactil' : 'Mostrar mando tactil'}
+              </button>
             </section>
 
             {state.log.length > 0 && (

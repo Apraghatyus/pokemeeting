@@ -86,6 +86,58 @@ que evolucionan al intercambiar, y mas adelante podemos ofrecer un boton
 explicito de "forzar evolucion" que reescriba la especie, claramente marcado
 como lo que es: una intervencion del emulador, no una mecanica del juego.
 
+## Intercambiar entre ROMs randomizadas de forma distinta
+
+Es el caso normal en este proyecto, no una excepcion: cada jugador randomiza su
+copia por su cuenta, asi que las dos ROMs tienen datos distintos.
+
+Lo primero que hay que entender es que **el bloque de 100 bytes guarda indices,
+no definiciones**. Dice "especie 25", "movimiento 85", "objeto 13". Que es la
+especie 25, cuanto ataque tiene y como se llama vive en la ROM, no en el bloque.
+
+De ahi sale la consecuencia que conviene tener clara y avisar en la interfaz:
+
+> Un Pokemon intercambiado entre dos aleatorizaciones distintas llega intacto,
+> pero **puede ser otra criatura al llegar**. Si en tu juego la especie 25 es un
+> Pikachu y en el suyo es un Golem, tu companero recibira un Golem con el mote,
+> los IV y la experiencia del que le mandaste.
+
+Esto no es un fallo nuestro: es exactamente lo que pasaria con dos cartuchos
+randomizados distintos y un cable link de verdad. Lo que no podemos hacer es
+ocultarlo.
+
+### Lo que si puede romper de verdad
+
+Un indice fuera de rango no da un Pokemon raro: da un "Bad Egg" o cuelga el
+juego. Antes de inyectar nada hay que validar contra la ROM **que recibe**:
+
+| Comprobacion | Por que |
+|---|---|
+| Checksum correcto tras descifrar | Demuestra que el bloque llego integro |
+| Especie dentro del limite de la ROM receptora | Un hack puede tener mas o menos especies que el otro |
+| Todos los IDs de movimiento validos | Igual que la especie |
+| ID de objeto valido | Idem |
+| Nivel entre 1 y 100 | Un nivel fuera de rango corrompe la tabla de estadisticas |
+
+Si algo no pasa la validacion, el intercambio **se rechaza entero** y se explica
+por que. Nunca se inyecta un bloque dudoso: el coste de equivocarse es la
+partida del jugador.
+
+### Ensenar lo que va a pasar antes de aceptar
+
+Se puede hacer mejor que avisar en general. Cada jugador puede leer de su propia
+ROM la tabla de nombres de especies, asi que al ofrecer un intercambio puede
+decirle al otro **como se llama esa especie en su juego**.
+
+El dialogo de intercambio entonces muestra las dos caras:
+
+    Entregas:  PIKACHU   (especie 25)
+    El recibe: GOLEM     (especie 25 en su copia)
+
+Asi la sorpresa es una decision, no un accidente. Y leer la tabla de nombres de
+la ROM en vez de llevarla codificada es lo mismo que ya hace falta para que los
+nombres salgan bien en una ROM randomizada o traducida.
+
 ## Primer paso de implementacion
 
 Antes que nada hay que resolver una incognita concreta: **en que desplazamiento
