@@ -1,0 +1,215 @@
+import { useState } from 'react';
+import type { SessionState } from '../net/useSession';
+import { Modal } from './Modal';
+
+type Props = {
+  open: boolean;
+  onClose: () => void;
+  state: SessionState;
+  romReady: boolean;
+  onCreate: (password: string) => void;
+  onJoin: (roomCode: string, password: string) => void;
+  onLeave: () => void;
+};
+
+/**
+ * Antes de tener sala muestra el formulario; con sala abierta, las credenciales
+ * listas para pasarselas a alguien.
+ */
+export const RoomModal = (props: Props) => {
+  const { open, onClose, state } = props;
+  const hasRoom = state.phase !== 'sin-sala';
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      icon={hasRoom ? '((•))' : '+'}
+      title={hasRoom ? 'Sala privada' : 'Jugar con un amigo'}
+      subtitle={
+        hasRoom
+          ? 'Comparte estos datos con tu companero.'
+          : 'Crea una sala y pasale el codigo, o entra en la suya.'
+      }
+    >
+      {hasRoom ? <RoomCredentials {...props} /> : <RoomSetup {...props} />}
+    </Modal>
+  );
+};
+
+/* ---------- sin sala: crear o entrar ---------- */
+
+const RoomSetup = ({ romReady, state, onCreate, onJoin }: Props) => {
+  const [mode, setMode] = useState<'crear' | 'unirme'>('crear');
+  const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+
+  const ready = romReady && password.length > 0 && (mode === 'crear' || code.length === 6);
+
+  return (
+    <>
+      <div className="tabs">
+        <button
+          type="button"
+          className={mode === 'crear' ? 'is-active' : undefined}
+          onClick={() => setMode('crear')}
+        >
+          Crear sala
+        </button>
+        <button
+          type="button"
+          className={mode === 'unirme' ? 'is-active' : undefined}
+          onClick={() => setMode('unirme')}
+        >
+          Entrar en una
+        </button>
+      </div>
+
+      <form
+        className="form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (mode === 'crear') onCreate(password);
+          else onJoin(code, password);
+        }}
+      >
+        {mode === 'unirme' && (
+          <label>
+            Codigo de sala
+            <input
+              value={code}
+              onChange={(event) => setCode(event.target.value.toUpperCase().slice(0, 6))}
+              placeholder="ABC123"
+              autoComplete="off"
+              spellCheck={false}
+              className="mono input--code"
+            />
+          </label>
+        )}
+        <label>
+          Contrasena
+          <input
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            placeholder={mode === 'crear' ? 'Elige una' : 'La que te han dado'}
+            autoComplete="off"
+          />
+        </label>
+        <button type="submit" className="button--primary" disabled={!ready}>
+          {mode === 'crear' ? 'Crear sala' : 'Entrar'}
+        </button>
+      </form>
+
+      <p className="hint">
+        {romReady
+          ? 'Tu companero necesita su propia copia del juego. Solo se comparte la pantalla, nunca la ROM.'
+          : 'Carga tu ROM antes de abrir una sala.'}
+      </p>
+
+      {state.error && (
+        <p className="alert" role="alert">
+          {state.error}
+        </p>
+      )}
+    </>
+  );
+};
+
+/* ---------- con sala: credenciales ---------- */
+
+/**
+ * Texto que se copia al portapapeles.
+ *
+ * Incluye la direccion de la pagina solo si sirve de algo para quien la reciba:
+ * "localhost" apunta al ordenador de quien copia, no al de su amigo, asi que
+ * mandarlo seria enganoso.
+ */
+const shareText = (code: string, password: string): string => {
+  const { origin, hostname } = globalThis.location;
+  const usable = !['localhost', '127.0.0.1', '::1'].includes(hostname);
+  const lines = [`Sala: ${code}`, `Contrasena: ${password}`];
+  if (usable) lines.unshift(`Juega conmigo en ${origin}`);
+  return lines.join('\n');
+};
+
+const RoomCredentials = ({ state, onLeave }: Props) => {
+  const [copied, setCopied] = useState<'no' | 'si' | 'fallo'>('no');
+
+  const copyAll = async () => {
+    if (!state.roomCode) return;
+    try {
+      await navigator.clipboard.writeText(shareText(state.roomCode, state.password ?? ''));
+      setCopied('si');
+      setTimeout(() => setCopied('no'), 2200);
+    } catch {
+      // El portapapeles puede estar denegado. Los datos siguen a la vista.
+      setCopied('fallo');
+    }
+  };
+
+  const waiting = state.phase === 'esperando-companero';
+
+  return (
+    <>
+      <label className="field">
+        Codigo de sala
+        <output className="field__value room-code">{state.roomCode}</output>
+      </label>
+
+      {state.password && (
+        <label className="field">
+          Contrasena
+          <output className="field__value mono">{state.password}</output>
+        </label>
+      )}
+
+      {state.password && (
+        <>
+          <button type="button" className="button--primary button--wide" onClick={() => void copyAll()}>
+            {copied === 'si' ? 'Credenciales copiadas' : 'Copiar credenciales'}
+          </button>
+          <p className="hint hint--center">
+            {copied === 'fallo'
+              ? 'El navegador no ha dejado copiar. Puedes leerlos de arriba.'
+              : 'Incluye codigo y contrasena'}
+          </p>
+        </>
+      )}
+
+      {/* Quien entra en la sala de otro no tiene contrasena que enseñar: ya la
+          escribio el, y no la guardamos. */}
+      {!state.password && (
+        <p className="hint">Estas en la sala de tu companero.</p>
+      )}
+
+      {state.peerRom && (
+        <div className="invite">
+          <span className="invite__label">Su ROM</span>
+          <strong className="invite__file" title={state.peerRom.fileName}>
+            {state.peerRom.fileName}
+          </strong>
+        </div>
+      )}
+
+      {state.compatibility && state.compatibility.level !== 'identica' && (
+        <p className="warn">{state.compatibility.message}</p>
+      )}
+
+      {waiting && <p className="hint">Aun no ha entrado nadie.</p>}
+      {state.phase === 'perdida' && (
+        <p className="hint">Se ha cortado el enlace. Tu partida sigue corriendo.</p>
+      )}
+
+      <button type="button" className="button--wide" onClick={onLeave}>
+        Salir de la sala
+      </button>
+
+      {state.error && (
+        <p className="alert" role="alert">
+          {state.error}
+        </p>
+      )}
+    </>
+  );
+};

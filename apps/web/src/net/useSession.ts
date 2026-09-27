@@ -21,6 +21,9 @@ export type SessionState = {
   error: string | null;
   /** Video en directo de la partida del companero. */
   remoteStream: MediaStream | null;
+  /** Contrasena que elegimos al crear la sala, para poder dictarla luego.
+   *  Solo la tiene el anfitrion y no sale de este navegador. */
+  password: string | null;
 };
 
 const initialState: SessionState = {
@@ -31,6 +34,7 @@ const initialState: SessionState = {
   compatibility: null,
   error: null,
   remoteStream: null,
+  password: null,
 };
 
 /** Fotogramas por segundo del video que enviamos. El GBA corre a 60, pero para
@@ -142,6 +146,7 @@ export const useSession = (
       patch({ error: null });
       try {
         (await connectSignaling()).createRoom(password, rom);
+        patch({ password });
       } catch (err) {
         patch({ error: err instanceof Error ? err.message : String(err) });
       }
