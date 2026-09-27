@@ -32,3 +32,6 @@ npm-debug.log*
 
 # Excepcion: si documentamos la carpeta de ROMs, ese README si se versiona
 !roms/README.md
+
+# Nucleo mGBA copiado desde node_modules por sync-core.mjs: artefacto generado
+apps/web/public/mgba/
