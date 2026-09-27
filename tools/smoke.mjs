@@ -21,7 +21,11 @@ const browser = await chromium.launch({
   headless: true,
   args: ['--autoplay-policy=no-user-gesture-required'],
 });
-const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+const page = await browser.newPage({
+  viewport: { width: 1280, height: 900 },
+  // El modo HTTPS de desarrollo usa un certificado autofirmado.
+  ignoreHTTPSErrors: true,
+});
 
 const noise = [];
 page.on('console', (m) => {
@@ -72,12 +76,15 @@ const changed = frames.filter((f, i) => i > 0 && Buffer.compare(frames[i - 1], f
 // El tamano del PNG es un buen indicador de cuanto detalle hay en pantalla:
 // un fundido a negro comprime a ~3 KB, una pantalla de titulo a ~27 KB.
 const richest = Math.max(...frames.map((f) => f.length));
+// La ficha de la ROM esta dentro del menu de opciones, asi que hay que abrirlo.
+await page.locator('.iconbutton').click();
 const romTitle = await page
   .locator('.panel', { hasText: 'ROM cargada' })
   .locator('dd')
   .first()
   .textContent()
   .catch(() => null);
+await page.locator('.iconbutton').click();
 console.log(`ficha de ROM: ${romTitle ?? 'NO VISIBLE'}`);
 console.log(`fotogramas distintos: ${changed}/${frames.length - 1}   detalle maximo: ${richest} bytes`);
 

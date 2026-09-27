@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
-import { compareRoms, type RomCompatibility, type RomFingerprint } from '@emupoke/protocol';
+import type { RomFingerprint } from '@emupoke/protocol';
+import { compareRoms, type RomCompatibility } from '@emupoke/pokemon';
 import { PeerLink, type PeerState } from './peerLink';
 import { SignalingClient } from './signalingClient';
 

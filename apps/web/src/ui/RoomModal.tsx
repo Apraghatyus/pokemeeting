@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { RomCompatibility } from '@emupoke/pokemon';
 import type { SessionState } from '../net/useSession';
 import { Modal } from './Modal';
 
@@ -116,6 +117,31 @@ const RoomSetup = ({ romReady, state, onCreate, onJoin }: Props) => {
   );
 };
 
+/* ---------- compatibilidad de las dos ROMs ---------- */
+
+/**
+ * No dice "compatible si o no" sino que se puede hacer con esta pareja de
+ * ROMs. Ver la partida del otro no exige nada; intercambiar si.
+ */
+const Compatibility = ({ report }: { report: RomCompatibility }) => {
+  if (report.level === 'identica') return null;
+
+  return (
+    <div className={`compat compat--${report.canTrade ? 'ok' : 'limitada'}`}>
+      <p className="compat__head">
+        <span className={`dot dot--${report.canTrade ? 'on' : 'wait'}`} />
+        {report.headline}
+      </p>
+      {!report.canTrade && <p className="compat__note">Los intercambios no estaran disponibles.</p>}
+      {report.notes.map((note) => (
+        <p className="compat__note" key={note}>
+          {note}
+        </p>
+      ))}
+    </div>
+  );
+};
+
 /* ---------- con sala: credenciales ---------- */
 
 /**
@@ -192,9 +218,7 @@ const RoomCredentials = ({ state, onLeave }: Props) => {
         </div>
       )}
 
-      {state.compatibility && state.compatibility.level !== 'identica' && (
-        <p className="warn">{state.compatibility.message}</p>
-      )}
+      {state.compatibility && <Compatibility report={state.compatibility} />}
 
       {waiting && <p className="hint">Aun no ha entrado nadie.</p>}
       {state.phase === 'perdida' && (

@@ -9,7 +9,6 @@
 import { createServer } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
 import {
-  compareRoms,
   isValidRoomCode,
   type ClientMessage,
   type ErrorCode,
@@ -83,14 +82,11 @@ const handleJoin = async (socket: WebSocket, message: Extract<ClientMessage, { t
     return;
   }
 
+  // El servidor no opina sobre las ROMs. Si dos personas quieren compartir
+  // sala jugando a cosas distintas, es asunto suyo: ver la pantalla del otro
+  // no exige nada en comun. Que se puede intercambiar lo decide el cliente,
+  // que si conoce el dominio.
   const other = room.host ?? room.guest;
-  if (other) {
-    const compatibility = compareRoms(message.rom, other.rom);
-    if (compatibility.level === 'bloqueo') {
-      fail(socket, 'rom-incompatible', compatibility.message);
-      return;
-    }
-  }
 
   // El intento correcto limpia el contador: quien acierta no debe arrastrar los
   // fallos de tecleo anteriores.

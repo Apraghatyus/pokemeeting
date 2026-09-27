@@ -18,8 +18,14 @@ const open = () =>
     ws.once('error', reject);
   });
 
-const next = (ws) =>
-  new Promise((resolve) => ws.once('message', (raw) => resolve(JSON.parse(raw.toString()))));
+const next = (ws, timeoutMs = 5000) =>
+  new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('no llego ninguna respuesta a tiempo')), timeoutMs);
+    ws.once('message', (raw) => {
+      clearTimeout(timer);
+      resolve(JSON.parse(raw.toString()));
+    });
+  });
 
 const say = (ws, msg) => ws.send(JSON.stringify(msg));
 
@@ -43,12 +49,21 @@ const rejected = await next(intruder);
 check('contrasena incorrecta se rechaza', rejected.type === 'error' && rejected.code === 'contrasena-incorrecta');
 intruder.close();
 
-// --- 3. ROM de otro juego se bloquea ---
-const wrongGame = await open();
-say(wrongGame, { type: 'join-room', roomCode: code, password: 'pikachu', rom: { ...rom('bbbb2222'), gameCode: 'AXVE' } });
-const blocked = await next(wrongGame);
-check('ROM de otro juego se bloquea', blocked.type === 'error' && blocked.code === 'rom-incompatible', blocked.message);
-wrongGame.close();
+// --- 3. otro juego de la familia NO se bloquea ---
+//
+// El servidor no opina sobre las ROMs: ver la pantalla del otro no exige nada
+// en comun, y Rojo Fuego con Verde Hoja es justo la pareja de siempre. Que se
+// puede intercambiar lo decide el cliente.
+const leafGreen = await open();
+const hostSeesLeafGreen = next(host);
+say(leafGreen, { type: 'join-room', roomCode: code, password: 'pikachu', rom: { ...rom('bbbb2222'), gameCode: 'BPGE' } });
+const accepted = await next(leafGreen);
+check('Verde Hoja puede entrar en una sala de Rojo Fuego', accepted.type === 'room-joined',
+  accepted.type === 'error' ? accepted.message : 'entra');
+await hostSeesLeafGreen;
+const hostSeesLeafGreenLeave = next(host);
+leafGreen.close();
+await hostSeesLeafGreenLeave;
 
 // --- 4. union correcta con CRC distinto (caso randomizado) ---
 const guestRom = rom('bbbb2222');

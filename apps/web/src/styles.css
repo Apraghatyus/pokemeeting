@@ -992,3 +992,36 @@ button.is-active {
     transform: translateX(-50%);
   }
 }
+
+/* ---------- compatibilidad de ROMs ---------- */
+
+.compat {
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--bg);
+}
+
+.compat--ok {
+  border-left-color: var(--ok);
+}
+
+.compat--limitada {
+  border-left-color: var(--wait);
+}
+
+.compat__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.compat__note {
+  margin: 7px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}

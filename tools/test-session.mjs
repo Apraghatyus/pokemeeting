@@ -9,13 +9,19 @@
 // Uso: node tools/test-session.mjs <rom.gba> [directorio-de-capturas]
 import { chromium } from 'playwright';
 
-const ROM = process.argv[2];
-const SHOTS = process.argv[3] ?? '.';
+// Se admiten dos ROMs distintas: el caso real es Rojo Fuego contra Verde Hoja.
+const ROM_HOST = process.argv[2];
+const ROM_GUEST = process.argv[3] && !process.argv[3].startsWith('-') && /\.gba$/i.test(process.argv[3])
+  ? process.argv[3]
+  : ROM_HOST;
+const SHOTS = (/\.gba$/i.test(process.argv[3] ?? '') ? process.argv[4] : process.argv[3]) ?? '.';
 const URL = process.env.SMOKE_URL ?? 'http://localhost:5173/';
 const PASSWORD = 'kanto26';
 
-if (!ROM) {
-  console.error('Falta la ROM.\nUso: node tools/test-session.mjs <rom.gba> [carpeta]');
+if (!ROM_HOST) {
+  console.error(
+    'Falta la ROM.\nUso: node tools/test-session.mjs <rom-anfitrion.gba> [rom-invitado.gba] [carpeta]',
+  );
   process.exit(2);
 }
 
@@ -32,7 +38,7 @@ const browser = await chromium.launch({
 });
 
 /** Abre una pestana con el emulador ya corriendo la ROM. */
-const openPlayer = async (label) => {
+const openPlayer = async (label, romPath) => {
   // Contextos separados: dos jugadores distintos, sin estado compartido.
   const context = await browser.newContext({
     viewport: { width: 1360, height: 900 },
@@ -45,15 +51,15 @@ const openPlayer = async (label) => {
   await page.waitForFunction(() => !document.querySelector('.dropzone button')?.disabled, null, {
     timeout: 30_000,
   });
-  await page.setInputFiles('input[type=file][accept*=".gba"]', ROM);
+  await page.setInputFiles('input[type=file][accept*=".gba"]', romPath);
   // Dejamos que el emulador dibuje: captureStream de un canvas en negro no
   // produce fotogramas y la conexion pareceria fallar sin serlo.
   await page.waitForTimeout(3000);
   return { page, label };
 };
 
-const host = await openPlayer('anfitrion');
-const guest = await openPlayer('invitado');
+const host = await openPlayer('anfitrion', ROM_HOST);
+const guest = await openPlayer('invitado', ROM_GUEST);
 
 // --- se puede escribir mientras el juego corre ---
 //
@@ -141,6 +147,18 @@ const hostVideo = await videoOf(host.page);
 const guestVideo = await videoOf(guest.page);
 check('el anfitrion recibe el video del invitado', hostVideo.width > 0, JSON.stringify(hostVideo));
 check('el invitado recibe el video del anfitrion', guestVideo.width > 0, JSON.stringify(guestVideo));
+
+// --- informe de compatibilidad entre las dos ROMs ---
+if (ROM_HOST !== ROM_GUEST) {
+  await host.page.locator('.roomchip').click();
+  const compat = await host.page.locator('.compat').textContent().catch(() => null);
+  check('se muestra un informe de compatibilidad', compat !== null);
+  console.log(`     informe: ${(compat ?? '').replace(/\s+/g, ' ').slice(0, 220)}`);
+  const tradesOk = await host.page.locator('.compat--ok').count();
+  check('las dos versiones se declaran aptas para intercambiar', tradesOk === 1);
+  await host.page.screenshot({ path: `${SHOTS}/ui-compatibilidad.png` });
+  await host.page.keyboard.press('Escape');
+}
 
 // --- intercambiar pantalla grande y pequena ---
 await host.page.locator('.slot--pip .slot__action').click();
