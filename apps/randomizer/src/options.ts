@@ -48,11 +48,45 @@ export const OPTIONS: readonly RandomizerOption[] = [
   },
   {
     id: 'entrenadores',
-    label: 'Entrenadores',
-    description: 'Los equipos de rivales, lideres y Alto Mando.',
+    label: 'Equipos de los entrenadores',
+    // La descripcion anterior decia "rivales, lideres y Alto Mando" y se leia
+    // como si los entrenadores normales quedaran fuera. Los incluye a todos.
+    description: 'Todos los NPC con los que peleas: rutas, gimnasios, rival y Alto Mando.',
     setter: 'setTrainersMod',
     index: 1, // RANDOM
     total: 6,
+  },
+  {
+    id: 'intercambios',
+    label: 'Intercambios con NPC',
+    description: 'El Pokemon que te dan los personajes que intercambian contigo.',
+    setter: 'setInGameTradesMod',
+    index: 1, // RANDOMIZE_GIVEN: se aleatoriza el que te dan, no el que piden
+    total: 3,
+  },
+  {
+    id: 'tutores',
+    label: 'Tutores de movimientos',
+    description: 'Que ensena cada tutor repartido por el mapa.',
+    setter: 'setMoveTutorMovesMod',
+    index: 1, // RANDOM
+    total: 2,
+  },
+  {
+    id: 'evoluciones',
+    label: 'Evoluciones',
+    description: 'En que evoluciona cada especie.',
+    setter: 'setEvolutionsMod',
+    index: 1, // RANDOM
+    total: 3,
+  },
+  {
+    id: 'tipos',
+    label: 'Tipos',
+    description: 'El tipo de cada especie, respetando su linea evolutiva.',
+    setter: 'setTypesMod',
+    index: 1, // RANDOM_FOLLOW_EVOLUTIONS
+    total: 3,
   },
   {
     id: 'movimientos',
