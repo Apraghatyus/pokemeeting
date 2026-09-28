@@ -133,6 +133,17 @@ export type LoadedRom = {
  * El fichero nunca sale del navegador del jugador.
  */
 export const loadRomFile = async (core: MgbaModule, file: File): Promise<LoadedRom> => {
+  // Si ya hay un juego corriendo hay que cerrarlo antes, y darle un respiro.
+  //
+  // Cargar una ROM encima de otra que todavia se esta inicializando revienta
+  // el nucleo con "memory access out of bounds", y no es un caso raro: pasa
+  // justo al aleatorizar, porque el juego original lleva un segundo corriendo
+  // cuando llega su sustituto.
+  if (core.gameName) {
+    core.quitGame();
+    await new Promise((resolve) => setTimeout(resolve, 120));
+  }
+
   await new Promise<void>((resolve) => core.uploadRom(file, resolve));
   const romPath = `${core.filePaths().gamePath}/${file.name}`;
   if (!core.loadGame(romPath)) {

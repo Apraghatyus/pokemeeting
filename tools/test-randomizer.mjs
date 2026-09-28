@@ -4,15 +4,14 @@
 // randomizer de verdad por debajo y verifica que lo que vuelve es una ROM de
 // GBA valida, del mismo juego y **distinta** de la que se mando.
 //
-// Uso: node tools/test-randomizer.mjs <rom.gba> [ajustes.rnqs]
+// Uso: node tools/test-randomizer.mjs <rom.gba>
 import { readFileSync } from 'node:fs';
 
 const ROM = process.argv[2];
-const SETTINGS = process.argv[3] ?? 'tools/randomizer/ejemplo.rnqs';
 const BASE = process.env.RANDOMIZER_URL ?? 'http://127.0.0.1:8788';
 
 if (!ROM) {
-  console.error('Falta la ROM.\nUso: node tools/test-randomizer.mjs <rom.gba> [ajustes.rnqs]');
+  console.error('Falta la ROM.\nUso: node tools/test-randomizer.mjs <rom.gba>');
   process.exit(2);
 }
 
@@ -39,20 +38,21 @@ const crc32 = (() => {
   };
 })();
 
-/** Marco del cuerpo: [4 bytes: longitud de ajustes][ajustes][ROM]. */
-const pack = (settings, rom) => {
-  const body = Buffer.alloc(4 + settings.length + rom.length);
-  body.writeUInt32BE(settings.length, 0);
-  settings.copy(body, 4);
-  rom.copy(body, 4 + settings.length);
+/** Marco del cuerpo: [4 bytes: longitud del JSON][JSON][ROM]. */
+const pack = (request, rom) => {
+  const header = Buffer.from(JSON.stringify(request), 'utf8');
+  const body = Buffer.alloc(4 + header.length + rom.length);
+  body.writeUInt32BE(header.length, 0);
+  header.copy(body, 4);
+  rom.copy(body, 4 + header.length);
   return body;
 };
 
-const post = (settings, rom) =>
+const post = (request, rom) =>
   fetch(`${BASE}/randomize`, {
     method: 'POST',
     headers: { 'content-type': 'application/octet-stream' },
-    body: pack(settings, rom),
+    body: pack(request, rom),
   });
 
 // --- 1. el servicio esta listo ---
@@ -65,6 +65,9 @@ try {
 }
 check('Java disponible y de 64 bits', health.java.available && health.java.bits64, health.java.version ?? '');
 check('el jar del randomizer esta en su sitio', health.jar.found, health.jar.path);
+check('el menu de opciones esta disponible', health.menu.available, health.menu.jjs ?? 'sin jjs');
+check('el catalogo llega con opciones', (health.options?.length ?? 0) >= 7,
+  `${health.options?.length ?? 0} opciones`);
 if (!health.jar.found || !health.java.available) {
   console.log('\nFalta preparacion, no se puede seguir. Lee tools/randomizer/LEEME.md.');
   process.exit(1);
@@ -77,7 +80,7 @@ if (!health.jar.found || !health.java.available) {
 const fake = Buffer.alloc(0x200);
 fake.write('AXVE', 0xac, 'ascii');
 fake[0xb2] = 0x96;
-const rejected = await post(readFileSync(SETTINGS), fake);
+const rejected = await post({ options: ['salvajes'] }, fake);
 const rejectedBody = await rejected.json().catch(() => ({}));
 check('otro juego se rechaza antes de tocar Java', rejected.status === 400, rejectedBody.message ?? '');
 
@@ -85,7 +88,10 @@ check('otro juego se rechaza antes de tocar Java', rejected.status === 400, reje
 const original = readFileSync(ROM);
 console.log(`\naleatorizando ${(original.length / 1024 / 1024).toFixed(0)} MB, esto tarda...`);
 const started = Date.now();
-const response = await post(readFileSync(SETTINGS), original);
+const response = await post(
+  { options: ['salvajes', 'iniciales', 'entrenadores', 'movimientos', 'mts', 'tiendas', 'objetos'] },
+  original,
+);
 const seconds = ((Date.now() - started) / 1000).toFixed(1);
 
 if (!response.ok) {
@@ -108,6 +114,20 @@ check('el contenido ha cambiado de verdad', antes !== despues, `${antes} -> ${de
 
 const seed = response.headers.get('x-seed');
 check('se informa de la semilla usada', seed !== null, seed ?? 'no aparecio en el registro');
+
+// El resumen es lo que permite notar que unos ajustes no cambiaron nada.
+const resumen = JSON.parse(
+  Buffer.from(response.headers.get('x-summary') ?? '', 'base64').toString('utf8'),
+);
+check('el resumen dice que ha cambiado', (resumen.changed?.length ?? 0) >= 5,
+  (resumen.changed ?? []).join(', '));
+check('y nombra los iniciales', (resumen.starters?.length ?? 0) === 3,
+  (resumen.starters ?? []).join(' / '));
+
+// --- una peticion sin opciones se rechaza con un mensaje claro ---
+const vacia = await post({ options: [] }, original);
+const vaciaBody = await vacia.json().catch(() => ({}));
+check('pedir sin marcar nada da un error entendible', vacia.status === 400, vaciaBody.message ?? '');
 
 console.log(failures === 0 ? '\nALEATORIZACION FUNCIONANDO' : `\n${failures} COMPROBACIONES FALLIDAS`);
 process.exit(failures === 0 ? 0 : 1);

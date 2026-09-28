@@ -50,6 +50,12 @@ await page.waitForFunction(() => !document.querySelector('.dropzone button')?.di
   timeout: 30_000,
 });
 await page.setInputFiles('input[type=file][accept*=".gba"]', ROM);
+// Al cargar la ROM aparece la pregunta de como jugar. Aqui se juega tal cual.
+await page
+  .getByRole('button', { name: 'Jugar tal cual' })
+  .click({ timeout: 20_000 })
+  .catch(() => {});
+
 
 // El mando debe aparecer solo, sin tocar ningun ajuste.
 const padVisible = await page

@@ -16,6 +16,9 @@ export type EmulatorState = {
   header: RomHeader | null;
   platform: PlatformDescriptor | null;
   romName: string | null;
+  /** De donde salio la ROM: elegida por el jugador o generada por nosotros.
+   *  Sirve para no volver a preguntar por aleatorizacion tras aleatorizar. */
+  romSource: 'usuario' | 'generada' | null;
   error: string | null;
   /** Momento del ultimo guardado del juego en SRAM, para dar senal al jugador. */
   lastSaveAt: number | null;
@@ -32,6 +35,7 @@ const initialState: EmulatorState = {
   header: null,
   platform: null,
   romName: null,
+  romSource: null,
   error: null,
   lastSaveAt: null,
   fastForward: false,
@@ -108,7 +112,7 @@ export const useEmulator = () => {
   }, [appendLog, fail]);
 
   const openRom = useCallback(
-    async (file: File) => {
+    async (file: File, source: 'usuario' | 'generada' = 'usuario') => {
       const core = coreRef.current;
       if (!core) return;
 
@@ -145,6 +149,7 @@ export const useEmulator = () => {
           header,
           platform,
           romName: file.name,
+          romSource: source,
           error: null,
         }));
       } catch (err) {
@@ -160,7 +165,10 @@ export const useEmulator = () => {
    */
   const openRomBytes = useCallback(
     async (bytes: Uint8Array, fileName: string) => {
-      await openRom(new File([bytes as BlobPart], fileName, { type: 'application/octet-stream' }));
+      await openRom(
+        new File([bytes as BlobPart], fileName, { type: 'application/octet-stream' }),
+        'generada',
+      );
     },
     [openRom],
   );

@@ -48,6 +48,12 @@ const openPlayer = async (label) => {
     timeout: 30_000,
   });
   await page.setInputFiles('input[type=file][accept*=".gba"]', ROM);
+  // Al cargar la ROM aparece la pregunta de como jugar. Aqui se juega tal cual.
+  await page
+    .getByRole('button', { name: 'Jugar tal cual' })
+    .click({ timeout: 20_000 })
+    .catch(() => {});
+
   await page.waitForTimeout(3000);
   return page;
 };

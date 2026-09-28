@@ -55,6 +55,13 @@ console.log(`nucleo listo=${booted}  mensaje="${await page.locator('.dropzone__h
 
 await page.setInputFiles('input[type=file][accept*=".gba"]', rom);
 
+// Al cargar la ROM aparece la pregunta de como jugar. Aqui interesa la ROM tal
+// cual: lo que se comprueba es que el emulador dibuja, no la aleatorizacion.
+await page
+  .getByRole('button', { name: 'Jugar tal cual' })
+  .click({ timeout: 20_000 })
+  .catch(() => {});
+
 // La intro de FireRed tarda unos segundos en llegar a dibujar algo reconocible.
 // La comprobacion que importa.
 //

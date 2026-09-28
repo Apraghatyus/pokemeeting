@@ -52,6 +52,12 @@ const openPlayer = async (label, romPath) => {
     timeout: 30_000,
   });
   await page.setInputFiles('input[type=file][accept*=".gba"]', romPath);
+  // Al cargar la ROM aparece la pregunta de como jugar. Aqui se juega tal cual.
+  await page
+    .getByRole('button', { name: 'Jugar tal cual' })
+    .click({ timeout: 20_000 })
+    .catch(() => {});
+
   // Dejamos que el emulador dibuje: captureStream de un canvas en negro no
   // produce fotogramas y la conexion pareceria fallar sin serlo.
   await page.waitForTimeout(3000);

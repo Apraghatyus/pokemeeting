@@ -4,11 +4,21 @@
 // va del navegador al proceso de al lado, y vuelve. Nunca pasa por internet ni
 // llega al companero.
 
+/** Una casilla del menu de aleatorizacion. */
+export type RandomizerOption = {
+  id: string;
+  label: string;
+  description: string;
+};
+
 export type RandomizerHealth = {
   ok: boolean;
   java: { available: boolean; version: string | null; bits64: boolean };
   jar: { path: string; found: boolean };
   games: string[];
+  /** Si se pueden construir los ajustes desde el menu, sin fichero .rnqs. */
+  menu: { available: boolean; jjs: string | null };
+  options: RandomizerOption[];
 };
 
 export type RandomizerStatus =
@@ -55,37 +65,54 @@ export const checkRandomizer = async (): Promise<RandomizerStatus> => {
   return { estado: 'listo', health };
 };
 
+export type RandomizeSummary = {
+  /** Apartados que cambiaron de verdad. */
+  changed: string[];
+  /** Los tres iniciales resultantes, si se aleatorizaron. */
+  starters: string[];
+};
+
 export type RandomizeResult = {
   rom: Uint8Array;
   /** Semilla que uso el randomizer, si aparecio en su registro. */
   seed: string | null;
+  /** Que ha cambiado. Vacio significa que los ajustes no tocaron nada. */
+  summary: RandomizeSummary;
 };
 
 /**
- * Empaqueta ajustes y ROM en un solo cuerpo:
- * [4 bytes: longitud de los ajustes][ajustes][ROM].
+ * Empaqueta la peticion y la ROM en un solo cuerpo:
+ * [4 bytes: longitud del JSON][JSON][ROM].
  *
  * Marco propio en vez de multipart porque los dos extremos son nuestros: se
- * construye en tres lineas y no impone limites de tamano a los ajustes.
+ * construye en tres lineas y no impone limites de tamano.
  */
-const pack = (settings: Uint8Array, rom: Uint8Array): Uint8Array => {
-  const body = new Uint8Array(4 + settings.length + rom.length);
-  new DataView(body.buffer).setUint32(0, settings.length, false);
-  body.set(settings, 4);
-  body.set(rom, 4 + settings.length);
+const pack = (request: RandomizeRequest, rom: Uint8Array): Uint8Array => {
+  const header = new TextEncoder().encode(JSON.stringify(request));
+  const body = new Uint8Array(4 + header.length + rom.length);
+  new DataView(body.buffer).setUint32(0, header.length, false);
+  body.set(header, 4);
+  body.set(rom, 4 + header.length);
   return body;
+};
+
+export type RandomizeRequest = {
+  /** Identificadores marcados en el menu. */
+  options?: string[];
+  /** Alternativa: un .rnqs exportado del randomizer de escritorio. */
+  settingsBase64?: string;
 };
 
 export class RandomizerError extends Error {}
 
 export const randomizeRom = async (
-  settings: Uint8Array,
+  request: RandomizeRequest,
   rom: Uint8Array,
 ): Promise<RandomizeResult> => {
   const response = await fetch(`${BASE}/randomize`, {
     method: 'POST',
     headers: { 'content-type': 'application/octet-stream' },
-    body: pack(settings, rom) as BodyInit,
+    body: pack(request, rom) as BodyInit,
   });
 
   if (!response.ok) {
@@ -93,8 +120,12 @@ export const randomizeRom = async (
     throw new RandomizerError(detail?.message ?? `El servicio respondio ${response.status}.`);
   }
 
+  const encoded = response.headers.get('x-summary');
   return {
     rom: new Uint8Array(await response.arrayBuffer()),
     seed: response.headers.get('x-seed'),
+    summary: encoded
+      ? (JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0)))) as RandomizeSummary)
+      : { changed: [], starters: [] },
   };
 };

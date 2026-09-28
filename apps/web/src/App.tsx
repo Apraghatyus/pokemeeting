@@ -4,7 +4,7 @@ import { DEFAULT_KEY_BINDINGS } from './core/mgbaCore';
 import { useEmulator } from './core/useEmulator';
 import { useKeyboardOwnership } from './core/useKeyboardOwnership';
 import { useSession } from './net/useSession';
-import { RandomizerPanel } from './ui/RandomizerPanel';
+import { RandomizerModal } from './ui/RandomizerModal';
 import { RomDropZone, RoomDropZoneHint } from './ui/RomDropZone';
 import { RomInfoCard } from './ui/RomInfoCard';
 import { RoomModal } from './ui/RoomModal';
@@ -21,6 +21,7 @@ export const App = () => {
 
   const [roomOpen, setRoomOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [randomizerOpen, setRandomizerOpen] = useState(false);
 
   // En movil los controles tactiles salen solos; en escritorio se pueden
   // encender desde el menu, que tambien sirve para probarlos.
@@ -30,7 +31,17 @@ export const App = () => {
 
   // Con el modal o el menu abiertos el teclado es de la interfaz aunque el foco
   // este en un boton: si no, las flechas moverian al personaje por detras.
-  const keyboardOwner = useKeyboardOwnership(emulator.coreRef, roomOpen || menuOpen);
+  const keyboardOwner = useKeyboardOwnership(
+    emulator.coreRef,
+    roomOpen || menuOpen || randomizerOpen,
+  );
+
+  // Al cargar una ROM se pregunta como quiere jugarse, antes de empezar:
+  // aleatorizar despues de jugar un rato significa perder la partida. No se
+  // pregunta por las ROMs que generamos nosotros, o seria un bucle.
+  useEffect(() => {
+    if (state.romSource === 'usuario' && state.romName) setRandomizerOpen(true);
+  }, [state.romName, state.romSource]);
 
   // La huella de la ROM va en una ref y no en el estado de la sesion porque los
   // callbacks de la senalizacion viven mas que el render que los creo: leerla
@@ -115,19 +126,30 @@ export const App = () => {
               )}
             </section>
 
-            <RandomizerPanel
-              romBytesRef={emulator.romBytesRef}
-              romName={state.romName}
-              gameCode={state.header?.gameCode ?? null}
-              onRandomized={emulator.openRomBytes}
-            />
-
             {hasRom && (
               <RomInfoCard
                 header={state.header!}
                 platform={state.platform!}
                 romName={state.romName!}
               />
+            )}
+
+            {hasRom && (
+              <section className="panel">
+                <h2>Aleatorizar</h2>
+                <p className="hint">
+                  Cambia que Pokemon, objetos y entrenadores aparecen en tu partida.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setRandomizerOpen(true);
+                  }}
+                >
+                  Abrir opciones
+                </button>
+              </section>
             )}
 
             <section className="panel">
@@ -161,6 +183,15 @@ export const App = () => {
           </div>
         )}
       </main>
+
+      <RandomizerModal
+        open={randomizerOpen}
+        onClose={() => setRandomizerOpen(false)}
+        romBytesRef={emulator.romBytesRef}
+        romName={state.romName}
+        gameCode={state.header?.gameCode ?? null}
+        onRandomized={emulator.openRomBytes}
+      />
 
       <RoomModal
         open={roomOpen}
