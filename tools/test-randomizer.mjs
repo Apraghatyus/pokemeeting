@@ -6,6 +6,7 @@
 //
 // Uso: node tools/test-randomizer.mjs <rom.gba>
 import { readFileSync } from 'node:fs';
+import { gunzipSync, gzipSync } from 'node:zlib';
 
 const ROM = process.argv[2];
 const BASE = process.env.RANDOMIZER_URL ?? 'http://127.0.0.1:8788';
@@ -48,12 +49,20 @@ const pack = (request, rom) => {
   return body;
 };
 
+// Se envia comprimido igual que el navegador: una ROM de 16 MB baja a 5.
 const post = (request, rom) =>
   fetch(`${BASE}/randomize`, {
     method: 'POST',
-    headers: { 'content-type': 'application/octet-stream' },
-    body: pack(request, rom),
+    headers: { 'content-type': 'application/octet-stream', 'x-body-encoding': 'gzip' },
+    body: gzipSync(pack(request, rom), { level: 6 }),
   });
+
+const leerRom = async (response) => {
+  const payload = Buffer.from(await response.arrayBuffer());
+  return new Uint8Array(
+    response.headers.get('x-body-encoding') === 'gzip' ? gunzipSync(payload) : payload,
+  );
+};
 
 // --- 1. el servicio esta listo ---
 let health;
@@ -101,7 +110,7 @@ if (!response.ok) {
   process.exit(1);
 }
 
-const randomized = new Uint8Array(await response.arrayBuffer());
+const randomized = await leerRom(response);
 check('la aleatorizacion termina bien', true, `${seconds} s`);
 check('vuelve una ROM de GBA valida', isGba(randomized));
 check('del mismo tamano que la original', randomized.length === original.length,

@@ -10,6 +10,7 @@
 //
 // Uso: node tools/test-randomizer-options.mjs <rom.gba>
 import { readFileSync } from 'node:fs';
+import { gunzipSync, gzipSync } from 'node:zlib';
 
 const ROM = process.argv[2];
 const BASE = process.env.RANDOMIZER_URL ?? 'http://127.0.0.1:8788';
@@ -57,8 +58,8 @@ for (const option of health.options) {
   const started = Date.now();
   const response = await fetch(`${BASE}/randomize`, {
     method: 'POST',
-    headers: { 'content-type': 'application/octet-stream' },
-    body: pack({ options: [option.id] }, original),
+    headers: { 'content-type': 'application/octet-stream', 'x-body-encoding': 'gzip' },
+    body: gzipSync(pack({ options: [option.id] }, original), { level: 6 }),
   });
 
   if (!response.ok) {
@@ -68,7 +69,10 @@ for (const option of health.options) {
     continue;
   }
 
-  const bytes = new Uint8Array(await response.arrayBuffer());
+  const payload = Buffer.from(await response.arrayBuffer());
+  const bytes = new Uint8Array(
+    response.headers.get('x-body-encoding') === 'gzip' ? gunzipSync(payload) : payload,
+  );
   const cambio = crc32(bytes) !== originalCrc;
   const segundos = ((Date.now() - started) / 1000).toFixed(1);
   console.log(

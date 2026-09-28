@@ -37,24 +37,34 @@ Si ya usas Tailscale, `tailscale funnel 5173` expone la misma web en
 dominio aleatorio. Hay que habilitar HTTPS y Funnel una vez en la consola de
 administracion.
 
-## Que cambia en modo tunel
+## La aleatorizacion tambien funciona por el enlace
 
-La aleatorizacion **deja de alcanzarse desde fuera**, pero tu la conservas.
+Quien entra manda su **propia** ROM y la recibe de vuelta. Eso es procesar su
+fichero, no distribuirlo, asi que se permite.
 
-Ese servicio corre en *tu* maquina. A traves del tunel, la ROM de la otra
-persona viajaria hasta tu ordenador para aleatorizarse y volver. No seria
-ilegal, porque es su propio fichero y vuelve a ella, pero la interfaz le dice
-"la ROM no sale de aqui" y dejaria de ser verdad.
+Lo que si cambia es el mensaje. En local la interfaz dice "la ROM no sale de
+aqui", y es verdad. Entrando por un enlace compartido eso seria mentira, asi
+que se le dice lo que pasa de verdad:
 
-El filtro es por host: las peticiones que llegan por `localhost` se atienden y
-las que llegan por el dominio del tunel reciben un 404. Asi tu sigues
-aleatorizando en `http://localhost:5173` mientras tu companero, entrando por el
-enlace, ve que no tiene esa funcion. Si el quiere aleatorizar, que ejecute su
-propio servicio.
+> Para aleatorizar, tu ROM se enviara al ordenador de quien abrio esta
+> partida, donde se procesa y se borra al terminar. Si prefieres que no salga
+> de tu equipo, juega tal cual.
 
-Ojo con esto al probar: si abres **tu propio enlace de tunel** en vez de
-localhost, tampoco tendras aleatorizacion, porque para el servidor eres uno mas
-de fuera.
+El cliente sabe cual de los dos mensajes toca mirando de donde viene la pagina:
+si la sirve `localhost`, el servicio esta en la misma maquina.
+
+Si prefieres no aceptar ficheros de nadie, arranca con la variable
+`RANDOMIZER_LOCAL_ONLY=1` y solo se atendera a quien entre por localhost.
+
+### Cuanto tarda
+
+Una ROM son 16 MB de ida y otros 16 de vuelta, y la vuelta gasta la subida de
+**tu** conexion, que suele ser lo mas escaso. Por eso el fichero viaja
+comprimido en ambos sentidos: una ROM de GBA baja a algo mas de 5 MB, y
+comprimir cuesta medio segundo.
+
+La diferencia medida sobre un tunel real con una subida de unos 64 KB/s: sin
+comprimir se agotaban cinco minutos sin terminar; comprimido, **77 segundos**.
 
 ## Advertencia
 

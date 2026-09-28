@@ -32,19 +32,17 @@ const useHttps = process.env['HTTPS'] === '1';
  *    cuyo Host no reconozca, asi que sin esto el tunel devuelve "Blocked
  *    request" y no hay forma de entrar.
  *
- * 2. El servicio de aleatorizacion deja de alcanzarse **desde fuera**. Corre en
- *    ESTA maquina: a traves del tunel, la ROM de la otra persona viajaria
- *    hasta aqui para aleatorizarse. No es ilegal, porque es su propio fichero
- *    y vuelve a ella, pero la interfaz le dice "la ROM no sale de aqui" y
- *    dejaria de ser verdad. Quien quiera aleatorizar que ejecute su propio
- *    servicio.
- *
- *    Se filtra por host y no quitando la pasarela entera, que era lo que hacia
- *    antes: asi quien abre el tunel sigue teniendo la funcion en su propio
- *    localhost, que es donde siempre fue legitima.
- *
  * No se activa HTTPS aqui: el tunel ya pone el suyo, con certificado de
  * verdad, y la pagina llega al visitante por https.
+ *
+ * Sobre la aleatorizacion a traves del tunel: **si se permite**. Quien entra
+ * manda su PROPIA ROM y la recibe de vuelta, que es procesar su fichero, no
+ * distribuirlo. Lo unico que hacia falta era que la interfaz dejara de
+ * prometerle "la ROM no sale de aqui" y le dijera adonde va; de eso se encarga
+ * el cliente, que sabe si la pagina viene de localhost o de un dominio ajeno.
+ *
+ * Con RANDOMIZER_LOCAL_ONLY=1 se cierra a quien venga de fuera, por si se
+ * prefiere no aceptar ficheros de nadie.
  */
 const useTunnel = process.env['TUNNEL'] === '1';
 
@@ -66,16 +64,19 @@ const proxy: Record<string, ProxyOptions> = {
 const isLocalHost = (host: string | undefined): boolean =>
   /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(host ?? '');
 
+/** Con esto puesto, solo se aleatoriza para quien entre por localhost. */
+const randomizerLocalOnly = process.env['RANDOMIZER_LOCAL_ONLY'] === '1';
+
 // El servicio de aleatorizacion escucha solo en 127.0.0.1. Pasar por aqui
 // evita ademas problemas de origen cruzado desde la pagina.
 proxy['/randomizer'] = {
   target: 'http://127.0.0.1:8788',
   rewrite: (path) => path.replace(/^\/randomizer/, ''),
-  // Con el tunel abierto, solo se atiende a quien viene por localhost. A los
-  // de fuera se les responde 404 y la interfaz les dice, con razon, que no
-  // tienen servicio de aleatorizacion.
-  ...(useTunnel
-    ? { bypass: (req: { headers: { host?: string } }) => (isLocalHost(req.headers.host) ? undefined : false) }
+  ...(randomizerLocalOnly
+    ? {
+        bypass: (req: { headers: { host?: string } }) =>
+          isLocalHost(req.headers.host) ? undefined : false,
+      }
     : {}),
 };
 

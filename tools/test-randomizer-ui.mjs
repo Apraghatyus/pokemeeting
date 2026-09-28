@@ -98,9 +98,11 @@ for (const etiqueta of ['Pokemon salvajes', 'Pokemon iniciales', 'Objetos del ma
 const antes = await page.locator('canvas').screenshot();
 
 await botonAleatorizar.click();
+// Margen amplio: por un tunel hay que subir y bajar la ROM, y eso puede pasar
+// del minuto aunque vaya comprimida.
 const terminado = await modal
   .locator('.modal__title', { hasText: 'Partida aleatorizada' })
-  .waitFor({ timeout: 90_000 })
+  .waitFor({ timeout: 300_000 })
   .then(() => true)
   .catch(() => false);
 check('la aleatorizacion termina', terminado);

@@ -32,6 +32,20 @@ export type RandomizerStatus =
 const BASE = '/randomizer';
 
 /**
+ * Si el servicio de aleatorizacion corre en OTRO ordenador.
+ *
+ * Se deduce de donde viene la pagina, que es suficiente y no necesita que el
+ * servidor lo cuente: si la sirve localhost, el servicio esta en esta misma
+ * maquina; si la sirve el dominio de un tunel, esta en la de quien lo abrio.
+ *
+ * Importa porque cambia lo que hay que decirle al jugador. En local la ROM no
+ * se mueve; a traves de un tunel viaja al ordenador del anfitrion y vuelve, y
+ * eso hay que decirlo antes, no despues.
+ */
+export const randomizerIsRemote = (): boolean =>
+  !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(globalThis.location.hostname);
+
+/**
  * Pregunta al servicio si puede trabajar.
  *
  * Distingue entre "no esta arrancado" y "esta arrancado pero le falta Java o el
@@ -105,14 +119,43 @@ export type RandomizeRequest = {
 
 export class RandomizerError extends Error {}
 
+/**
+ * Cabecera propia, no `Content-Encoding`.
+ *
+ * La estandar la pueden tocar los intermediarios: el proxy de desarrollo o
+ * Cloudflare podrian descomprimir o recomprimir por su cuenta. Con una nuestra,
+ * lo que se empaqueta aqui es exactamente lo que se desempaqueta alli.
+ */
+const ENCODING_HEADER = 'x-body-encoding';
+
+/**
+ * Comprimir antes de enviar no es un adorno.
+ *
+ * Una ROM de GBA baja de 16 MB a algo mas de 5. Por una conexion domestica de
+ * subida lenta, eso es la diferencia entre cuatro minutos y poco mas de uno, y
+ * comprimir cuesta medio segundo.
+ */
+const gzip = async (data: Uint8Array): Promise<Uint8Array> => {
+  const stream = new Blob([data as BlobPart]).stream().pipeThrough(new CompressionStream('gzip'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+};
+
+const gunzip = async (data: ArrayBuffer): Promise<Uint8Array> => {
+  const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+};
+
 export const randomizeRom = async (
   request: RandomizeRequest,
   rom: Uint8Array,
 ): Promise<RandomizeResult> => {
   const response = await fetch(`${BASE}/randomize`, {
     method: 'POST',
-    headers: { 'content-type': 'application/octet-stream' },
-    body: pack(request, rom) as BodyInit,
+    headers: {
+      'content-type': 'application/octet-stream',
+      [ENCODING_HEADER]: 'gzip',
+    },
+    body: (await gzip(pack(request, rom))) as BodyInit,
   });
 
   if (!response.ok) {
@@ -121,8 +164,12 @@ export const randomizeRom = async (
   }
 
   const encoded = response.headers.get('x-summary');
+  const payload = await response.arrayBuffer();
   return {
-    rom: new Uint8Array(await response.arrayBuffer()),
+    rom:
+      response.headers.get(ENCODING_HEADER) === 'gzip'
+        ? await gunzip(payload)
+        : new Uint8Array(payload),
     seed: response.headers.get('x-seed'),
     summary: encoded
       ? (JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0)))) as RandomizeSummary)

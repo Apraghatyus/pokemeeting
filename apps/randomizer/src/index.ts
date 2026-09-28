@@ -4,18 +4,21 @@
 // del navegador. Este servicio es el puente, y vive en la maquina del propio
 // jugador.
 //
-// Tres reglas que definen el diseno y no son negociables:
+// Tres reglas que definen el diseno:
 //
-//   1. Escucha SOLO en 127.0.0.1. No se publica a la red. Si tu companero
-//      quiere randomizar, ejecuta el suyo.
+//   1. Escucha solo en 127.0.0.1. Llegar hasta el desde fuera exige pasar por
+//      el servidor de desarrollo, que es quien decide a quien atiende.
 //   2. No guarda nada. Fichero temporal, devolver, borrar en un finally.
-//   3. Nunca entrega a una persona un fichero originado por otra. Cada quien
-//      randomiza su propia copia.
+//   3. Devuelve la ROM a quien la mando, y a nadie mas.
 //
-// Esa tercera regla es la linea legal del proyecto entero: procesar tu propia
-// ROM no es distribuirla; mandarsela a otro si lo seria.
+// La tercera es la linea legal del proyecto entero: procesar la ROM de alguien
+// y devolversela no es distribuirla; entregarsela a un tercero si lo seria.
+// Por eso alguien que entra por un enlace compartido SI puede aleatorizar su
+// propia copia, y la interfaz le dice adonde viaja su fichero antes de que
+// decida.
 
 import { spawn } from 'node:child_process';
+import { gunzipSync, gzipSync } from 'node:zlib';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -34,6 +37,17 @@ const SUPPORTED_GAMES = new Set(['BPR', 'BPG']);
 
 /** Tamano maximo aceptado, con holgura sobre los 32 MB de la ROM mas grande. */
 const MAX_BODY_BYTES = 48 * 1024 * 1024;
+
+/**
+ * Cabecera con la que el cliente avisa de que el cuerpo viene comprimido.
+ *
+ * Se usa una propia en vez de `Content-Encoding` a proposito: esa es estandar
+ * y cualquier intermediario (el proxy de desarrollo, Cloudflare) puede
+ * decidir descomprimirla o recomprimirla por su cuenta. Con una cabecera
+ * nuestra, lo que se empaqueta aqui es exactamente lo que se desempaqueta
+ * alli.
+ */
+const ENCODING_HEADER = 'x-body-encoding';
 
 /** Una ejecucion que tarde mas que esto es que se ha colgado. */
 const JAVA_TIMEOUT_MS = 5 * 60 * 1000;
@@ -258,6 +272,16 @@ const summarize = (log: string, requested: readonly RandomizerOption[]): Randomi
   return { changed, starters };
 };
 
+/**
+ * Comprimir merece la pena de verdad: una ROM de GBA baja de 16 MB a algo mas
+ * de 5, y comprimir cuesta medio segundo. En una conexion domestica de subida
+ * lenta eso es la diferencia entre cuatro minutos y poco mas de uno.
+ */
+const maybeDecompress = (body: Buffer, req: IncomingMessage): Buffer =>
+  req.headers[ENCODING_HEADER] === 'gzip'
+    ? gunzipSync(body, { maxOutputLength: MAX_BODY_BYTES })
+    : body;
+
 const handleRandomize = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
   const jar = jarPath();
   if (!existsSync(jar)) {
@@ -271,7 +295,7 @@ const handleRandomize = async (req: IncomingMessage, res: ServerResponse): Promi
   let request: RandomizeRequest;
   let rom: Buffer;
   try {
-    ({ request, rom } = unpack(await readBody(req)));
+    ({ request, rom } = unpack(maybeDecompress(await readBody(req), req)));
   } catch (error) {
     sendJson(res, 400, {
       error: 'peticion-invalida',
@@ -397,16 +421,20 @@ const handleRandomize = async (req: IncomingMessage, res: ServerResponse): Promi
     }
 
     const randomized = await readFile(output);
+    // Se devuelve comprimida por el mismo motivo: la vuelta gasta la subida de
+    // esta maquina, que suele ser lo mas escaso de las dos.
+    const payload = gzipSync(randomized, { level: 6 });
     res.writeHead(200, {
       'content-type': 'application/octet-stream',
-      'content-length': randomized.length,
+      'content-length': payload.length,
+      [ENCODING_HEADER]: 'gzip',
       ...(seed ? { 'x-seed': seed } : {}),
       // En base64 porque lleva acentos y las cabeceras HTTP son ASCII.
       'x-summary': Buffer.from(JSON.stringify(summary), 'utf8').toString('base64'),
       // Estas cabeceras deben ser legibles desde el navegador.
-      'access-control-expose-headers': 'x-seed, x-summary',
+      'access-control-expose-headers': `x-seed, x-summary, ${ENCODING_HEADER}`,
     });
-    res.end(randomized);
+    res.end(payload);
     console.log(
       `randomizada una ROM ${gameCode}${seed ? ` (semilla ${seed})` : ''}` +
         (summary.changed.length ? ` -> ${summary.changed.join(', ')}` : ' -> sin cambios'),

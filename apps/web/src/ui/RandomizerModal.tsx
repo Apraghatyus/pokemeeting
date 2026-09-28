@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type RefObject } from 'react';
 import {
   checkRandomizer,
   randomizeRom,
+  randomizerIsRemote,
   type RandomizerStatus,
   type RandomizeSummary,
 } from '../net/randomizer';
@@ -146,6 +147,21 @@ export const RandomizerModal = ({
 
           {status.estado === 'listo' && supported && (
             <>
+              {/* La promesa de que la ROM no se mueve solo es cierta en local.
+                  Entrando por un enlace compartido viaja al ordenador de quien
+                  lo abrio, y eso se dice antes de aleatorizar, no despues. */}
+              {randomizerIsRemote() ? (
+                <p className="warn">
+                  Para aleatorizar, tu ROM se enviara al ordenador de quien abrio esta partida,
+                  donde se procesa y se borra al terminar. Si prefieres que no salga de tu equipo,
+                  juega tal cual.
+                </p>
+              ) : (
+                <p className="hint">
+                  Se aleatoriza tu propia copia en este ordenador. La ROM no sale de aqui.
+                </p>
+              )}
+
               <div className="opciones">
                 {options.map((option) => (
                   <label className="opcion" key={option.id}>
