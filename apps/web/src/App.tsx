@@ -70,6 +70,10 @@ export const App = () => {
         onOpenRoom={() => setRoomOpen(true)}
         onToggleMenu={() => setMenuOpen((v) => !v)}
         menuOpen={menuOpen}
+        volume={state.volume}
+        onVolume={emulator.setVolume}
+        onToggleMute={emulator.toggleMute}
+        volumeDisabled={!hasRom}
       />
 
       <main className="app__main">
@@ -116,7 +120,6 @@ export const App = () => {
                 onDownloadSave={emulator.downloadSave}
                 onImportSave={emulator.importSave}
                 onFastForward={emulator.setFastForward}
-                onVolume={emulator.setVolume}
               />
               {state.lastSaveAt && (
                 <p className="note">

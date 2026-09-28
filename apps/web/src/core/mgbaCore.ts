@@ -43,7 +43,13 @@ export type MgbaModule = {
   buttonPress(name: string): void;
   buttonUnpress(name: string): void;
   toggleInput(enabled: boolean): void;
-  setVolume(percent: number): void;
+  /**
+   * Volumen como **multiplicador**, no como porcentaje: 1.0 es el 100% y el
+   * maximo util es 2.0. Pasarle 70 creyendo que son "70%" pide un 7000% y el
+   * sonido sale roto, que es exactamente lo que pasaba.
+   */
+  setVolume(multiplier: number): void;
+  getVolume(): number;
   resumeAudio(): void;
   addCoreCallbacks(callbacks: MgbaCoreCallbacks): void;
   quickReload(): void;
@@ -55,6 +61,11 @@ export type MgbaModule = {
   gameName?: string;
   saveName?: string;
   FS: EmscriptenFS;
+  /** Salida de audio de SDL. Se usa para comprobar que suena de verdad. */
+  SDL2?: {
+    audio?: { currentOutputBuffer?: AudioBuffer; scriptProcessorNode?: ScriptProcessorNode };
+    audioContext?: AudioContext;
+  };
 };
 
 type MgbaFactory = (options: { canvas: HTMLCanvasElement }) => Promise<MgbaModule>;
@@ -119,6 +130,14 @@ export const startCore = async (canvas: HTMLCanvasElement): Promise<MgbaModule> 
   const core = await create({ canvas });
   // Monta IndexedDB y recupera los ficheros persistidos de sesiones anteriores.
   await core.FSInit();
+
+  // En desarrollo dejamos el nucleo a mano. Sirve para depurar y, sobre todo,
+  // para poder comprobar el sonido: la unica forma de verificarlo sin oirlo es
+  // mirar el bufer de salida que mGBA expone en SDL2.audio.
+  if (import.meta.env.DEV) {
+    (globalThis as unknown as { mGBAModule?: MgbaModule }).mGBAModule = core;
+  }
+
   return core;
 };
 

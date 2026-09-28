@@ -10,7 +10,6 @@ type Props = {
   onDownloadSave: () => void;
   onImportSave: (file: File) => void;
   onFastForward: (enabled: boolean) => void;
-  onVolume: (percent: number) => void;
 };
 
 const SLOT = 1;
@@ -24,7 +23,6 @@ export const Toolbar = ({
   onDownloadSave,
   onImportSave,
   onFastForward,
-  onVolume,
 }: Props) => {
   const saveInputRef = useRef<HTMLInputElement | null>(null);
   const playing = state.status === 'running' || state.status === 'paused';
@@ -78,17 +76,6 @@ export const Toolbar = ({
           event.target.value = '';
         }}
       />
-
-      <label className="toolbar__volume">
-        Volumen
-        <input
-          type="range"
-          min={0}
-          max={100}
-          value={state.volume}
-          onChange={(event) => onVolume(Number(event.target.value))}
-        />
-      </label>
     </div>
   );
 };

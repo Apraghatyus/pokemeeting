@@ -24,7 +24,8 @@
     "test:randomizer:ui": "node tools/test-randomizer-ui.mjs",
     "test:voice": "node tools/test-voice.mjs",
     "test:randomizer:options": "node tools/test-randomizer-options.mjs",
-    "dev:tunnel": "npm run dev:tunnel --workspace=@emupoke/web"
+    "dev:tunnel": "npm run dev:tunnel --workspace=@emupoke/web",
+    "test:audio": "node tools/test-audio.mjs"
   },
   "engines": {
     "node": ">=20"

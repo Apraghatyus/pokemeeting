@@ -1,5 +1,6 @@
 import type { SessionState } from '../net/useSession';
 import type { KeyboardOwner } from '../core/useKeyboardOwnership';
+import { VolumeControl } from './VolumeControl';
 
 type Props = {
   session: SessionState;
@@ -7,6 +8,12 @@ type Props = {
   onOpenRoom: () => void;
   onToggleMenu: () => void;
   menuOpen: boolean;
+  /** Volumen del juego, de 0 a 200. */
+  volume: number;
+  onVolume: (percent: number) => void;
+  onToggleMute: () => void;
+  /** Sin ROM cargada no hay nada que oir. */
+  volumeDisabled: boolean;
 };
 
 const STATUS: Record<SessionState['phase'], { text: string; dot: string }> = {
@@ -17,7 +24,17 @@ const STATUS: Record<SessionState['phase'], { text: string; dot: string }> = {
   perdida: { text: 'Conexion perdida', dot: 'off' },
 };
 
-export const TopBar = ({ session, keyboardOwner, onOpenRoom, onToggleMenu, menuOpen }: Props) => {
+export const TopBar = ({
+  session,
+  keyboardOwner,
+  onOpenRoom,
+  onToggleMenu,
+  menuOpen,
+  volume,
+  onVolume,
+  onToggleMute,
+  volumeDisabled,
+}: Props) => {
   const status = STATUS[session.phase];
 
   return (
@@ -47,6 +64,13 @@ export const TopBar = ({ session, keyboardOwner, onOpenRoom, onToggleMenu, menuO
       </button>
 
       <div className="topbar__right">
+        <VolumeControl
+          volume={volume}
+          onVolume={onVolume}
+          onToggleMute={onToggleMute}
+          disabled={volumeDisabled}
+        />
+
         {/* Solo se menciona el teclado cuando deja de ser del juego: si no,
             es ruido permanente en la barra. */}
         {keyboardOwner === 'interfaz' && <span className="chip chip--interfaz">Escribiendo</span>}

@@ -23,11 +23,55 @@ export type EmulatorState = {
   /** Momento del ultimo guardado del juego en SRAM, para dar senal al jugador. */
   lastSaveAt: number | null;
   fastForward: boolean;
+  /** Volumen del juego en porcentaje, de 0 a 200. */
   volume: number;
+  /** Volumen al que volver al quitar el silencio. */
+  volumeBeforeMute: number;
   log: string[];
 };
 
 const MAX_LOG_LINES = 40;
+
+/** El nucleo admite hasta 200%, que amplifica por encima del original. */
+export const MAX_VOLUME = 200;
+
+const DEFAULT_VOLUME = 70;
+
+/**
+ * El nucleo quiere un multiplicador (1.0 = 100%), no un porcentaje.
+ *
+ * Es el fallo que rompia el sonido: se le pasaba el porcentaje tal cual, asi
+ * que un 70 pedia un 7000%.
+ */
+const toMultiplier = (percent: number): number => percent / 100;
+
+const VOLUME_KEY = 'emupoke.volumen';
+
+/** El volumen sobrevive a recargar la pagina: es una molestia recurrente. */
+const rememberVolume = (percent: number): void => {
+  try {
+    globalThis.localStorage?.setItem(VOLUME_KEY, String(percent));
+  } catch {
+    // Sin almacenamiento disponible no pasa nada: se usa el valor por defecto.
+  }
+};
+
+const recallVolume = (fallback: number): number => {
+  try {
+    const stored = globalThis.localStorage?.getItem(VOLUME_KEY);
+    // Comprobar el null ANTES de convertir no es ceremonia: getItem devuelve
+    // null cuando no hay nada guardado y Number(null) es 0, que pasa cualquier
+    // validacion de rango. Sin esto la aplicacion arrancaba silenciada la
+    // primera vez, y como el boton alterna respecto al estado, parecia que
+    // silenciar subia el sonido.
+    if (stored === null || stored === undefined || stored === '') return fallback;
+
+    const value = Number(stored);
+    return Number.isFinite(value) && value >= 0 && value <= MAX_VOLUME ? value : fallback;
+  } catch {
+    return fallback;
+  }
+};
 const FAST_FORWARD_MULTIPLIER = 3;
 
 const initialState: EmulatorState = {
@@ -39,7 +83,8 @@ const initialState: EmulatorState = {
   error: null,
   lastSaveAt: null,
   fastForward: false,
-  volume: 70,
+  volume: DEFAULT_VOLUME,
+  volumeBeforeMute: DEFAULT_VOLUME,
   log: [],
 };
 
@@ -50,7 +95,10 @@ export const useEmulator = () => {
   // Guardamos los bytes de la ROM cargada para poder reenviarla al servicio de
   // aleatorizacion sin pedirle al jugador que vuelva a elegir el fichero.
   const romBytesRef = useRef<Uint8Array | null>(null);
-  const [state, setState] = useState<EmulatorState>(initialState);
+  const [state, setState] = useState<EmulatorState>(() => {
+    const volume = recallVolume(initialState.volume);
+    return { ...initialState, volume, volumeBeforeMute: volume || initialState.volume };
+  });
 
   const appendLog = useCallback((line: string) => {
     setState((prev) => ({ ...prev, log: [...prev.log, line].slice(-MAX_LOG_LINES) }));
@@ -79,7 +127,7 @@ export const useEmulator = () => {
         if (cancelled) return;
         coreRef.current = core;
         applyDefaultKeyBindings(core);
-        core.setVolume(initialState.volume);
+        core.setVolume(toMultiplier(recallVolume(initialState.volume)));
 
         core.setLogger((entry) => {
           if (entry.level === 'error' || entry.level === 'fatal') {
@@ -258,9 +306,31 @@ export const useEmulator = () => {
   }, []);
 
   const setVolume = useCallback((percent: number) => {
-    coreRef.current?.setVolume(percent);
-    setState((prev) => ({ ...prev, volume: percent }));
+    const clamped = Math.min(Math.max(percent, 0), MAX_VOLUME);
+    coreRef.current?.setVolume(toMultiplier(clamped));
+    setState((prev) => ({
+      ...prev,
+      volume: clamped,
+      // Solo se recuerda un nivel audible: si no, quitar el silencio devolveria
+      // al silencio.
+      volumeBeforeMute: clamped > 0 ? clamped : prev.volumeBeforeMute,
+    }));
+    rememberVolume(clamped);
   }, []);
+
+  /**
+   * Silencia el juego y devuelve el volumen anterior al quitarlo.
+   *
+   * El calculo va FUERA del actualizador de estado, y no es un detalle de
+   * estilo. Un actualizador de React tiene que ser puro porque puede
+   * ejecutarse mas de una vez; al tener dentro la llamada al nucleo, cada
+   * ejecucion extra volvia a alternar el silencio y el efecto acababa
+   * invertido: silenciar subia el sonido y quitar el silencio lo apagaba. El
+   * estado que se mostraba era correcto, que es lo que lo hacia dificil de ver.
+   */
+  const toggleMute = useCallback(() => {
+    setVolume(state.volume > 0 ? 0 : state.volumeBeforeMute || DEFAULT_VOLUME);
+  }, [setVolume, state.volume, state.volumeBeforeMute]);
 
   return {
     canvasRef,
@@ -277,5 +347,6 @@ export const useEmulator = () => {
     importSave,
     setFastForward,
     setVolume,
+    toggleMute,
   };
 };

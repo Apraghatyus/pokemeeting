@@ -1171,3 +1171,43 @@ button.is-active {
   gap: 8px;
   margin-top: 4px;
 }
+
+/* ---------- volumen del juego ---------- */
+
+.volumen {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.volumen input[type='range'] {
+  width: 96px;
+  accent-color: var(--accent);
+}
+
+.volumen input[type='range']:disabled {
+  opacity: 0.35;
+}
+
+.volumen__cifra {
+  font-size: 11.5px;
+  color: var(--muted);
+  min-width: 34px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Por encima del 100% el nucleo amplifica: se marca para que no sorprenda. */
+.volumen__cifra.is-alto {
+  color: var(--wait);
+}
+
+@media (max-width: 720px) {
+  .volumen input[type='range'] {
+    width: 64px;
+  }
+
+  .volumen__cifra {
+    display: none;
+  }
+}
