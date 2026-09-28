@@ -11,6 +11,18 @@ export type SessionPhase =
   | 'conectada'
   | 'perdida';
 
+export type MicState = 'apagado' | 'pidiendo' | 'encendido' | 'denegado';
+
+export type VoiceState = {
+  mic: MicState;
+  micError: string | null;
+  /** Voz del companero, separada del video de su partida. */
+  partnerStream: MediaStream | null;
+  /** Volumen al que le oimos, de 0 a 100. */
+  partnerVolume: number;
+  partnerMuted: boolean;
+};
+
 export type SessionState = {
   phase: SessionPhase;
   /** Codigo para dictarle al companero. */
@@ -25,6 +37,7 @@ export type SessionState = {
   /** Contrasena que elegimos al crear la sala, para poder dictarla luego.
    *  Solo la tiene el anfitrion y no sale de este navegador. */
   password: string | null;
+  voice: VoiceState;
 };
 
 const initialState: SessionState = {
@@ -36,6 +49,13 @@ const initialState: SessionState = {
   error: null,
   remoteStream: null,
   password: null,
+  voice: {
+    mic: 'apagado',
+    micError: null,
+    partnerStream: null,
+    partnerVolume: 80,
+    partnerMuted: false,
+  },
 };
 
 /** Fotogramas por segundo del video que enviamos. El GBA corre a 60, pero para
@@ -50,9 +70,16 @@ export const useSession = (
   const signalingRef = useRef<SignalingClient | null>(null);
   const peerRef = useRef<PeerLink | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  // La pista del microfono sobrevive a la conexion: si el companero se va y
+  // vuelve, se reengancha al nuevo enlace sin volver a pedir permiso.
+  const micTrackRef = useRef<MediaStreamTrack | null>(null);
 
   const patch = useCallback((changes: Partial<SessionState>) => {
     setState((prev) => ({ ...prev, ...changes }));
+  }, []);
+
+  const patchVoice = useCallback((changes: Partial<VoiceState>) => {
+    setState((prev) => ({ ...prev, voice: { ...prev.voice, ...changes } }));
   }, []);
 
   /** Captura el canvas del emulador como video. Se hace una sola vez y se
@@ -77,6 +104,7 @@ export const useSession = (
       const peer = new PeerLink(
         {
           onRemoteStream: (stream) => patch({ remoteStream: stream }),
+          onRemoteVoice: (stream) => patchVoice({ partnerStream: stream }),
           onState: (peerState: PeerState) => {
             if (peerState === 'conectada') patch({ phase: 'conectada' });
             if (peerState === 'perdida') patch({ phase: 'perdida', remoteStream: null });
@@ -89,10 +117,12 @@ export const useSession = (
         localStream(),
       );
       peerRef.current = peer;
+      // Si el microfono ya estaba encendido, se reengancha al enlace nuevo.
+      if (micTrackRef.current) void peer.setVoiceTrack(micTrackRef.current);
       patch({ phase: 'conectando' });
       if (asOfferer) void peer.offer();
     },
-    [localStream, patch],
+    [localStream, patch, patchVoice],
   );
 
   const connectSignaling = useCallback(async (): Promise<SignalingClient> => {
@@ -172,13 +202,63 @@ export const useSession = (
     [connectSignaling, patch, romRef],
   );
 
+  /**
+   * Enciende o apaga el microfono.
+   *
+   * La cancelacion de eco no es opcional: la voz del companero suena por los
+   * altavoces y sin ella se le devuelve su propia voz con retraso.
+   */
+  const toggleMic = useCallback(async () => {
+    const existing = micTrackRef.current;
+    if (existing) {
+      await peerRef.current?.setVoiceTrack(null);
+      existing.stop();
+      micTrackRef.current = null;
+      patchVoice({ mic: 'apagado', micError: null });
+      return;
+    }
+
+    patchVoice({ mic: 'pidiendo', micError: null });
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      const track = stream.getAudioTracks()[0] ?? null;
+      micTrackRef.current = track;
+      await peerRef.current?.setVoiceTrack(track);
+      patchVoice({ mic: 'encendido' });
+    } catch (err) {
+      patchVoice({
+        mic: 'denegado',
+        micError:
+          err instanceof Error && err.name === 'NotAllowedError'
+            ? 'No has dado permiso para usar el microfono.'
+            : 'No se pudo abrir el microfono.',
+      });
+    }
+  }, [patchVoice]);
+
+  const setPartnerVolume = useCallback(
+    (percent: number) => patchVoice({ partnerVolume: percent }),
+    [patchVoice],
+  );
+
+  const togglePartnerMute = useCallback(
+    () => setState((prev) => ({ ...prev, voice: { ...prev.voice, partnerMuted: !prev.voice.partnerMuted } })),
+    [],
+  );
+
   const leave = useCallback(() => {
     peerRef.current?.close();
     peerRef.current = null;
     signalingRef.current?.close();
     signalingRef.current = null;
+    // Soltar el microfono al salir: dejarlo abierto encendería el indicador
+    // del navegador sin que nadie escuche.
+    micTrackRef.current?.stop();
+    micTrackRef.current = null;
     setState(initialState);
   }, []);
 
-  return { state, createRoom, joinRoom, leave };
+  return { state, createRoom, joinRoom, leave, toggleMic, setPartnerVolume, togglePartnerMute };
 };

@@ -21,7 +21,8 @@
     "test:roms": "npx tsx tools/test-roms.mjs",
     "dev:randomizer": "npm run dev --workspace=@emupoke/randomizer",
     "test:randomizer": "node tools/test-randomizer.mjs",
-    "test:randomizer:ui": "node tools/test-randomizer-ui.mjs"
+    "test:randomizer:ui": "node tools/test-randomizer-ui.mjs",
+    "test:voice": "node tools/test-voice.mjs"
   },
   "engines": {
     "node": ">=20"

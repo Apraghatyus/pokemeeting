@@ -93,6 +93,27 @@ Si a alguien se le cae la conexion, su emulacion **sigue corriendo**. Solo se
 cae el video y el canal de datos; los eventos de Soul Link ocurridos mientras
 tanto se encolan y se envian al reconectar.
 
+## Hablar durante la partida
+
+Por la misma conexion directa viaja la voz. El hueco de audio se reserva al
+negociar el enlace, aunque todavia no haya microfono abierto: encenderlo mas
+tarde es solo cambiar la pista de ese hueco, sin repetir el intercambio de
+ofertas y sin cortar el video.
+
+Dos detalles que costaron encontrarse y conviene no deshacer:
+
+- **El hueco lo reserva solo quien hace la oferta.** Si quien responde crea el
+  suyo, acaba con un transceptor huerfano y su microfono no llega a ninguna
+  parte. Quien responde, en cambio, declara `sendrecv` antes de contestar: sin
+  eso el audio quedaria en un unico sentido.
+- **El elemento de audio se monta siempre**, aunque no haya conexion. La pista
+  remota llega ANTES de que la conexion se declare establecida, asi que montar
+  el elemento al conectar dejaba la voz sin asignar.
+
+La voz va por su propio elemento, aparte del video de la partida, que se
+reproduce silenciado. Asi se le puede bajar el volumen a la persona sin tocar
+el juego, y silenciarla del todo.
+
 ## Jugar desde el movil
 
 Funciona, con una condicion tecnica que conviene entender porque no es evidente:

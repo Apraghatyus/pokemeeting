@@ -12,6 +12,7 @@ import { Stage } from './ui/Stage';
 import { Toolbar } from './ui/Toolbar';
 import { TouchControls } from './ui/TouchControls';
 import { TopBar } from './ui/TopBar';
+import { VoiceBar } from './ui/VoiceBar';
 
 export const App = () => {
   const emulator = useEmulator();
@@ -73,6 +74,14 @@ export const App = () => {
               hint={RoomDropZoneHint(state.status)}
             />
           }
+        />
+
+        <VoiceBar
+          voice={session.state.voice}
+          connected={session.state.phase === 'conectada'}
+          onToggleMic={() => void session.toggleMic()}
+          onToggleMute={session.togglePartnerMute}
+          onVolume={session.setPartnerVolume}
         />
 
         {touchPad && hasRom && <TouchControls coreRef={emulator.coreRef} />}
