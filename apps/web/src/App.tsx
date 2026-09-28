@@ -130,11 +130,28 @@ export const App = () => {
             </section>
 
             {hasRom && (
-              <RomInfoCard
-                header={state.header!}
-                platform={state.platform!}
-                romName={state.romName!}
-              />
+              <>
+                <RomInfoCard
+                  header={state.header!}
+                  platform={state.platform!}
+                  romName={state.romName!}
+                />
+                <section className="panel">
+                  <h2>Cambiar de juego</h2>
+                  <p className="hint">
+                    Cierra esta ROM y vuelve a la pantalla de carga para elegir otra.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      emulator.closeRom();
+                    }}
+                  >
+                    Cargar otra ROM
+                  </button>
+                </section>
+              </>
             )}
 
             {hasRom && (
@@ -152,6 +169,12 @@ export const App = () => {
                 >
                   Abrir opciones
                 </button>
+                {state.romSource === 'generada' && (
+                  <p className="hint">
+                    Estas jugando una copia aleatorizada. Aleatorizar otra vez parte siempre de tu
+                    ROM original, no de esta.
+                  </p>
+                )}
               </section>
             )}
 
@@ -190,9 +213,9 @@ export const App = () => {
       <RandomizerModal
         open={randomizerOpen}
         onClose={() => setRandomizerOpen(false)}
-        romBytesRef={emulator.romBytesRef}
-        romName={state.romName}
+        baseRom={emulator.baseRomRef}
         gameCode={state.header?.gameCode ?? null}
+        yaAleatorizada={state.romSource === 'generada'}
         onRandomized={emulator.openRomBytes}
       />
 

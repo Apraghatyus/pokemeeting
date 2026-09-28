@@ -84,7 +84,7 @@ export const TopBar = ({
         </span>
         <button
           type="button"
-          className={`iconbutton${menuOpen ? ' is-active' : ''}`}
+          className={`iconbutton iconbutton--opciones${menuOpen ? ' is-active' : ''}`}
           onClick={onToggleMenu}
           title="Opciones"
           aria-label="Opciones"

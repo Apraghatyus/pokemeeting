@@ -11,10 +11,16 @@ import { Modal } from './Modal';
 type Props = {
   open: boolean;
   onClose: () => void;
-  /** Bytes de la ROM cargada ahora mismo. */
-  romBytesRef: RefObject<Uint8Array | null>;
-  romName: string | null;
+  /**
+   * La ROM que eligio el jugador, NO la que esta corriendo.
+   *
+   * Aleatorizar siempre parte de la original. Partir de la que corre encadenaba
+   * copias sobre copias y nunca daba una partida nueva limpia.
+   */
+  baseRom: RefObject<{ bytes: Uint8Array; fileName: string } | null>;
   gameCode: string | null;
+  /** true si lo que corre ahora ya es una copia generada por nosotros. */
+  yaAleatorizada: boolean;
   /** Carga en el emulador la ROM ya aleatorizada. */
   onRandomized: (bytes: Uint8Array, fileName: string) => Promise<void>;
 };
@@ -41,9 +47,9 @@ const DEFAULT_SELECTION = ['salvajes', 'iniciales', 'entrenadores', 'movimientos
 export const RandomizerModal = ({
   open,
   onClose,
-  romBytesRef,
-  romName,
+  baseRom,
   gameCode,
+  yaAleatorizada,
   onRandomized,
 }: Props) => {
   const [status, setStatus] = useState<RandomizerStatus>({ estado: 'comprobando' });
@@ -80,14 +86,15 @@ export const RandomizerModal = ({
   };
 
   const run = async () => {
-    const rom = romBytesRef.current;
-    if (!rom) return;
+    const base = baseRom.current;
+    if (!base) return;
 
     setProgress({ fase: 'trabajando' });
     try {
-      const result = await randomizeRom({ options: [...selected] }, rom);
+      // Siempre desde la original: asi el nombre tampoco se encadena.
+      const result = await randomizeRom({ options: [...selected] }, base.bytes);
       lastRom.current = result.rom;
-      const fileName = (romName ?? 'pokemon.gba').replace(/\.gba$/i, '') + '-aleatorizada.gba';
+      const fileName = base.fileName.replace(/\.gba$/i, '') + '-aleatorizada.gba';
       await onRandomized(result.rom, fileName);
       setProgress({ fase: 'hecho', seed: result.seed, fileName, summary: result.summary });
     } catch (error) {
@@ -159,6 +166,16 @@ export const RandomizerModal = ({
               ) : (
                 <p className="hint">
                   Se aleatoriza tu propia copia en este ordenador. La ROM no sale de aqui.
+                </p>
+              )}
+
+              {/* Aleatorizar otra vez no retoca la partida en marcha: genera
+                  otra copia desde la ROM original y tira la anterior. */}
+              {yaAleatorizada && (
+                <p className="warn">
+                  Ya estas jugando una copia aleatorizada. Si aleatorizas otra vez se genera una
+                  nueva desde tu ROM original y se descarta esta, con su partida guardada.
+                  Descargala antes si quieres conservarla.
                 </p>
               )}
 

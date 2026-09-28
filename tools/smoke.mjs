@@ -84,14 +84,14 @@ const changed = frames.filter((f, i) => i > 0 && Buffer.compare(frames[i - 1], f
 // un fundido a negro comprime a ~3 KB, una pantalla de titulo a ~27 KB.
 const richest = Math.max(...frames.map((f) => f.length));
 // La ficha de la ROM esta dentro del menu de opciones, asi que hay que abrirlo.
-await page.locator('.iconbutton').click();
+await page.locator('.iconbutton--opciones').click();
 const romTitle = await page
   .locator('.panel', { hasText: 'ROM cargada' })
   .locator('dd')
   .first()
   .textContent()
   .catch(() => null);
-await page.locator('.iconbutton').click();
+await page.locator('.iconbutton--opciones').click();
 console.log(`ficha de ROM: ${romTitle ?? 'NO VISIBLE'}`);
 console.log(`fotogramas distintos: ${changed}/${frames.length - 1}   detalle maximo: ${richest} bytes`);
 

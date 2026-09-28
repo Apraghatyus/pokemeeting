@@ -151,7 +151,17 @@ export type LoadedRom = {
  * Sube una ROM al FS virtual y la arranca.
  * El fichero nunca sale del navegador del jugador.
  */
-export const loadRomFile = async (core: MgbaModule, file: File): Promise<LoadedRom> => {
+export const loadRomFile = async (
+  core: MgbaModule,
+  file: File,
+  /**
+   * Se ejecuta con el juego anterior ya cerrado y antes de subir el nuevo.
+   *
+   * Es el unico momento seguro para borrar ficheros del anterior: hacerlo
+   * antes significa quitarle el fichero a mGBA mientras aun lo tiene abierto.
+   */
+  betweenGames?: () => void,
+): Promise<LoadedRom> => {
   // Si ya hay un juego corriendo hay que cerrarlo antes, y darle un respiro.
   //
   // Cargar una ROM encima de otra que todavia se esta inicializando revienta
@@ -162,6 +172,8 @@ export const loadRomFile = async (core: MgbaModule, file: File): Promise<LoadedR
     core.quitGame();
     await new Promise((resolve) => setTimeout(resolve, 120));
   }
+
+  betweenGames?.();
 
   await new Promise<void>((resolve) => core.uploadRom(file, resolve));
   const romPath = `${core.filePaths().gamePath}/${file.name}`;

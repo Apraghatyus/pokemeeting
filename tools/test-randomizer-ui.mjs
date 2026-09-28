@@ -63,7 +63,7 @@ const jugandoVanilla = await vanilla.evaluate(
 check('elegir jugar tal cual cierra la pregunta', jugandoVanilla);
 
 const ficheroVanilla = await vanilla.evaluate(async () => {
-  document.querySelector('.iconbutton').click();
+  document.querySelector('.iconbutton--opciones').click();
   await new Promise((r) => setTimeout(r, 300));
   const celdas = document.querySelectorAll('.panel dd');
   return celdas[0]?.textContent ?? null;
@@ -122,8 +122,63 @@ await page.screenshot({ path: `${SHOTS}/ui-randomizer.png`, fullPage: true });
 
 await modal.getByRole('button', { name: 'Empezar a jugar' }).click();
 await page.waitForTimeout(6000);
+
+// Que el canvas cambie no demuestra nada: el juego anterior tambien se mueve.
+// Lo que hay que comprobar es QUE ROM tiene cargada el nucleo.
+const cargada = await page.evaluate(() => globalThis.mGBAModule?.gameName ?? null);
+check(
+  'el nucleo tiene cargada la ROM aleatorizada',
+  /-aleatorizada\.gba$/.test(cargada ?? ''),
+  cargada?.split('/').pop() ?? 'ninguna',
+);
+
 const despues = await page.locator('canvas').screenshot();
 check('el emulador sigue dibujando con la ROM nueva', Buffer.compare(antes, despues) !== 0);
+
+// --- aleatorizar otra vez debe partir de la ROM original, no de la generada ---
+await page.locator('.iconbutton--opciones').click();
+await page.getByRole('button', { name: 'Abrir opciones' }).click();
+const modal2 = page.locator('dialog.modal[open]');
+await modal2.locator('.opcion').first().waitFor({ timeout: 25_000 });
+check(
+  'avisa de que se descartara la copia actual',
+  (await modal2.locator('.warn').count()) >= 1,
+);
+await modal2.getByRole('button', { name: /Aleatorizar y jugar/ }).click();
+await modal2
+  .locator('.modal__title', { hasText: 'Partida aleatorizada' })
+  .waitFor({ timeout: 300_000 });
+await modal2.getByRole('button', { name: 'Empezar a jugar' }).click();
+await page.waitForTimeout(3000);
+
+const segunda = await page.evaluate(() => globalThis.mGBAModule?.gameName ?? null);
+check(
+  'la segunda no encadena nombres sobre la primera',
+  !/-aleatorizada-aleatorizada/.test(segunda ?? ''),
+  segunda?.split('/').pop() ?? 'ninguna',
+);
+
+// Y no debe quedar basura: la original y una sola copia.
+const ficheros = await page.evaluate(() => {
+  const m = globalThis.mGBAModule;
+  try {
+    return m.FS.readdir(m.filePaths().gamePath).filter((f) => !f.startsWith('.'));
+  } catch {
+    return [];
+  }
+});
+check('no se acumulan copias en el sistema de ficheros', ficheros.length === 2,
+  `${ficheros.length} ficheros`);
+
+// --- y se puede cambiar de ROM sin recargar ---
+await page.locator('.iconbutton--opciones').click();
+await page.getByRole('button', { name: 'Cargar otra ROM' }).click();
+const vuelveLaZona = await page
+  .locator('.dropzone')
+  .waitFor({ timeout: 10_000 })
+  .then(() => true)
+  .catch(() => false);
+check('se puede volver a la pantalla de carga sin recargar', vuelveLaZona);
 
 const vuelveAPreguntar = await page.evaluate(
   () => document.querySelector('dialog.modal[open]') !== null,

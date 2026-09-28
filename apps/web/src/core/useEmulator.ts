@@ -45,6 +45,28 @@ const DEFAULT_VOLUME = 70;
  */
 const toMultiplier = (percent: number): number => percent / 100;
 
+/**
+ * Borra del sistema de ficheros del nucleo una ROM generada y su partida.
+ *
+ * Sin esto se van acumulando copias en memoria, y peor: como la siguiente
+ * aleatorizacion puede llamarse igual, heredaria el guardado de la anterior,
+ * que pertenece a otro juego.
+ */
+const discardGeneratedRom = (core: MgbaModule, romPath: string | null): void => {
+  if (!romPath) return;
+  const saveName = romPath.split('/').pop()?.replace(/\.gba$/i, '.sav');
+  const savePath = saveName ? `${core.filePaths().savePath}/${saveName}` : null;
+
+  for (const path of [romPath, savePath]) {
+    if (!path) continue;
+    try {
+      if (core.FS.analyzePath(path).exists) core.FS.unlink(path);
+    } catch {
+      // Si no se puede borrar no es grave: se sobrescribira.
+    }
+  }
+};
+
 const VOLUME_KEY = 'emupoke.volumen';
 
 /** El volumen sobrevive a recargar la pagina: es una molestia recurrente. */
@@ -95,6 +117,19 @@ export const useEmulator = () => {
   // Guardamos los bytes de la ROM cargada para poder reenviarla al servicio de
   // aleatorizacion sin pedirle al jugador que vuelva a elegir el fichero.
   const romBytesRef = useRef<Uint8Array | null>(null);
+
+  /**
+   * La ROM que eligio el jugador, aparte de la que esta corriendo.
+   *
+   * Son dos cosas distintas y confundirlas era un fallo real: al aleatorizar,
+   * la ROM en marcha pasa a ser la generada, y la siguiente aleatorizacion
+   * partia de esa en vez de la original. Salian copias encadenadas
+   * ("-aleatorizada-aleatorizada") y nunca una partida nueva limpia.
+   */
+  const baseRomRef = useRef<{ bytes: Uint8Array; fileName: string } | null>(null);
+
+  /** Ruta de la ultima ROM generada, para poder borrarla al hacer otra. */
+  const generatedPathRef = useRef<string | null>(null);
   const [state, setState] = useState<EmulatorState>(() => {
     const volume = recallVolume(initialState.volume);
     return { ...initialState, volume, volumeBeforeMute: volume || initialState.volume };
@@ -186,8 +221,23 @@ export const useEmulator = () => {
       }
 
       try {
-        await loadRomFile(core, file);
+        // La copia anterior se descarta al cambiar de ROM, pero SOLO cuando el
+        // nucleo ya la ha cerrado: borrarle el fichero mientras lo tiene
+        // abierto es pedir problemas. De eso se encarga el gancho.
+        const previous = generatedPathRef.current;
+        const loaded = await loadRomFile(core, file, () => {
+          discardGeneratedRom(core, previous);
+        });
         romBytesRef.current = bytes;
+
+        if (source === 'usuario') {
+          // Elegir una ROM empieza de cero: deja de haber copia generada.
+          generatedPathRef.current = null;
+          baseRomRef.current = { bytes, fileName: file.name };
+        } else {
+          generatedPathRef.current = loaded.romPath;
+        }
+
         // Los navegadores bloquean el audio hasta que hay interaccion del usuario;
         // elegir el fichero cuenta como tal, asi que este es el momento valido.
         core.resumeAudio();
@@ -332,10 +382,38 @@ export const useEmulator = () => {
     setVolume(state.volume > 0 ? 0 : state.volumeBeforeMute || DEFAULT_VOLUME);
   }, [setVolume, state.volume, state.volumeBeforeMute]);
 
+  /**
+   * Vuelve al principio para poder elegir otra ROM.
+   *
+   * Antes no habia forma de cambiar de juego sin recargar la pagina.
+   */
+  const closeRom = useCallback(() => {
+    const core = coreRef.current;
+    if (core) {
+      discardGeneratedRom(core, generatedPathRef.current);
+      core.quitGame();
+    }
+    generatedPathRef.current = null;
+    baseRomRef.current = null;
+    romBytesRef.current = null;
+    setState((prev) => ({
+      ...prev,
+      status: 'ready',
+      header: null,
+      platform: null,
+      romName: null,
+      romSource: null,
+      lastSaveAt: null,
+      error: null,
+    }));
+  }, []);
+
   return {
     canvasRef,
     coreRef,
     romBytesRef,
+    baseRomRef,
+    closeRom,
     state,
     openRom,
     openRomBytes,
