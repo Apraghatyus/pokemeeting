@@ -90,8 +90,27 @@ ni para nada que dependa de reaccionar al instante.
                                                    cerrada
 
 Si a alguien se le cae la conexion, su emulacion **sigue corriendo**. Solo se
-cae el video y el canal de datos; los eventos de Soul Link ocurridos mientras
-tanto se encolan y se envian al reconectar.
+cae el video, la voz y el canal de datos.
+
+## Reconexion
+
+Se reintenta solo **tres veces**, esperando 2, 4 y 8 segundos. La espera crece
+porque reintentar al instante contra una red caida no arregla nada y ademas
+gasta los tres intentos en menos de un segundo.
+
+Agotados los tres, se para y aparece un boton. Insistir en bucle contra una red
+que sigue sin volver no sirve de nada, y quien esta delante sabe mejor que
+nosotros cuando ha vuelto. Cada pulsacion vale por un intento.
+
+Volver a entrar se hace con `join-room` aunque uno fuera el anfitrion: al
+caerse el socket el servidor libera su sitio y la sala sigue viva diez minutos,
+asi que el camino de vuelta es el mismo para los dos. Por eso se guarda tambien
+la contrasena del invitado, que antes no se conservaba: sin ella habria que
+pedirsela otra vez a mitad de partida.
+
+**Lo que no se puede recuperar** es que se reinicie el servidor de salas: las
+salas viven en memoria y desaparecen con el. En ese caso hay que crear una
+nueva, y la interfaz lo dice en vez de reintentar sin sentido.
 
 ## Hablar durante la partida
 

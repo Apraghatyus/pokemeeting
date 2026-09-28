@@ -207,6 +207,7 @@ export const App = () => {
           session.leave();
           setRoomOpen(false);
         }}
+        onRetry={session.retryNow}
       />
     </div>
   );

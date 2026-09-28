@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { RomCompatibility } from '@emupoke/pokemon';
-import type { SessionState } from '../net/useSession';
+import { MAX_RECONNECT_ATTEMPTS, type SessionState } from '../net/useSession';
 import { Modal } from './Modal';
 
 type Props = {
@@ -11,6 +11,7 @@ type Props = {
   onCreate: (password: string) => void;
   onJoin: (roomCode: string, password: string) => void;
   onLeave: () => void;
+  onRetry: () => void;
 };
 
 /**
@@ -117,6 +118,48 @@ const RoomSetup = ({ romReady, state, onCreate, onJoin }: Props) => {
   );
 };
 
+/* ---------- reconexion ---------- */
+
+/**
+ * Que se ve cuando se corta el enlace.
+ *
+ * Se insiste solo tres veces y luego se para. Reintentar en bucle contra una
+ * red que sigue caida no arregla nada y llena la pantalla de mensajes; quien
+ * esta delante sabe mejor que nosotros cuando ha vuelto la conexion.
+ */
+const Reconexion = ({ state, onRetry }: { state: SessionState; onRetry: () => void }) => {
+  const { attempts, trying, exhausted } = state.reconnect;
+
+  return (
+    <div className="reconexion">
+      <p className="reconexion__estado">
+        {trying ? (
+          <>
+            <span className="dot dot--busy" />
+            Reconectando... (intento {attempts} de {MAX_RECONNECT_ATTEMPTS})
+          </>
+        ) : (
+          <>
+            <span className="dot dot--off" />
+            Se ha cortado el enlace.
+          </>
+        )}
+      </p>
+
+      <p className="hint">
+        Tu partida sigue corriendo: esto solo afecta a ver la pantalla de tu companero y a
+        hablar con el.
+      </p>
+
+      {exhausted && (
+        <button type="button" className="button--primary button--wide" onClick={onRetry}>
+          Reintentar ahora
+        </button>
+      )}
+    </div>
+  );
+};
+
 /* ---------- compatibilidad de las dos ROMs ---------- */
 
 /**
@@ -158,7 +201,7 @@ const shareText = (code: string, password: string): string => {
   return lines.join('\n');
 };
 
-const RoomCredentials = ({ state, onLeave }: Props) => {
+const RoomCredentials = ({ state, onLeave, onRetry }: Props) => {
   const [copied, setCopied] = useState<'no' | 'si' | 'fallo'>('no');
 
   const copyAll = async () => {
@@ -220,9 +263,7 @@ const RoomCredentials = ({ state, onLeave }: Props) => {
       {state.compatibility && <Compatibility report={state.compatibility} />}
 
       {waiting && <p className="hint">Aun no ha entrado nadie.</p>}
-      {state.phase === 'perdida' && (
-        <p className="hint">Se ha cortado el enlace. Tu partida sigue corriendo.</p>
-      )}
+      {state.phase === 'perdida' && <Reconexion state={state} onRetry={onRetry} />}
 
       <button type="button" className="button--wide" onClick={onLeave}>
         Salir de la sala

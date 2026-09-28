@@ -23,6 +23,18 @@ export type VoiceState = {
   partnerMuted: boolean;
 };
 
+/** Intentos automaticos antes de dejarlo en manos del jugador. */
+export const MAX_RECONNECT_ATTEMPTS = 3;
+
+export type ReconnectState = {
+  /** Cuantos intentos automaticos se llevan. */
+  attempts: number;
+  /** Si hay un intento en marcha ahora mismo. */
+  trying: boolean;
+  /** Se agotaron los intentos: toca pulsar el boton. */
+  exhausted: boolean;
+};
+
 export type SessionState = {
   phase: SessionPhase;
   /** Codigo para dictarle al companero. */
@@ -38,6 +50,7 @@ export type SessionState = {
    *  Solo la tiene el anfitrion y no sale de este navegador. */
   password: string | null;
   voice: VoiceState;
+  reconnect: ReconnectState;
 };
 
 const initialState: SessionState = {
@@ -49,6 +62,7 @@ const initialState: SessionState = {
   error: null,
   remoteStream: null,
   password: null,
+  reconnect: { attempts: 0, trying: false, exhausted: false },
   voice: {
     mic: 'apagado',
     micError: null,
@@ -73,6 +87,36 @@ export const useSession = (
   // La pista del microfono sobrevive a la conexion: si el companero se va y
   // vuelve, se reengancha al nuevo enlace sin volver a pedir permiso.
   const micTrackRef = useRef<MediaStreamTrack | null>(null);
+  /**
+   * Con que volver a entrar en la sala.
+   *
+   * Se guarda tambien la contrasena del invitado, que antes no se conservaba:
+   * sin ella no se puede reconectar solo, y pedirsela otra vez a mitad de
+   * partida es justo lo que se quiere evitar.
+   */
+  const credentialsRef = useRef<{ roomCode: string; password: string } | null>(null);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /**
+   * Intentos consumidos, en una referencia y no en el estado.
+   *
+   * El contador se consulta y se incrementa desde fuera del render, y meterlo
+   * en el actualizador de estado fue justo el fallo anterior: un actualizador
+   * de React tiene que ser puro porque puede ejecutarse varias veces, y ahi
+   * dentro habia un setTimeout que acababa programando intentos de mas.
+   */
+  const attemptsRef = useRef(0);
+  /** Evita que una salida voluntaria dispare la reconexion. */
+  const leftOnPurposeRef = useRef(false);
+  /** Contrasena de la peticion en curso, hasta que el servidor confirma. */
+  const pendingPasswordRef = useRef<string | null>(null);
+  /**
+   * Puente hacia la funcion de reconexion.
+   *
+   * Hace falta una referencia porque los manejadores de la senalizacion se
+   * crean antes que ella y tienen que poder llamarla: sin el puente serian
+   * dependencias circulares.
+   */
+  const reconnectRef = useRef<() => void>(() => {});
 
   const patch = useCallback((changes: Partial<SessionState>) => {
     setState((prev) => ({ ...prev, ...changes }));
@@ -107,7 +151,12 @@ export const useSession = (
           onRemoteVoice: (stream) => patchVoice({ partnerStream: stream }),
           onState: (peerState: PeerState) => {
             if (peerState === 'conectada') patch({ phase: 'conectada' });
-            if (peerState === 'perdida') patch({ phase: 'perdida', remoteStream: null });
+            if (peerState === 'perdida') {
+              patch({ phase: 'perdida', remoteStream: null });
+              // No basta con avisar: un enlace roto no se arregla solo, hay que
+              // rehacer la negociacion volviendo a entrar en la sala.
+              reconnectRef.current();
+            }
           },
           onData: () => {
             // Aqui entraran los eventos de Soul Link y los intercambios.
@@ -116,6 +165,9 @@ export const useSession = (
         },
         localStream(),
       );
+      // Cerrar el anterior antes de sustituirlo: al reconectar llega uno nuevo
+      // y dejar el viejo abierto mantiene camaras y micro tomados.
+      peerRef.current?.close();
       peerRef.current = peer;
       // Si el microfono ya estaba encendido, se reengancha al enlace nuevo.
       if (micTrackRef.current) void peer.setVoiceTrack(micTrackRef.current);
@@ -129,8 +181,18 @@ export const useSession = (
     if (signalingRef.current) return signalingRef.current;
 
     const client = new SignalingClient({
-      onRoomCreated: (roomCode) => patch({ roomCode, isHost: true, phase: 'esperando-companero' }),
+      onRoomCreated: (roomCode) => {
+        // Se guardan para poder volver a entrar solo si se cae el enlace.
+        const password = pendingPasswordRef.current;
+        if (password) credentialsRef.current = { roomCode, password };
+        patch({ roomCode, isHost: true, phase: 'esperando-companero' });
+      },
       onRoomJoined: (roomCode, peerRom) => {
+        const password = pendingPasswordRef.current;
+        if (password) credentialsRef.current = { roomCode, password };
+        // Volver a entrar bien significa que la reconexion termino.
+        attemptsRef.current = 0;
+        patch({ reconnect: { attempts: 0, trying: false, exhausted: false } });
         const mine = romRef.current;
         patch({
           roomCode,
@@ -153,12 +215,23 @@ export const useSession = (
         patch({ phase: 'esperando-companero', peerRom: null, remoteStream: null, compatibility: null });
       },
       onSignal: (data) => void peerRef.current?.accept(data),
-      onError: (_code, message) => patch({ error: message }),
+      onError: (_code, message) => {
+        // Un rechazo del servidor durante la vuelta no debe dejar la interfaz
+        // diciendo "reconectando" para siempre: se ofrece el boton.
+        setState((prev) => ({
+          ...prev,
+          error: message,
+          reconnect: prev.reconnect.trying
+            ? { attempts: attemptsRef.current, trying: false, exhausted: true }
+            : prev.reconnect,
+        }));
+      },
       onDisconnected: () => {
         signalingRef.current = null;
         setState((prev) =>
           prev.phase === 'sin-sala' ? prev : { ...prev, phase: 'perdida', remoteStream: null },
         );
+        reconnectRef.current();
       },
     });
 
@@ -175,6 +248,9 @@ export const useSession = (
         return;
       }
       patch({ error: null });
+      leftOnPurposeRef.current = false;
+      attemptsRef.current = 0;
+      pendingPasswordRef.current = password;
       try {
         (await connectSignaling()).createRoom(password, rom);
         patch({ password });
@@ -193,6 +269,9 @@ export const useSession = (
         return;
       }
       patch({ error: null });
+      leftOnPurposeRef.current = false;
+      attemptsRef.current = 0;
+      pendingPasswordRef.current = password;
       try {
         (await connectSignaling()).joinRoom(roomCode, password, rom);
       } catch (err) {
@@ -248,7 +327,104 @@ export const useSession = (
     [],
   );
 
+  /**
+   * Vuelve a entrar en la sala con las credenciales guardadas.
+   *
+   * Se entra con join-room aunque uno fuera el anfitrion: al caerse el socket
+   * el servidor libera su sitio y la sala sigue viva un rato, asi que volver a
+   * entrar es el mismo camino para los dos.
+   */
+  const rejoin = useCallback(async (): Promise<boolean> => {
+    const credentials = credentialsRef.current;
+    const rom = romRef.current;
+    if (!credentials || !rom) return false;
+
+    peerRef.current?.close();
+    peerRef.current = null;
+    signalingRef.current?.close();
+    signalingRef.current = null;
+
+    try {
+      pendingPasswordRef.current = credentials.password;
+      const client = await connectSignaling();
+      client.joinRoom(credentials.roomCode, credentials.password, rom);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [connectSignaling, romRef]);
+
+  /**
+   * Espera creciente entre intentos: 2, 4 y 8 segundos.
+   *
+   * Reintentar al instante no sirve de nada cuando lo que fallo es la red, y
+   * ademas gasta los tres intentos en menos de un segundo.
+   */
+  const backoffMs = (attempt: number): number => 2000 * 2 ** attempt;
+
+  const scheduleReconnect = useCallback(() => {
+    if (leftOnPurposeRef.current || !credentialsRef.current) return;
+    // Ya hay un intento esperando su turno.
+    if (reconnectTimerRef.current) return;
+
+    if (attemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
+      patch({
+        reconnect: { attempts: attemptsRef.current, trying: false, exhausted: true },
+      });
+      return;
+    }
+
+    const attempt = attemptsRef.current;
+    attemptsRef.current = attempt + 1;
+    patch({ reconnect: { attempts: attempt + 1, trying: true, exhausted: false } });
+
+    reconnectTimerRef.current = setTimeout(() => {
+      reconnectTimerRef.current = null;
+      void rejoin().then((ok) => {
+        // Si salio bien, onRoomJoined pondra el contador a cero.
+        if (ok) return;
+        patch({ reconnect: { attempts: attemptsRef.current, trying: false, exhausted: false } });
+        scheduleReconnectRef.current();
+      });
+    }, backoffMs(attempt));
+  }, [patch, rejoin]);
+
+  const scheduleReconnectRef = useRef<() => void>(() => {});
+  scheduleReconnectRef.current = scheduleReconnect;
+  reconnectRef.current = scheduleReconnect;
+
+  /**
+   * Reintento a mano, tras agotarse los automaticos.
+   *
+   * Cada pulsacion vale por un intento y no reanuda el bucle: si la red sigue
+   * caida, insistir sola no ayuda y el jugador sabe mejor que nosotros cuando
+   * ha vuelto.
+   */
+  const retryNow = useCallback(() => {
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+    attemptsRef.current = MAX_RECONNECT_ATTEMPTS;
+    patch({ reconnect: { attempts: MAX_RECONNECT_ATTEMPTS, trying: true, exhausted: false } });
+    void rejoin().then((ok) => {
+      if (!ok) {
+        patch({
+          reconnect: { attempts: MAX_RECONNECT_ATTEMPTS, trying: false, exhausted: true },
+        });
+      }
+    });
+  }, [patch, rejoin]);
+
   const leave = useCallback(() => {
+    // Marcar la salida como voluntaria antes de cerrar nada: si no, el cierre
+    // del socket dispararia la reconexion automatica.
+    leftOnPurposeRef.current = true;
+    credentialsRef.current = null;
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
     peerRef.current?.close();
     peerRef.current = null;
     signalingRef.current?.close();
@@ -260,5 +436,14 @@ export const useSession = (
     setState(initialState);
   }, []);
 
-  return { state, createRoom, joinRoom, leave, toggleMic, setPartnerVolume, togglePartnerMute };
+  return {
+    state,
+    createRoom,
+    joinRoom,
+    leave,
+    retryNow,
+    toggleMic,
+    setPartnerVolume,
+    togglePartnerMute,
+  };
 };

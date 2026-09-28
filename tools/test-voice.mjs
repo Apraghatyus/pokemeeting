@@ -132,6 +132,45 @@ const audio = await guest.evaluate(async () => {
 check('al invitado le llega la voz del anfitrion', audio.found && audio.live && audio.muted === false,
   JSON.stringify(audio));
 
+// --- y en el sentido contrario, que es el que fallaba ---
+//
+// Quien responde a la conexion tenia un transceptor huerfano: oia al otro pero
+// su microfono no llegaba a ninguna parte. Un fallo que solo se ve probando
+// las dos direcciones, porque en una funcionaba.
+await guest.getByRole('button', { name: /Hablar/ }).click();
+const micInvitado = await guest
+  .locator('.voice__mic.is-on')
+  .waitFor({ timeout: 15_000 })
+  .then(() => true)
+  .catch(() => false);
+check('el microfono del invitado se abre', micInvitado);
+
+const audioVuelta = await host.evaluate(async () => {
+  const element = document.querySelector('.voice audio');
+  if (!element) return { found: false };
+  for (let i = 0; i < 40; i += 1) {
+    const track = element.srcObject?.getAudioTracks?.()[0];
+    if (track && !track.muted && track.readyState === 'live') {
+      return { found: true, live: true, muted: false };
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  const track = element.srcObject?.getAudioTracks?.()[0];
+  return { found: true, live: track?.readyState === 'live', muted: track?.muted ?? null };
+});
+check('al anfitrion le llega la voz del invitado', audioVuelta.found && audioVuelta.live && audioVuelta.muted === false,
+  JSON.stringify(audioVuelta));
+
+// Los dos hablando a la vez es el caso real de una partida acompanada.
+const simultaneo = await Promise.all([
+  host.locator('.voice__mic.is-on').count(),
+  guest.locator('.voice__mic.is-on').count(),
+]);
+check('los dos pueden tener el microfono abierto a la vez', simultaneo.every((n) => n === 1),
+  `anfitrion=${simultaneo[0]} invitado=${simultaneo[1]}`);
+
+await guest.getByRole('button', { name: /Micro abierto/ }).click();
+
 // --- silenciar al companero ---
 await guest.locator('.voice__partner button').click();
 const muted = await guest.evaluate(() => document.querySelector('.voice audio')?.muted ?? null);

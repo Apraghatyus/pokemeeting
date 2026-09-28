@@ -35,7 +35,11 @@ export const TopBar = ({
   onToggleMute,
   volumeDisabled,
 }: Props) => {
-  const status = STATUS[session.phase];
+  // Reconectando es un estado distinto de "caido": el jugador necesita saber
+  // que se esta intentando solo, para no dar la partida por perdida.
+  const status = session.reconnect.trying
+    ? { text: 'Reconectando', dot: 'busy' }
+    : STATUS[session.phase];
 
   return (
     <header className="topbar">
