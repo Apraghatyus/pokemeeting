@@ -16,19 +16,24 @@ que sin permitirlo no se entra.
 
 ## Como se hace
 
-Arranca la web en modo tunel, que resuelve lo segundo:
+Tres terminales:
 
-    npm run dev:signaling      (en una terminal)
-    npm run dev:tunnel         (en otra)
+    npm run dev:signaling      el servidor de salas
+    npm run dev:tunnel         la web, aceptando hosts de fuera
+    npm run tunnel             el enlace publico
 
-Y abre el tunel, que resuelve lo primero:
+El ultimo imprime la direccion `https://algo-aleatorio.trycloudflare.com` que
+puedes pasarle a tu companero. Muere cuando cierras esa ventana.
 
-    cloudflared tunnel --url http://localhost:5173
+Antes de abrir nada comprueba que la web esta levantada **y en modo tunel**: si
+estuviera en modo normal, el enlace daria "Blocked request" y costaria entender
+por que. Es mejor fallar ahi con un mensaje claro que dejar al visitante ante
+un error mudo.
 
-Da una direccion `https://algo-aleatorio.trycloudflare.com` que puedes pasarle
-a tu companero. Muere cuando paras el proceso.
-
-Si no tienes cloudflared: `winget install cloudflare.cloudflared`.
+Necesita `cloudflared`. Si no aparece en `tools/cloudflared.exe` ni en el
+sistema, el propio comando dice como instalarlo
+(`winget install cloudflare.cloudflared`). Ese ejecutable no se versiona: son
+55 MB de un binario de terceros.
 
 ### Alternativa: Tailscale Funnel
 

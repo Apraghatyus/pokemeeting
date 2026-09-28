@@ -38,3 +38,6 @@ apps/web/public/mgba/
 
 # El jar del randomizer es de terceros y con licencia GPL-3: no se versiona
 tools/randomizer/*.jar
+
+# cloudflared es un binario de terceros de 55 MB: se descarga, no se versiona
+tools/cloudflared.exe

@@ -26,7 +26,8 @@
     "test:randomizer:options": "node tools/test-randomizer-options.mjs",
     "dev:tunnel": "npm run dev:tunnel --workspace=@emupoke/web",
     "test:audio": "node tools/test-audio.mjs",
-    "test:reconexion": "node tools/test-reconexion.mjs"
+    "test:reconexion": "node tools/test-reconexion.mjs",
+    "tunnel": "node tools/tunnel.mjs"
   },
   "engines": {
     "node": ">=20"
