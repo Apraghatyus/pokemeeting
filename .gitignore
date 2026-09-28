@@ -35,3 +35,6 @@ npm-debug.log*
 
 # Nucleo mGBA copiado desde node_modules por sync-core.mjs: artefacto generado
 apps/web/public/mgba/
+
+# El jar del randomizer es de terceros y con licencia GPL-3: no se versiona
+tools/randomizer/*.jar

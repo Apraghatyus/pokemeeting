@@ -40,6 +40,12 @@ export default defineConfig({
         ws: true,
         rewrite: (path) => path.replace(/^\/signaling/, ''),
       },
+      // El servicio de aleatorizacion escucha solo en 127.0.0.1. Pasar por
+      // aqui evita ademas problemas de origen cruzado desde la pagina.
+      '/randomizer': {
+        target: 'http://127.0.0.1:8788',
+        rewrite: (path) => path.replace(/^\/randomizer/, ''),
+      },
     },
   },
   preview: { headers: crossOriginIsolation },

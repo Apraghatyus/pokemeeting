@@ -4,6 +4,7 @@ import { DEFAULT_KEY_BINDINGS } from './core/mgbaCore';
 import { useEmulator } from './core/useEmulator';
 import { useKeyboardOwnership } from './core/useKeyboardOwnership';
 import { useSession } from './net/useSession';
+import { RandomizerPanel } from './ui/RandomizerPanel';
 import { RomDropZone, RoomDropZoneHint } from './ui/RomDropZone';
 import { RomInfoCard } from './ui/RomInfoCard';
 import { RoomModal } from './ui/RoomModal';
@@ -104,6 +105,13 @@ export const App = () => {
                 </p>
               )}
             </section>
+
+            <RandomizerPanel
+              romBytesRef={emulator.romBytesRef}
+              romName={state.romName}
+              gameCode={state.header?.gameCode ?? null}
+              onRandomized={emulator.openRomBytes}
+            />
 
             {hasRom && (
               <RomInfoCard

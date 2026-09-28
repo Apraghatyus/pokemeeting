@@ -1,9 +1,34 @@
 # Integrar el Universal Pokemon Randomizer ZX
 
-Estado: investigado y **aparcado**. Nada implementado.
+Estado: **implementado** para Rojo Fuego y Verde Hoja.
 
-Se retoma despues del Soul Link y los intercambios. Esto queda escrito para no
-repetir la investigacion.
+## Como se usa
+
+1. Descarga `PokeRandoZX.jar` y dejalo en `tools/randomizer/`
+   (instrucciones en `tools/randomizer/LEEME.md`).
+2. Arranca todo con `npm run dev:all`.
+3. Carga tu ROM, abre el menu de opciones y busca el panel "Aleatorizar".
+4. Elige un fichero de ajustes `.rnqs` y pulsa "Aleatorizar y jugar".
+
+La ROM aleatorizada se carga sola en el emulador y se puede descargar para no
+repetir el proceso.
+
+Los ajustes se exportan desde la interfaz de escritorio del randomizer. Si no
+tienes ninguno, se puede generar uno de partida sin abrirla:
+
+    jjs -cp tools/randomizer/PokeRandoZX.jar tools/randomizer/generar-ajustes.js -- ajustes.rnqs
+
+(`jjs` viene con Java 8. El script rellena cuatro campos que un `Settings`
+recien creado deja a null y que harian fallar el guardado.)
+
+## Como esta montado
+
+Un servicio local, `apps/randomizer`, que escucha **solo en 127.0.0.1**.
+Recibe tu ROM y los ajustes, ejecuta el jar por linea de ordenes, devuelve el
+resultado y borra los temporales en un `finally`.
+
+El navegador lo alcanza por `/randomizer`, que el servidor de desarrollo
+redirige al puerto 8788.
 
 ## Lo que se comprobo en el repositorio
 

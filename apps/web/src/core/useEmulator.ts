@@ -43,6 +43,9 @@ export const useEmulator = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const coreRef = useRef<MgbaModule | null>(null);
   const bootedRef = useRef(false);
+  // Guardamos los bytes de la ROM cargada para poder reenviarla al servicio de
+  // aleatorizacion sin pedirle al jugador que vuelva a elegir el fichero.
+  const romBytesRef = useRef<Uint8Array | null>(null);
   const [state, setState] = useState<EmulatorState>(initialState);
 
   const appendLog = useCallback((line: string) => {
@@ -123,7 +126,8 @@ export const useEmulator = () => {
         return;
       }
 
-      const header = readRomHeader(new Uint8Array(await file.arrayBuffer()));
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const header = readRomHeader(bytes);
       if (!header.valid) {
         fail(new Error(`"${file.name}" no parece una ROM de GBA: falta el byte fijo de cabecera.`));
         return;
@@ -131,6 +135,7 @@ export const useEmulator = () => {
 
       try {
         await loadRomFile(core, file);
+        romBytesRef.current = bytes;
         // Los navegadores bloquean el audio hasta que hay interaccion del usuario;
         // elegir el fichero cuenta como tal, asi que este es el momento valido.
         core.resumeAudio();
@@ -147,6 +152,17 @@ export const useEmulator = () => {
       }
     },
     [fail],
+  );
+
+  /**
+   * Carga una ROM que no viene de un fichero elegido por el jugador, como la
+   * que devuelve el servicio de aleatorizacion.
+   */
+  const openRomBytes = useCallback(
+    async (bytes: Uint8Array, fileName: string) => {
+      await openRom(new File([bytes as BlobPart], fileName, { type: 'application/octet-stream' }));
+    },
+    [openRom],
   );
 
   const togglePause = useCallback(() => {
@@ -241,8 +257,10 @@ export const useEmulator = () => {
   return {
     canvasRef,
     coreRef,
+    romBytesRef,
     state,
     openRom,
+    openRomBytes,
     togglePause,
     reset,
     saveState,
