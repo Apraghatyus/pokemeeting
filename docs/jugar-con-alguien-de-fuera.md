@@ -39,17 +39,22 @@ administracion.
 
 ## Que cambia en modo tunel
 
-El modo tunel **retira la pasarela del servicio de aleatorizacion**, y es a
-proposito.
+La aleatorizacion **deja de alcanzarse desde fuera**, pero tu la conservas.
 
 Ese servicio corre en *tu* maquina. A traves del tunel, la ROM de la otra
 persona viajaria hasta tu ordenador para aleatorizarse y volver. No seria
 ilegal, porque es su propio fichero y vuelve a ella, pero la interfaz le dice
 "la ROM no sale de aqui" y dejaria de ser verdad.
 
-Antes que matizar el mensaje, se quita la funcion: quien quiera aleatorizar que
-ejecute su propio servicio. Tu, para ti mismo, sigues teniendolo en
-`http://localhost:5173`.
+El filtro es por host: las peticiones que llegan por `localhost` se atienden y
+las que llegan por el dominio del tunel reciben un 404. Asi tu sigues
+aleatorizando en `http://localhost:5173` mientras tu companero, entrando por el
+enlace, ve que no tiene esa funcion. Si el quiere aleatorizar, que ejecute su
+propio servicio.
+
+Ojo con esto al probar: si abres **tu propio enlace de tunel** en vez de
+localhost, tampoco tendras aleatorizacion, porque para el servidor eres uno mas
+de fuera.
 
 ## Advertencia
 

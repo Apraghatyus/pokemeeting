@@ -32,12 +32,16 @@ const useHttps = process.env['HTTPS'] === '1';
  *    cuyo Host no reconozca, asi que sin esto el tunel devuelve "Blocked
  *    request" y no hay forma de entrar.
  *
- * 2. Se retira la pasarela del servicio de aleatorizacion. Ese servicio corre
- *    en ESTA maquina: a traves del tunel, la ROM de la otra persona viajaria
+ * 2. El servicio de aleatorizacion deja de alcanzarse **desde fuera**. Corre en
+ *    ESTA maquina: a traves del tunel, la ROM de la otra persona viajaria
  *    hasta aqui para aleatorizarse. No es ilegal, porque es su propio fichero
  *    y vuelve a ella, pero la interfaz le dice "la ROM no sale de aqui" y
- *    dejaria de ser verdad. Antes que matizar el mensaje, se quita la funcion:
- *    quien quiera aleatorizar que ejecute su propio servicio.
+ *    dejaria de ser verdad. Quien quiera aleatorizar que ejecute su propio
+ *    servicio.
+ *
+ *    Se filtra por host y no quitando la pasarela entera, que era lo que hacia
+ *    antes: asi quien abre el tunel sigue teniendo la funcion en su propio
+ *    localhost, que es donde siempre fue legitima.
  *
  * No se activa HTTPS aqui: el tunel ya pone el suyo, con certificado de
  * verdad, y la pagina llega al visitante por https.
@@ -58,14 +62,22 @@ const proxy: Record<string, ProxyOptions> = {
   },
 };
 
-if (!useTunnel) {
-  // El servicio de aleatorizacion escucha solo en 127.0.0.1. Pasar por
-  // aqui evita ademas problemas de origen cruzado desde la pagina.
-  proxy['/randomizer'] = {
-    target: 'http://127.0.0.1:8788',
-    rewrite: (path) => path.replace(/^\/randomizer/, ''),
-  };
-}
+/** Hosts que consideramos "esta misma maquina". */
+const isLocalHost = (host: string | undefined): boolean =>
+  /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(host ?? '');
+
+// El servicio de aleatorizacion escucha solo en 127.0.0.1. Pasar por aqui
+// evita ademas problemas de origen cruzado desde la pagina.
+proxy['/randomizer'] = {
+  target: 'http://127.0.0.1:8788',
+  rewrite: (path) => path.replace(/^\/randomizer/, ''),
+  // Con el tunel abierto, solo se atiende a quien viene por localhost. A los
+  // de fuera se les responde 404 y la interfaz les dice, con razon, que no
+  // tienen servicio de aleatorizacion.
+  ...(useTunnel
+    ? { bypass: (req: { headers: { host?: string } }) => (isLocalHost(req.headers.host) ? undefined : false) }
+    : {}),
+};
 
 export default defineConfig({
   plugins: [react(), ...(useHttps ? [basicSsl()] : [])],
