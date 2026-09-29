@@ -217,6 +217,8 @@ export const App = () => {
         gameCode={state.header?.gameCode ?? null}
         yaAleatorizada={state.romSource === 'generada'}
         onRandomized={emulator.openRomBytes}
+        onContinuar={emulator.openSavedGame}
+        onBorrar={emulator.deleteSavedGame}
       />
 
       <RoomModal

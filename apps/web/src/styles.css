@@ -1233,3 +1233,83 @@ button.is-active {
   font-size: 13px;
   font-weight: 600;
 }
+
+/* ---------- partidas guardadas ---------- */
+
+.partidas {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.partidas__titulo {
+  margin: 0 0 2px;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.partida {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.partida__abrir {
+  flex: 1;
+  text-align: left;
+  padding: 8px 10px;
+  line-height: 1.35;
+}
+
+.partida__abrir strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.partida__abrir em {
+  display: block;
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.partida__borrar {
+  width: 34px;
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.partida__borrar:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+/* Partida de otra ROM: se muestra para poder borrarla, no para abrirla. */
+.partida__ajena {
+  flex: 1;
+  padding: 8px 10px;
+  line-height: 1.35;
+  opacity: 0.75;
+}
+
+.partida__ajena strong {
+  display: block;
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.partida__ajena em {
+  display: block;
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--muted);
+}

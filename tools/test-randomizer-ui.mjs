@@ -128,7 +128,8 @@ await page.waitForTimeout(6000);
 const cargada = await page.evaluate(() => globalThis.mGBAModule?.gameName ?? null);
 check(
   'el nucleo tiene cargada la ROM aleatorizada',
-  /-aleatorizada\.gba$/.test(cargada ?? ''),
+  // Cada copia lleva un sufijo propio para no pisar el guardado de otra.
+  /-aleatoria-\w+\.gba$/.test(cargada ?? ''),
   cargada?.split('/').pop() ?? 'ninguna',
 );
 
@@ -140,9 +141,12 @@ await page.locator('.iconbutton--opciones').click();
 await page.getByRole('button', { name: 'Abrir opciones' }).click();
 const modal2 = page.locator('dialog.modal[open]');
 await modal2.locator('.opcion').first().waitFor({ timeout: 25_000 });
+// Ya no se descarta nada: la partida anterior aparece en la lista para volver
+// a ella, y aleatorizar crea otra aparte.
 check(
-  'avisa de que se descartara la copia actual',
-  (await modal2.locator('.warn').count()) >= 1,
+  'ofrece volver a la partida ya creada',
+  (await modal2.locator('.partida').count()) >= 1,
+  `${await modal2.locator('.partida').count()} en la lista`,
 );
 await modal2.getByRole('button', { name: /Aleatorizar y jugar/ }).click();
 await modal2
@@ -154,11 +158,12 @@ await page.waitForTimeout(3000);
 const segunda = await page.evaluate(() => globalThis.mGBAModule?.gameName ?? null);
 check(
   'la segunda no encadena nombres sobre la primera',
-  !/-aleatorizada-aleatorizada/.test(segunda ?? ''),
+  !/-aleatorizada-aleatorizada|-aleatoria-\w+-aleatoria/.test(segunda ?? ''),
   segunda?.split('/').pop() ?? 'ninguna',
 );
 
-// Y no debe quedar basura: la original y una sola copia.
+// Cada aleatorizacion es una partida aparte, asi que ahora SI se conservan:
+// la original mas una copia por cada vez que se aleatorizo.
 const ficheros = await page.evaluate(() => {
   const m = globalThis.mGBAModule;
   try {
@@ -167,8 +172,8 @@ const ficheros = await page.evaluate(() => {
     return [];
   }
 });
-check('no se acumulan copias en el sistema de ficheros', ficheros.length === 2,
-  `${ficheros.length} ficheros`);
+check('cada aleatorizacion conserva su propia copia', ficheros.length === 3,
+  `${ficheros.length} ficheros: ${ficheros.map((f) => f.slice(-16)).join(' | ')}`);
 
 // --- y se puede cambiar de ROM sin recargar ---
 await page.locator('.iconbutton--opciones').click();

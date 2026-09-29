@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   applyDefaultKeyBindings,
+  loadExistingRom,
   loadRomFile,
   SAVESTATE,
   startCore,
@@ -54,10 +55,7 @@ const toMultiplier = (percent: number): number => percent / 100;
  */
 const discardGeneratedRom = (core: MgbaModule, romPath: string | null): void => {
   if (!romPath) return;
-  const saveName = romPath.split('/').pop()?.replace(/\.gba$/i, '.sav');
-  const savePath = saveName ? `${core.filePaths().savePath}/${saveName}` : null;
-
-  for (const path of [romPath, savePath]) {
+  for (const path of [romPath, savePathFor(core, romPath)]) {
     if (!path) continue;
     try {
       if (core.FS.analyzePath(path).exists) core.FS.unlink(path);
@@ -65,6 +63,12 @@ const discardGeneratedRom = (core: MgbaModule, romPath: string | null): void => 
       // Si no se puede borrar no es grave: se sobrescribira.
     }
   }
+};
+
+/** Ruta del fichero de partida que mGBA asocia a una ROM. */
+const savePathFor = (core: MgbaModule, romPath: string): string | null => {
+  const name = romPath.split('/').pop()?.replace(/\.gba$/i, '.sav');
+  return name ? `${core.filePaths().savePath}/${name}` : null;
 };
 
 const VOLUME_KEY = 'emupoke.volumen';
@@ -126,7 +130,7 @@ export const useEmulator = () => {
    * partia de esa en vez de la original. Salian copias encadenadas
    * ("-aleatorizada-aleatorizada") y nunca una partida nueva limpia.
    */
-  const baseRomRef = useRef<{ bytes: Uint8Array; fileName: string } | null>(null);
+  const baseRomRef = useRef<{ bytes: Uint8Array; fileName: string; crc32: string } | null>(null);
 
   /** Ruta de la ultima ROM generada, para poder borrarla al hacer otra. */
   const generatedPathRef = useRef<string | null>(null);
@@ -224,19 +228,17 @@ export const useEmulator = () => {
         // La copia anterior se descarta al cambiar de ROM, pero SOLO cuando el
         // nucleo ya la ha cerrado: borrarle el fichero mientras lo tiene
         // abierto es pedir problemas. De eso se encarga el gancho.
-        const previous = generatedPathRef.current;
-        const loaded = await loadRomFile(core, file, () => {
-          discardGeneratedRom(core, previous);
-        });
+        // Cada copia generada estrena su propio nombre, asi que no hay nada
+        // que descartar: no puede heredar el guardado de otra.
+        const loaded = await loadRomFile(core, file);
         romBytesRef.current = bytes;
 
         if (source === 'usuario') {
-          // Elegir una ROM empieza de cero: deja de haber copia generada.
-          generatedPathRef.current = null;
-          baseRomRef.current = { bytes, fileName: file.name };
-        } else {
-          generatedPathRef.current = loaded.romPath;
+          baseRomRef.current = { bytes, fileName: file.name, crc32: header.crc32 };
         }
+        generatedPathRef.current = source === 'generada' ? loaded.romPath : null;
+        // Persistir en IndexedDB para que la copia sobreviva a recargar.
+        if (source === 'generada') void core.FSSync();
 
         // Los navegadores bloquean el audio hasta que hay interaccion del usuario;
         // elegir el fichero cuenta como tal, asi que este es el momento valido.
@@ -270,6 +272,53 @@ export const useEmulator = () => {
     },
     [openRom],
   );
+
+  /**
+   * Continua una partida guardada.
+   *
+   * No se vuelve a subir nada: la ROM y su guardado ya estan en el sistema de
+   * ficheros del nucleo, persistidos desde la sesion en que se crearon.
+   */
+  const openSavedGame = useCallback(
+    async (fileName: string) => {
+      const core = coreRef.current;
+      if (!core) return;
+
+      const romPath = `${core.filePaths().gamePath}/${fileName}`;
+      try {
+        if (!core.FS.analyzePath(romPath).exists) {
+          throw new Error(`Ya no esta el fichero de esa partida ("${fileName}").`);
+        }
+        const bytes = core.FS.readFile(romPath);
+        const header = readRomHeader(bytes);
+
+        await loadExistingRom(core, romPath);
+        core.resumeAudio();
+        romBytesRef.current = bytes;
+        generatedPathRef.current = romPath;
+        setState((prev) => ({
+          ...prev,
+          status: 'running',
+          header,
+          platform: detectPlatform(fileName),
+          romName: fileName,
+          romSource: 'generada',
+          error: null,
+        }));
+      } catch (err) {
+        fail(err);
+      }
+    },
+    [fail],
+  );
+
+  /** Borra una partida guardada: su ROM y su fichero de guardado. */
+  const deleteSavedGame = useCallback((fileName: string) => {
+    const core = coreRef.current;
+    if (!core) return;
+    discardGeneratedRom(core, `${core.filePaths().gamePath}/${fileName}`);
+    void core.FSSync();
+  }, []);
 
   const togglePause = useCallback(() => {
     const core = coreRef.current;
@@ -414,6 +463,8 @@ export const useEmulator = () => {
     romBytesRef,
     baseRomRef,
     closeRom,
+    openSavedGame,
+    deleteSavedGame,
     state,
     openRom,
     openRomBytes,

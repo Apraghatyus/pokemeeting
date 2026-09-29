@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import {
   checkRandomizer,
   randomizeRom,
@@ -6,6 +6,18 @@ import {
   type RandomizerStatus,
   type RandomizeSummary,
 } from '../net/randomizer';
+import {
+  cuando,
+  MAX_PARTIDAS,
+  nombreParaNueva,
+  olvidar,
+  partidasDe,
+  registrar,
+  resumirCambios,
+  tocar,
+  todasLasPartidas,
+  type PartidaGuardada,
+} from '../core/partidas';
 import { Modal } from './Modal';
 
 type Props = {
@@ -17,12 +29,16 @@ type Props = {
    * Aleatorizar siempre parte de la original. Partir de la que corre encadenaba
    * copias sobre copias y nunca daba una partida nueva limpia.
    */
-  baseRom: RefObject<{ bytes: Uint8Array; fileName: string } | null>;
+  baseRom: RefObject<{ bytes: Uint8Array; fileName: string; crc32: string } | null>;
   gameCode: string | null;
   /** true si lo que corre ahora ya es una copia generada por nosotros. */
   yaAleatorizada: boolean;
   /** Carga en el emulador la ROM ya aleatorizada. */
   onRandomized: (bytes: Uint8Array, fileName: string) => Promise<void>;
+  /** Continua una partida guardada que ya esta en el nucleo. */
+  onContinuar: (fileName: string) => Promise<void>;
+  /** Borra los ficheros de una partida guardada. */
+  onBorrar: (fileName: string) => void;
 };
 
 type Progress =
@@ -51,11 +67,29 @@ export const RandomizerModal = ({
   gameCode,
   yaAleatorizada,
   onRandomized,
+  onContinuar,
+  onBorrar,
 }: Props) => {
   const [status, setStatus] = useState<RandomizerStatus>({ estado: 'comprobando' });
   const [progress, setProgress] = useState<Progress>({ fase: 'eligiendo' });
   const [selected, setSelected] = useState<Set<string>>(new Set(DEFAULT_SELECTION));
+  const [partidas, setPartidas] = useState<PartidaGuardada[]>([]);
+  const [otras, setOtras] = useState<PartidaGuardada[]>([]);
   const lastRom = useRef<Uint8Array | null>(null);
+
+  // La lista se relee al abrir: puede haber cambiado desde la vez anterior.
+  const releer = useCallback(() => {
+    const crc = baseRom.current?.crc32 ?? '';
+    setPartidas(partidasDe(crc));
+    // Las de otras ROMs tambien ocupan sitio, asi que hay que poder borrarlas
+    // desde aqui: si no, con el cupo lleno de partidas de otro juego no habria
+    // forma de hacer hueco.
+    setOtras(todasLasPartidas().filter((p) => p.baseCrc32 !== crc));
+  }, [baseRom]);
+
+  useEffect(() => {
+    if (open) releer();
+  }, [open, releer]);
 
   useEffect(() => {
     if (open) void checkRandomizer().then(setStatus);
@@ -73,8 +107,14 @@ export const RandomizerModal = ({
 
   const supported = gameCode !== null && SUPPORTED.has(gameCode.slice(0, 3));
   const options = status.estado === 'listo' ? status.health.options : [];
+  const guardadas = partidas.length + otras.length;
+  const lleno = guardadas >= MAX_PARTIDAS;
   const canRandomize =
-    status.estado === 'listo' && supported && selected.size > 0 && progress.fase !== 'trabajando';
+    status.estado === 'listo' &&
+    supported &&
+    selected.size > 0 &&
+    !lleno &&
+    progress.fase !== 'trabajando';
 
   const toggle = (id: string) => {
     setSelected((prev) => {
@@ -94,8 +134,18 @@ export const RandomizerModal = ({
       // Siempre desde la original: asi el nombre tampoco se encadena.
       const result = await randomizeRom({ options: [...selected] }, base.bytes);
       lastRom.current = result.rom;
-      const fileName = base.fileName.replace(/\.gba$/i, '') + '-aleatorizada.gba';
+
+      // Nombre propio para cada copia: asi conviven varias partidas de la
+      // misma ROM sin pisarse el fichero de guardado.
+      const fileName = nombreParaNueva(base.fileName);
       await onRandomized(result.rom, fileName);
+      registrar({
+        fichero: fileName,
+        baseNombre: base.fileName,
+        baseCrc32: base.crc32,
+        semilla: result.seed,
+        cambiado: result.summary.changed,
+      });
       setProgress({ fase: 'hecho', seed: result.seed, fileName, summary: result.summary });
     } catch (error) {
       setProgress({
@@ -169,14 +219,86 @@ export const RandomizerModal = ({
                 </p>
               )}
 
-              {/* Aleatorizar otra vez no retoca la partida en marcha: genera
-                  otra copia desde la ROM original y tira la anterior. */}
-              {yaAleatorizada && (
+              {partidas.length > 0 && (
+                <div className="partidas">
+                  <p className="partidas__titulo">Partidas guardadas de esta ROM</p>
+                  {partidas.map((partida) => (
+                    <div className="partida" key={partida.id}>
+                      <button
+                        type="button"
+                        className="partida__abrir"
+                        onClick={() => {
+                          tocar(partida.id);
+                          void onContinuar(partida.fichero).then(onClose);
+                        }}
+                      >
+                        <strong>{resumirCambios(partida.cambiado)}</strong>
+                        <em>
+                          {cuando(partida.creada)}
+                          {partida.semilla ? ` · semilla ${partida.semilla.slice(-6)}` : ''}
+                        </em>
+                      </button>
+                      <button
+                        type="button"
+                        className="partida__borrar"
+                        title="Borrar esta partida"
+                        aria-label={`Borrar la partida de ${cuando(partida.creada)}`}
+                        onClick={() => {
+                          onBorrar(partida.fichero);
+                          olvidar(partida.id);
+                          releer();
+                        }}
+                      >
+                        x
+                      </button>
+                    </div>
+                  ))}
+                  <p className="hint">
+                    Aleatorizar de nuevo crea otra partida aparte. Ninguna se pierde.
+                  </p>
+                </div>
+              )}
+
+              {/* Con el cupo lleno hay que poder hacer hueco desde aqui, incluso
+                  si lo ocupan partidas de otro juego. */}
+              {lleno && otras.length > 0 && (
+                <div className="partidas">
+                  <p className="partidas__titulo">De otras ROMs</p>
+                  {otras.map((partida) => (
+                    <div className="partida" key={partida.id}>
+                      <span className="partida__ajena">
+                        <strong>{partida.baseNombre.replace(/\.gba$/i, '')}</strong>
+                        <em>
+                          {resumirCambios(partida.cambiado)} · {cuando(partida.creada)}
+                        </em>
+                      </span>
+                      <button
+                        type="button"
+                        className="partida__borrar"
+                        title="Borrar esta partida"
+                        aria-label={`Borrar la partida de ${partida.baseNombre}`}
+                        onClick={() => {
+                          onBorrar(partida.fichero);
+                          olvidar(partida.id);
+                          releer();
+                        }}
+                      >
+                        x
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {lleno && (
                 <p className="warn">
-                  Ya estas jugando una copia aleatorizada. Si aleatorizas otra vez se genera una
-                  nueva desde tu ROM original y se descarta esta, con su partida guardada.
-                  Descargala antes si quieres conservarla.
+                  Tienes {guardadas} partidas guardadas, el maximo. Cada una es una ROM entera
+                  ocupando sitio en el navegador: borra alguna para crear otra.
                 </p>
+              )}
+
+              {yaAleatorizada && partidas.length === 0 && (
+                <p className="hint">Ya estas jugando una copia aleatorizada.</p>
               )}
 
               <div className="opciones">

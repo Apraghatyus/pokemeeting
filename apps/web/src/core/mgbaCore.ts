@@ -201,6 +201,23 @@ export const DEFAULT_KEY_BINDINGS: readonly (readonly [sdlKey: string, gbaInput:
   ['Backspace', 'Select'],
 ];
 
+/**
+ * Arranca una ROM que ya esta en el sistema de ficheros del nucleo.
+ *
+ * Es el camino para continuar una partida guardada: el fichero y su .sav ya
+ * estan ahi, asi que no hay nada que subir, solo cerrar el juego anterior y
+ * abrir este.
+ */
+export const loadExistingRom = async (core: MgbaModule, romPath: string): Promise<void> => {
+  if (core.gameName) {
+    core.quitGame();
+    await new Promise((resolve) => setTimeout(resolve, 120));
+  }
+  if (!core.loadGame(romPath)) {
+    throw new Error(`No se pudo abrir "${romPath.split('/').pop()}". Puede que ya no exista.`);
+  }
+};
+
 export const applyDefaultKeyBindings = (core: MgbaModule): void => {
   for (const [sdlKey, gbaInput] of DEFAULT_KEY_BINDINGS) {
     core.bindKey(sdlKey, gbaInput);
