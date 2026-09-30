@@ -8,6 +8,7 @@ type Props = {
   onSaveState: (slot: number) => void;
   onLoadState: (slot: number) => void;
   onDownloadSave: () => void;
+  onExportState: () => void;
   onImportSave: (file: File) => void;
   onFastForward: (enabled: boolean) => void;
 };
@@ -21,6 +22,7 @@ export const Toolbar = ({
   onSaveState,
   onLoadState,
   onDownloadSave,
+  onExportState,
   onImportSave,
   onFastForward,
 }: Props) => {
@@ -61,6 +63,11 @@ export const Toolbar = ({
 
       <button type="button" disabled={!playing} onClick={onDownloadSave}>
         Exportar .sav
+      </button>
+      {/* El estado sirve aunque no se haya guardado dentro del juego: captura
+          la memoria tal y como esta ahora mismo. */}
+      <button type="button" disabled={!playing} onClick={onExportState}>
+        Exportar estado
       </button>
       <button type="button" disabled={!playing} onClick={() => saveInputRef.current?.click()}>
         Importar .sav

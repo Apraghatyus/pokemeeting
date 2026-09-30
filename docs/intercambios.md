@@ -95,16 +95,34 @@ Lo primero que hay que entender es que **el bloque de 100 bytes guarda indices,
 no definiciones**. Dice "especie 25", "movimiento 85", "objeto 13". Que es la
 especie 25, cuanto ataque tiene y como se llama vive en la ROM, no en el bloque.
 
-De ahi sale la consecuencia que conviene tener clara y avisar en la interfaz:
+Aqui hubo una suposicion equivocada que conviene dejar corregida, porque
+cambia lo que hay que decirle al jugador.
 
-> Un Pokemon intercambiado entre dos aleatorizaciones distintas llega intacto,
-> pero **puede ser otra criatura al llegar**. Si en tu juego la especie 25 es un
-> Pikachu y en el suyo es un Golem, tu companero recibira un Golem con el mote,
-> los IV y la experiencia del que le mandaste.
+**Lo que se creia:** que un Pokemon intercambiado entre dos aleatorizaciones
+llegaria convertido en otra especie, porque el numero de especie significaria
+cosas distintas en cada ROM.
 
-Esto no es un fallo nuestro: es exactamente lo que pasaria con dos cartuchos
-randomizados distintos y un cable link de verdad. Lo que no podemos hacer es
-ocultarlo.
+**Lo que pasa de verdad**, comprobado generando dos copias aleatorizadas de la
+misma ROM y comparandolas: la tabla de nombres queda **identica** en las dos.
+El randomizer no renombra especies, cambia sus datos. Un Bulbasaur llega como
+Bulbasaur.
+
+Lo que si cambia:
+
+> El Pokemon conserva su nombre, su mote, sus IV y su experiencia, pero pasa a
+> tener las **estadisticas, el tipo y la habilidad** que esa especie tenga en la
+> ROM que lo recibe. Un Bulbasaur con 45 de PS en una copia puede tener 30 en
+> la otra.
+
+Medido sobre dos copias reales:
+
+| | original | copia A | copia B |
+|---|---|---|---|
+| Nombre de la especie 1 | BULBASAUR | BULBASAUR | BULBASAUR |
+| Sus PS base | 45 | 30 | 53 |
+
+Sigue siendo lo mismo que pasaria con dos cartuchos randomizados y un cable
+link de verdad, y sigue habiendo que decirlo. Pero decirlo bien.
 
 ### Lo que si puede romper de verdad
 

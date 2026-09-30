@@ -86,7 +86,10 @@ export const compareRoms = (mine: RomFingerprint, theirs: RomFingerprint): RomCo
 
   const notes = [
     'Misma edicion pero copias distintas: es lo esperado si cada uno randomiza la suya.',
-    'Al estar randomizadas por separado, un Pokemon intercambiado puede llegar convertido en otra especie: lo que viaja es el numero de especie, y que especie es ese numero lo decide cada ROM.',
+    // Comprobado generando dos copias aleatorizadas de la misma ROM: la tabla
+    // de nombres queda identica en las dos. Lo que el randomizer cambia son
+    // los datos de cada especie, no como se llama.
+    'Al estar randomizadas por separado, un Pokemon intercambiado llega con su nombre intacto, pero con las estadisticas, el tipo y la habilidad que tenga esa especie en la ROM que lo recibe.',
   ];
 
   if (mine.version !== theirs.version) {

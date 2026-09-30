@@ -118,6 +118,7 @@ export const App = () => {
                 onSaveState={emulator.saveState}
                 onLoadState={emulator.loadState}
                 onDownloadSave={emulator.downloadSave}
+                onExportState={emulator.exportState}
                 onImportSave={emulator.importSave}
                 onFastForward={emulator.setFastForward}
               />

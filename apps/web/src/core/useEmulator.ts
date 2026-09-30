@@ -38,6 +38,9 @@ export const MAX_VOLUME = 200;
 
 const DEFAULT_VOLUME = 70;
 
+/** Ranura que usa la exportacion, aparte de la que usa el jugador. */
+const EXPORT_SLOT = 9;
+
 /**
  * El nucleo quiere un multiplicador (1.0 = 100%), no un porcentaje.
  *
@@ -375,6 +378,18 @@ export const useEmulator = () => {
       appendLog('todavia no hay partida guardada que exportar');
       return;
     }
+
+    // Una partida en blanco son todo ceros, y exportarla confunde mucho: el
+    // fichero parece correcto y esta vacio. Solo se escribe al guardar DENTRO
+    // del juego, no basta con haber jugado.
+    if (save.every((byte) => byte === 0)) {
+      fail(
+        new Error(
+          'Tu partida esta vacia: el juego solo la escribe al guardar desde su menu. Guarda dentro del juego y vuelve a exportar.',
+        ),
+      );
+      return;
+    }
     const baseName = (core.gameName ?? 'partida').replace(/\.[^.]+$/, '');
     const url = URL.createObjectURL(new Blob([save as BlobPart], { type: 'application/octet-stream' }));
     const anchor = document.createElement('a');
@@ -383,6 +398,46 @@ export const useEmulator = () => {
     anchor.click();
     URL.revokeObjectURL(url);
   }, [appendLog]);
+
+  /**
+   * Descarga el estado completo del emulador.
+   *
+   * A diferencia del .sav, esto captura la memoria viva: sirve aunque no se
+   * haya guardado dentro del juego. Es ademas de donde saldran los datos para
+   * los intercambios, asi que poder sacarlo a un fichero hace falta para
+   * poder trabajar con partidas reales.
+   */
+  const exportState = useCallback(() => {
+    const core = coreRef.current;
+    if (!core?.gameName) {
+      appendLog('no hay ningun juego cargado');
+      return;
+    }
+
+    // Sin banderas: la estructura cruda, sin captura de pantalla. Son los
+    // 0x61000 bytes que sabemos interpretar.
+    if (!core.saveStateSlot(EXPORT_SLOT, 0)) {
+      fail(new Error('mGBA no pudo guardar el estado.'));
+      return;
+    }
+
+    const base = core.gameName.split('/').pop()?.replace(/\.gba$/i, '') ?? 'partida';
+    const ruta = `${core.filePaths().saveStatePath}/${base}.ss${EXPORT_SLOT}`;
+    try {
+      const bytes = core.FS.readFile(ruta);
+      const url = URL.createObjectURL(
+        new Blob([bytes as BlobPart], { type: 'application/octet-stream' }),
+      );
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${base}.estado.bin`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      appendLog(`estado exportado: ${bytes.length} bytes`);
+    } catch (err) {
+      fail(err);
+    }
+  }, [appendLog, fail]);
 
   /** Importa un .sav existente para continuar una partida empezada en otro emulador. */
   const importSave = useCallback(
@@ -473,6 +528,7 @@ export const useEmulator = () => {
     saveState,
     loadState,
     downloadSave,
+    exportState,
     importSave,
     setFastForward,
     setVolume,

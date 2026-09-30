@@ -57,8 +57,8 @@ check('una ROM que no es Pokemon NO comparte sala', !otro.canPlayTogether);
 const random = compareRoms(rom('BPRS', 'aaa'), rom('BPRS', 'bbb'));
 check('dos aleatorizaciones de la misma edicion se permiten', random.canPlayTogether);
 check('y se pueden intercambiar', random.canTrade);
-check('avisando de que un Pokemon puede llegar como otra especie',
-  random.notes.some((n) => /otra especie/.test(n)));
+check('avisando de que cambian estadisticas, tipo y habilidad',
+  random.notes.some((n) => /estadisticas, el tipo y la habilidad/.test(n)));
 
 const iguales = compareRoms(rom('BPRS', 'aaa'), rom('BPRS', 'aaa'));
 check('la misma copia se reconoce como identica', iguales.level === 'identica');
