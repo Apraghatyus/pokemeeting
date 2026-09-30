@@ -88,8 +88,18 @@ export type RandomizeSummary = {
 
 export type RandomizeResult = {
   rom: Uint8Array;
-  /** Semilla que uso el randomizer, si aparecio en su registro. */
+  /** Semilla con la que se genero. Es media receta para rehacerla. */
   seed: string | null;
+  /** La otra media: los ajustes exactos, en el formato del randomizer. */
+  ajustes: string | null;
+  /**
+   * Si esta copia se podra rehacer mas adelante.
+   *
+   * Es false cuando el servicio tuvo que tirar de la linea de ordenes del
+   * randomizer, que escoge la semilla ella sola. Entonces la copia existe pero
+   * no hay forma de volver a generarla, y eso hay que decirlo.
+   */
+  reproducible: boolean;
   /** Que ha cambiado. Vacio significa que los ajustes no tocaron nada. */
   summary: RandomizeSummary;
 };
@@ -115,9 +125,17 @@ export type RandomizeRequest = {
   options?: string[];
   /** Alternativa: un .rnqs exportado del randomizer de escritorio. */
   settingsBase64?: string;
+  /** Ajustes guardados de una partida que se esta rehaciendo. */
+  settingsString?: string;
+  /** Semilla concreta: con ella sale la misma copia de siempre. */
+  seed?: string;
 };
 
 export class RandomizerError extends Error {}
+
+/** Las cabeceras HTTP son ASCII, asi que lo que lleva acentos viaja en base64. */
+const desdeBase64 = (texto: string): Uint8Array =>
+  Uint8Array.from(atob(texto), (c) => c.charCodeAt(0));
 
 /**
  * Cabecera propia, no `Content-Encoding`.
@@ -164,6 +182,7 @@ export const randomizeRom = async (
   }
 
   const encoded = response.headers.get('x-summary');
+  const ajustes = response.headers.get('x-settings');
   const payload = await response.arrayBuffer();
   return {
     rom:
@@ -171,8 +190,10 @@ export const randomizeRom = async (
         ? await gunzip(payload)
         : new Uint8Array(payload),
     seed: response.headers.get('x-seed'),
+    ajustes: ajustes ? new TextDecoder().decode(desdeBase64(ajustes)) : null,
+    reproducible: response.headers.get('x-reproducible') === '1',
     summary: encoded
-      ? (JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0)))) as RandomizeSummary)
+      ? (JSON.parse(new TextDecoder().decode(desdeBase64(encoded))) as RandomizeSummary)
       : { changed: [], starters: [] },
   };
 };

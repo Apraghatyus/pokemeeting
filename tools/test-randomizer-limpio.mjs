@@ -49,7 +49,8 @@ const aleatorizar = async () => {
   const texto = ((await modal.textContent()) ?? '').replace(/\s+/g, ' ');
   await modal.getByRole('button', { name: 'Empezar a jugar' }).click();
   await page.waitForTimeout(2500);
-  return /Semilla usada: (\d+)/.exec(texto)?.[1] ?? null;
+  // La semilla va dentro de la receta, que es el cuarto campo de la linea.
+  return /EMUPOKE1\.[0-9a-f]{8}\.[0-9a-f]{8}\.(\d+)\./.exec(texto)?.[1] ?? null;
 };
 
 const guardados = () =>
@@ -107,7 +108,7 @@ check('se ofrece la partida guardada de esta ROM', (await modal.locator('.partid
 await modal.getByRole('button', { name: 'Aleatorizar y jugar' }).click();
 await modal.locator('.modal__title', { hasText: 'Partida aleatorizada' }).waitFor({ timeout: 300_000 });
 const texto2 = ((await modal.textContent()) ?? '').replace(/\s+/g, ' ');
-const segunda = /Semilla usada: (\d+)/.exec(texto2)?.[1] ?? null;
+const segunda = /EMUPOKE1\.[0-9a-f]{8}\.[0-9a-f]{8}\.(\d+)\./.exec(texto2)?.[1] ?? null;
 await modal.getByRole('button', { name: 'Empezar a jugar' }).click();
 await page.waitForTimeout(2500);
 check('la segunda aleatorizacion usa otra semilla', segunda !== null && segunda !== primera,

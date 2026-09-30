@@ -33,6 +33,8 @@
     "memoria:volcar": "node tools/memoria/volcar-savestate.mjs",
     "memoria:analizar": "npx tsx tools/memoria/analizar-savestate.mjs",
     "memoria:nombres": "npx tsx tools/memoria/buscar-nombres.mjs",
+    "test:receta": "node tools/test-receta.mjs",
+    "test:semilla": "node tools/test-semilla.mjs",
     "test:estadisticas": "npx tsx tools/memoria/test-estadisticas.mjs",
     "memoria:intercambiar": "npx tsx tools/memoria/intercambiar.mjs"
   },

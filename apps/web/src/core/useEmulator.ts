@@ -315,6 +315,19 @@ export const useEmulator = () => {
     [fail],
   );
 
+  /**
+   * Si la copia de una partida guardada sigue en este navegador.
+   *
+   * El navegador puede haber tirado los datos para hacer sitio, o el jugador
+   * puede estar en otro ordenador. En ese caso la partida no se abre: se
+   * rehace desde su semilla, que para eso se guarda.
+   */
+  const existeGuardada = useCallback((fileName: string): boolean => {
+    const core = coreRef.current;
+    if (!core) return false;
+    return core.FS.analyzePath(`${core.filePaths().gamePath}/${fileName}`).exists;
+  }, []);
+
   /** Borra una partida guardada: su ROM y su fichero de guardado. */
   const deleteSavedGame = useCallback((fileName: string) => {
     const core = coreRef.current;
@@ -519,6 +532,7 @@ export const useEmulator = () => {
     baseRomRef,
     closeRom,
     openSavedGame,
+    existeGuardada,
     deleteSavedGame,
     state,
     openRom,

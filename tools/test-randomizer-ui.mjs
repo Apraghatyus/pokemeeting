@@ -115,8 +115,12 @@ check(
   /Ha cambiado: ([^.]+)/.exec(texto)?.[1] ?? texto.slice(0, 120),
 );
 check('se nombran los nuevos iniciales', /Iniciales/.test(texto),
-  /Iniciales\s*(.+?)Semilla/.exec(texto.replace(/\s+/g, ' '))?.[1]?.trim() ?? '');
-check('se informa de la semilla', /Semilla usada: \d+/.test(texto));
+  /Iniciales\s*(.+?)Receta/.exec(texto.replace(/\s+/g, ' '))?.[1]?.trim() ?? '');
+// Antes aqui se comprobaba un "Semilla usada: N" suelto. Ahora la semilla va
+// dentro de la receta, que es lo unico que sirve para rehacer la partida: una
+// semilla sin sus ajustes no reconstruye nada.
+check('se da la receta para rehacer la partida', /EMUPOKE1\.[0-9a-f]{8}\.[0-9a-f]{8}\.\d+\./.test(texto),
+  /EMUPOKE1\.\S{0,30}/.exec(texto)?.[0] ?? texto.slice(0, 120));
 
 await page.screenshot({ path: `${SHOTS}/ui-randomizer.png`, fullPage: true });
 

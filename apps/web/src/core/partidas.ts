@@ -20,9 +20,34 @@ export type PartidaGuardada = {
   creada: number;
   jugada: number;
   semilla: string | null;
+  /**
+   * Los ajustes exactos, en el formato del propio randomizer.
+   *
+   * Junto con la semilla y la ROM base, esto es todo lo que hace falta para
+   * volver a generar esta misma copia byte a byte. Por eso no se descarga
+   * nada: la copia no se guarda fuera, se sabe rehacer.
+   */
+  ajustes: string | null;
+  /**
+   * CRC de la copia generada.
+   *
+   * Sirve para comprobar que una copia rehecha es de verdad la misma. Sin esa
+   * comprobacion, un randomizer actualizado podria dar un mundo parecido pero
+   * distinto, y el guardado dejaria de encajar sin que nadie supiera por que.
+   */
+  crc32: string | null;
   /** Apartados que se aleatorizaron. */
   cambiado: string[];
 };
+
+/**
+ * Si una partida se puede volver a generar desde su receta.
+ *
+ * Las partidas creadas antes de que existiera la receta no la tienen, y las
+ * hechas sin jjs tampoco: en esos casos la copia vive solo en este navegador.
+ */
+export const sePuedeRehacer = (partida: PartidaGuardada): boolean =>
+  Boolean(partida.semilla && partida.ajustes);
 
 const CLAVE = 'emupoke.partidas';
 

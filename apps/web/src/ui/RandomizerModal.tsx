@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useState, type RefObject } from 'react';
 import {
   checkRandomizer,
   randomizeRom,
@@ -14,10 +14,13 @@ import {
   partidasDe,
   registrar,
   resumirCambios,
+  sePuedeRehacer,
   tocar,
   todasLasPartidas,
   type PartidaGuardada,
 } from '../core/partidas';
+import { crc32 } from '../core/romHeader';
+import { codificarReceta, descodificarReceta } from '../core/receta';
 import { Modal } from './Modal';
 
 type Props = {
@@ -39,12 +42,21 @@ type Props = {
   onContinuar: (fileName: string) => Promise<void>;
   /** Borra los ficheros de una partida guardada. */
   onBorrar: (fileName: string) => void;
+  /** Si la copia de una partida sigue en el navegador o hay que rehacerla. */
+  existeGuardada: (fileName: string) => boolean;
 };
 
 type Progress =
   | { fase: 'eligiendo' }
   | { fase: 'trabajando' }
-  | { fase: 'hecho'; seed: string | null; fileName: string; summary: RandomizeSummary }
+  | {
+      fase: 'hecho';
+      seed: string | null;
+      fileName: string;
+      summary: RandomizeSummary;
+      /** Como rehacer esta copia, o null si no se va a poder. */
+      receta: string | null;
+    }
   | { fase: 'error'; message: string };
 
 /** Alcance acordado: de momento solo Rojo Fuego y Verde Hoja. */
@@ -69,13 +81,14 @@ export const RandomizerModal = ({
   onRandomized,
   onContinuar,
   onBorrar,
+  existeGuardada,
 }: Props) => {
   const [status, setStatus] = useState<RandomizerStatus>({ estado: 'comprobando' });
   const [progress, setProgress] = useState<Progress>({ fase: 'eligiendo' });
   const [selected, setSelected] = useState<Set<string>>(new Set(DEFAULT_SELECTION));
   const [partidas, setPartidas] = useState<PartidaGuardada[]>([]);
   const [otras, setOtras] = useState<PartidaGuardada[]>([]);
-  const lastRom = useRef<Uint8Array | null>(null);
+  const [recetaPegada, setRecetaPegada] = useState('');
 
   // La lista se relee al abrir: puede haber cambiado desde la vez anterior.
   const releer = useCallback(() => {
@@ -133,20 +146,37 @@ export const RandomizerModal = ({
     try {
       // Siempre desde la original: asi el nombre tampoco se encadena.
       const result = await randomizeRom({ options: [...selected] }, base.bytes);
-      lastRom.current = result.rom;
 
       // Nombre propio para cada copia: asi conviven varias partidas de la
       // misma ROM sin pisarse el fichero de guardado.
       const fileName = nombreParaNueva(base.fileName);
+      const generada = crc32(result.rom);
       await onRandomized(result.rom, fileName);
       registrar({
         fichero: fileName,
         baseNombre: base.fileName,
         baseCrc32: base.crc32,
         semilla: result.seed,
+        ajustes: result.ajustes,
+        crc32: generada,
         cambiado: result.summary.changed,
       });
-      setProgress({ fase: 'hecho', seed: result.seed, fileName, summary: result.summary });
+      setProgress({
+        fase: 'hecho',
+        seed: result.seed,
+        fileName,
+        summary: result.summary,
+        // La receta solo tiene sentido si de verdad se puede rehacer con ella.
+        receta:
+          result.reproducible && result.seed && result.ajustes
+            ? codificarReceta({
+                baseCrc32: base.crc32,
+                crc32: generada,
+                semilla: result.seed,
+                ajustes: result.ajustes,
+              })
+            : null,
+      });
     } catch (error) {
       setProgress({
         fase: 'error',
@@ -155,17 +185,110 @@ export const RandomizerModal = ({
     }
   };
 
-  /** Descarga la ROM aleatorizada para poder reutilizarla sin repetir el proceso. */
-  const download = () => {
-    if (progress.fase !== 'hecho' || !lastRom.current) return;
-    const url = URL.createObjectURL(
-      new Blob([lastRom.current as BlobPart], { type: 'application/octet-stream' }),
-    );
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = progress.fileName;
-    anchor.click();
-    URL.revokeObjectURL(url);
+  /**
+   * Rehace una partida a partir de una receta que trae el jugador.
+   *
+   * El mismo camino que `rehacer`, pero para una copia de la que este
+   * navegador no sabe nada: otro ordenador, u otra persona que quiere jugar
+   * exactamente el mismo mundo.
+   */
+  const desdeReceta = async () => {
+    const base = baseRom.current;
+    const receta = descodificarReceta(recetaPegada);
+    if (!base) return;
+    if (!receta) {
+      setProgress({ fase: 'error', message: 'Esa receta no se entiende. Copiala entera.' });
+      return;
+    }
+    if (receta.baseCrc32 !== base.crc32) {
+      setProgress({
+        fase: 'error',
+        message:
+          'Esa receta es de otra copia de la ROM original. Hace falta exactamente la misma con la que se creo.',
+      });
+      return;
+    }
+
+    setProgress({ fase: 'trabajando' });
+    try {
+      const result = await randomizeRom(
+        { settingsString: receta.ajustes, seed: receta.semilla },
+        base.bytes,
+      );
+      const generada = crc32(result.rom);
+      if (generada !== receta.crc32) {
+        setProgress({
+          fase: 'error',
+          message:
+            'Lo generado no coincide con lo que dice la receta, seguramente por una version distinta del randomizer. No lo cargo: seria otro mundo.',
+        });
+        return;
+      }
+      const fileName = nombreParaNueva(base.fileName);
+      await onRandomized(result.rom, fileName);
+      registrar({
+        fichero: fileName,
+        baseNombre: base.fileName,
+        baseCrc32: base.crc32,
+        semilla: receta.semilla,
+        ajustes: receta.ajustes,
+        crc32: generada,
+        cambiado: result.summary.changed,
+      });
+      onClose();
+    } catch (error) {
+      setProgress({
+        fase: 'error',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  /**
+   * Vuelve a generar una partida cuya copia ya no esta en este navegador.
+   *
+   * Es lo que sustituye a descargar la ROM. Se genera otra vez con su semilla
+   * y sus ajustes, y se comprueba que sale exactamente la misma: si no
+   * coincidiera, el mundo seria otro y el guardado dejaria de encajar, asi que
+   * antes de cargar nada se avisa.
+   */
+  const rehacer = async (partida: PartidaGuardada) => {
+    const base = baseRom.current;
+    if (!base || !partida.semilla || !partida.ajustes) return;
+    if (base.crc32 !== partida.baseCrc32) {
+      setProgress({
+        fase: 'error',
+        message: 'Esa partida se hizo con otra copia de la ROM original.',
+      });
+      return;
+    }
+
+    setProgress({ fase: 'trabajando' });
+    try {
+      const result = await randomizeRom(
+        { settingsString: partida.ajustes, seed: partida.semilla },
+        base.bytes,
+      );
+      const generada = crc32(result.rom);
+      if (partida.crc32 && generada !== partida.crc32) {
+        setProgress({
+          fase: 'error',
+          message:
+            'La copia rehecha no es identica a la original, seguramente por un randomizer distinto al de entonces. No la cargo: tu guardado no encajaria con ella.',
+        });
+        return;
+      }
+      // Con el mismo nombre de fichero, el guardado que ya hubiera sigue
+      // siendo el suyo.
+      await onRandomized(result.rom, partida.fichero);
+      tocar(partida.id);
+      onClose();
+    } catch (error) {
+      setProgress({
+        fase: 'error',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
   };
 
   return (
@@ -181,7 +304,7 @@ export const RandomizerModal = ({
       }
     >
       {progress.fase === 'hecho' ? (
-        <Resultado progress={progress} onDownload={download} onClose={onClose} />
+        <Resultado progress={progress} onClose={onClose} />
       ) : (
         <>
           {status.estado === 'comprobando' && <p className="hint">Buscando el servicio...</p>}
@@ -222,42 +345,56 @@ export const RandomizerModal = ({
               {partidas.length > 0 && (
                 <div className="partidas">
                   <p className="partidas__titulo">Partidas guardadas de esta ROM</p>
-                  {partidas.map((partida) => (
-                    <div className="partida" key={partida.id}>
-                      <button
-                        type="button"
-                        className="partida__abrir"
-                        onClick={() => {
-                          tocar(partida.id);
-                          void onContinuar(partida.fichero).then(onClose);
-                        }}
-                      >
-                        <strong>{resumirCambios(partida.cambiado)}</strong>
-                        <em>
-                          {cuando(partida.creada)}
-                          {partida.semilla ? ` · semilla ${partida.semilla.slice(-6)}` : ''}
-                        </em>
-                      </button>
-                      <button
-                        type="button"
-                        className="partida__borrar"
-                        title="Borrar esta partida"
-                        aria-label={`Borrar la partida de ${cuando(partida.creada)}`}
-                        onClick={() => {
-                          onBorrar(partida.fichero);
-                          olvidar(partida.id);
-                          releer();
-                        }}
-                      >
-                        x
-                      </button>
-                    </div>
-                  ))}
+                  {partidas.map((partida) => {
+                    const aqui = existeGuardada(partida.fichero);
+                    const rehacible = sePuedeRehacer(partida);
+                    return (
+                      <div className="partida" key={partida.id}>
+                        <button
+                          type="button"
+                          className="partida__abrir"
+                          // Una partida cuya copia ya no esta y que tampoco se
+                          // sabe rehacer no lleva a ningun sitio: se deja a la
+                          // vista para poder borrarla, pero sin abrirla.
+                          disabled={!aqui && !rehacible}
+                          onClick={() => {
+                            if (aqui) {
+                              tocar(partida.id);
+                              void onContinuar(partida.fichero).then(onClose);
+                            } else {
+                              void rehacer(partida);
+                            }
+                          }}
+                        >
+                          <strong>{resumirCambios(partida.cambiado)}</strong>
+                          <em>
+                            {cuando(partida.creada)}
+                            {partida.semilla ? ` · semilla ${partida.semilla.slice(-6)}` : ''}
+                            {aqui ? '' : rehacible ? ' · hay que rehacerla' : ' · ya no esta'}
+                          </em>
+                        </button>
+                        <button
+                          type="button"
+                          className="partida__borrar"
+                          title="Borrar esta partida"
+                          aria-label={`Borrar la partida de ${cuando(partida.creada)}`}
+                          onClick={() => {
+                            onBorrar(partida.fichero);
+                            olvidar(partida.id);
+                            releer();
+                          }}
+                        >
+                          x
+                        </button>
+                      </div>
+                    );
+                  })}
                   <p className="hint">
                     Aleatorizar de nuevo crea otra partida aparte. Ninguna se pierde.
                   </p>
                 </div>
               )}
+
 
               {/* Con el cupo lleno hay que poder hacer hueco desde aqui, incluso
                   si lo ocupan partidas de otro juego. */}
@@ -289,6 +426,33 @@ export const RandomizerModal = ({
                   ))}
                 </div>
               )}
+
+              {/* La vuelta de la receta: alguien que juega desde otro ordenador,
+                  o que perdio los datos del navegador, trae su linea de texto y
+                  su ROM original y recupera el mismo mundo exacto. */}
+              <details className="partidas">
+                <summary className="partidas__titulo">Tengo una receta</summary>
+                <textarea
+                  className="field__value mono receta-pegada"
+                  rows={2}
+                  value={recetaPegada}
+                  placeholder="EMUPOKE1..."
+                  onChange={(event) => setRecetaPegada(event.target.value)}
+                  aria-label="Receta de una partida"
+                />
+                <button
+                  type="button"
+                  className="button--wide"
+                  disabled={recetaPegada.trim() === '' || lleno || progress.fase === 'trabajando'}
+                  onClick={() => void desdeReceta()}
+                >
+                  Rehacer esa partida
+                </button>
+                <p className="hint">
+                  Hace falta la misma ROM original con la que se creo. La receta sola no sirve de
+                  nada: no lleva el juego dentro.
+                </p>
+              </details>
 
               {lleno && (
                 <p className="warn">
@@ -351,44 +515,71 @@ export const RandomizerModal = ({
 
 const Resultado = ({
   progress,
-  onDownload,
   onClose,
 }: {
   progress: Extract<Progress, { fase: 'hecho' }>;
-  onDownload: () => void;
   onClose: () => void;
-}) => (
-  <>
-    {/* Unos ajustes que no tocan nada producen una ROM aparentemente normal.
-        Decir que ha cambiado evita descubrirlo tras media hora jugando. */}
-    {progress.summary.changed.length === 0 ? (
-      <p className="warn">La ROM se genero, pero no se cambio nada.</p>
-    ) : (
-      <p className="note">
-        Ha cambiado: <strong>{progress.summary.changed.join(', ')}</strong>.
-      </p>
-    )}
+}) => {
+  const [copiada, setCopiada] = useState<'no' | 'si' | 'fallo'>('no');
 
-    {progress.summary.starters.length > 0 && (
-      <div className="invite">
-        <span className="invite__label">Iniciales</span>
-        <strong>{progress.summary.starters.join('  /  ')}</strong>
+  const copiar = async () => {
+    if (!progress.receta) return;
+    try {
+      await navigator.clipboard.writeText(progress.receta);
+      setCopiada('si');
+      setTimeout(() => setCopiada('no'), 2200);
+    } catch {
+      // El portapapeles puede estar denegado. La receta sigue a la vista.
+      setCopiada('fallo');
+    }
+  };
+
+  return (
+    <>
+      {/* Unos ajustes que no tocan nada producen una ROM aparentemente normal.
+          Decir que ha cambiado evita descubrirlo tras media hora jugando. */}
+      {progress.summary.changed.length === 0 ? (
+        <p className="warn">La ROM se genero, pero no se cambio nada.</p>
+      ) : (
+        <p className="note">
+          Ha cambiado: <strong>{progress.summary.changed.join(', ')}</strong>.
+        </p>
+      )}
+
+      {progress.summary.starters.length > 0 && (
+        <div className="invite">
+          <span className="invite__label">Iniciales</span>
+          <strong>{progress.summary.starters.join('  /  ')}</strong>
+        </div>
+      )}
+
+      {progress.receta ? (
+        <>
+          <label className="field">
+            Receta de esta partida
+            <output className="field__value mono receta">{progress.receta}</output>
+          </label>
+          <button type="button" className="button--wide" onClick={() => void copiar()}>
+            {copiada === 'si' ? 'Receta copiada' : 'Copiar la receta'}
+          </button>
+          <p className="hint">
+            {copiada === 'fallo'
+              ? 'El navegador no ha dejado copiar. Puedes leerla de arriba.'
+              : 'Tu partida se queda guardada en este navegador, asi que normalmente no te hara falta. Guarda la receta por si juegas desde otro ordenador o pierdes los datos: con ella y tu ROM original se vuelve a generar este mismo mundo, identico. Tambien puedes darsela a tu companero para que juegue el mismo.'}
+          </p>
+        </>
+      ) : (
+        <p className="warn">
+          Esta copia no se va a poder rehacer{progress.seed ? ` (semilla ${progress.seed})` : ''}.
+          Vive solo en este navegador: si borras sus datos, se pierde.
+        </p>
+      )}
+
+      <div className="modal__acciones">
+        <button type="button" className="button--primary button--wide" onClick={onClose}>
+          Empezar a jugar
+        </button>
       </div>
-    )}
-
-    <p className="hint">
-      {progress.seed ? `Semilla usada: ${progress.seed}. ` : ''}
-      Tu companero tendra otra aleatorizacion distinta aunque marque lo mismo: el randomizer no
-      permite fijar la semilla.
-    </p>
-
-    <div className="modal__acciones">
-      <button type="button" className="button--wide" onClick={onDownload}>
-        Descargar la ROM
-      </button>
-      <button type="button" className="button--primary button--wide" onClick={onClose}>
-        Empezar a jugar
-      </button>
-    </div>
-  </>
-);
+    </>
+  );
+};

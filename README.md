@@ -113,6 +113,10 @@ comprueban cosas que solo se pueden comprobar así.
 | `npm run test:randomizer:options -- <rom>` | Que **cada** opción cambia la ROM |
 | `npm run test:randomizer:ui -- <rom>` | El menú de aleatorización |
 | `npm run test:partidas -- <rom>` | Las partidas guardadas y su tope |
+| `npm run test:semilla -- <rom>` | Que la misma semilla da la misma ROM |
+| `npm run test:receta -- <rom>` | Recuperar una partida sin haberla descargado |
+| `npm run test:gen3` | El descifrado de un Pokémon de tercera generación |
+| `npm run test:estadisticas -- <estado> <rom>` | Que las estadísticas se calculan como el juego |
 
 La mayoría necesita la aplicación levantada. Todas piden una ROM porque no hay
 ninguna en el repositorio.

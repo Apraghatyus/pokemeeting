@@ -41,3 +41,6 @@ tools/randomizer/*.jar
 
 # cloudflared es un binario de terceros de 55 MB: se descarga, no se versiona
 tools/cloudflared.exe
+
+# Capturas que dejan las pruebas al correrlas sin indicar carpeta.
+*.png

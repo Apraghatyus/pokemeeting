@@ -17,6 +17,7 @@
 // propia copia, y la interfaz le dice adonde viaja su fichero antes de que
 // decida.
 
+import { randomBytes } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
@@ -25,6 +26,7 @@ import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { buildSettingsScript, optionById, publicOptions, type RandomizerOption } from './options.ts';
+import { buildFromStringScript, buildRandomizeScript } from './semilla.ts';
 
 const PORT = Number(process.env['PORT'] ?? 8788);
 
@@ -93,6 +95,15 @@ type RandomizeRequest = {
   options?: string[];
   /** Fichero .rnqs en base64, como alternativa al menu. */
   settingsBase64?: string;
+  /** Cadena de ajustes del propio randomizer, para rehacer una partida. */
+  settingsString?: string;
+  /**
+   * Semilla concreta, para rehacer una copia que ya existio.
+   *
+   * Sin ella se escoge una y se devuelve: toda copia nace con su semilla
+   * anotada, porque es lo que permite reconstruirla sin guardar el fichero.
+   */
+  seed?: string;
 };
 
 /**
@@ -208,11 +219,20 @@ const run = (command: string, args: string[]): Promise<JavaRun> =>
   });
 
 /**
+ * Escoge una semilla nueva.
+ *
+ * Seis bytes, que son mas de doscientos billones de mundos posibles y caben
+ * exactos en un numero de JavaScript, asi que ni el navegador ni el registro
+ * la redondean por el camino.
+ */
+const pickSeed = (): string => String(Number(BigInt('0x' + randomBytes(6).toString('hex'))));
+
+/**
  * Busca la semilla en el registro que deja el randomizer.
  *
- * No se puede *elegir* la semilla desde la linea de ordenes, pero si leer cual
- * uso. Sirve para que el jugador pueda anotarla y para explicar por que dos
- * aleatorizaciones no salen iguales.
+ * Solo hace falta en la via sin jjs, que es la unica donde la semilla la
+ * escoge el randomizer y no nosotros. Ahi la copia no se podra rehacer, pero
+ * al menos se sabe con que se hizo.
  */
 const extractSeed = (log: string): string | null =>
   /random\s+seed[:\s]+(\d+)/i.exec(log)?.[1] ?? null;
@@ -313,9 +333,11 @@ const handleRandomize = async (req: IncomingMessage, res: ServerResponse): Promi
     return;
   }
 
-  // Resolver que opciones se piden, antes de tocar el disco.
+  // Resolver que opciones se piden, antes de tocar el disco. Rehaciendo una
+  // partida desde su receta no hay menu que validar: los ajustes vienen ya
+  // resueltos dentro de la propia receta.
   let chosen: RandomizerOption[] = [];
-  if (!request.settingsBase64) {
+  if (!request.settingsBase64 && !request.settingsString) {
     const ids = request.options ?? [];
     if (ids.length === 0) {
       sendJson(res, 400, {
@@ -344,13 +366,43 @@ const handleRandomize = async (req: IncomingMessage, res: ServerResponse): Promi
 
     await writeFile(input, rom);
 
+    // Los ajustes pueden venir de tres sitios: un fichero .rnqs del randomizer
+    // de escritorio, la cadena de ajustes de una partida que se esta
+    // rehaciendo, o el menu de la interfaz.
+    const jjs = await findJjs();
     if (request.settingsBase64) {
       await writeFile(settingsFile, Buffer.from(request.settingsBase64, 'base64'));
+    } else if (request.settingsString) {
+      if (!jjs) {
+        sendJson(res, 503, {
+          error: 'sin-jjs',
+          message: 'Sin jjs no puedo reconstruir unos ajustes guardados.',
+        });
+        return;
+      }
+      const scriptPath = join(workdir, 'desde-cadena.js');
+      await writeFile(scriptPath, buildFromStringScript(), 'utf8');
+      const rehecho = await run(jjs, [
+        '-cp',
+        `"${jar}"`,
+        `"${scriptPath}"`,
+        '--',
+        `"${request.settingsString}"`,
+        `"${settingsFile}"`,
+      ]);
+      if (!existsSync(settingsFile)) {
+        sendJson(res, 400, {
+          error: 'ajustes-invalidos',
+          message:
+            'Esa receta no la entiende tu version del randomizer, asi que no puedo rehacer la partida.',
+          detalle: (rehecho.stderr || rehecho.stdout).slice(-1500),
+        });
+        return;
+      }
     } else {
       // El fichero de ajustes lo escribe la propia clase Settings del
       // randomizer a traves de jjs: su formato lleva version y suma de
       // comprobacion, y reproducirlo por nuestra cuenta seria fragil.
-      const jjs = await findJjs();
       if (!jjs) {
         sendJson(res, 503, {
           error: 'sin-jjs',
@@ -378,19 +430,44 @@ const handleRandomize = async (req: IncomingMessage, res: ServerResponse): Promi
       }
     }
 
-    const execution = await run('java', [
-      '-Xmx4096M',
-      '-jar',
-      `"${jar}"`,
-      'cli',
-      '-s',
-      `"${settingsFile}"`,
-      '-i',
-      `"${input}"`,
-      '-o',
-      `"${output}"`,
-      '-l',
-    ]);
+    // Con jjs se aleatoriza con una semilla que elegimos nosotros, y esa copia
+    // se puede rehacer mas tarde sin guardarla. Sin jjs solo queda su linea de
+    // ordenes, que escoge la semilla ella y no deja repetirla: esa partida
+    // nace sin receta, y la interfaz lo dice.
+    const semilla = request.seed ?? pickSeed();
+    let ajustesUsados: string | null = null;
+    let execution: Awaited<ReturnType<typeof run>>;
+
+    if (jjs) {
+      const scriptPath = join(workdir, 'aleatorizar.js');
+      await writeFile(scriptPath, buildRandomizeScript(), 'utf8');
+      execution = await run(jjs, [
+        '-J-Xmx4096M',
+        '-cp',
+        `"${jar}"`,
+        `"${scriptPath}"`,
+        '--',
+        `"${input}"`,
+        `"${settingsFile}"`,
+        `"${output}"`,
+        semilla,
+      ]);
+      ajustesUsados = /^AJUSTES:(.+)$/m.exec(execution.stdout)?.[1]?.trim() ?? null;
+    } else {
+      execution = await run('java', [
+        '-Xmx4096M',
+        '-jar',
+        `"${jar}"`,
+        'cli',
+        '-s',
+        `"${settingsFile}"`,
+        '-i',
+        `"${input}"`,
+        '-o',
+        `"${output}"`,
+        '-l',
+      ]);
+    }
 
     if (execution.timedOut) {
       sendJson(res, 504, {
@@ -408,14 +485,15 @@ const handleRandomize = async (req: IncomingMessage, res: ServerResponse): Promi
       return;
     }
 
-    // El registro queda junto a la salida: de ahi sacamos la semilla y el
-    // resumen de lo que ha cambiado.
-    let seed: string | null = null;
+    // El registro queda junto a la salida: de ahi sale el resumen de lo que ha
+    // cambiado. La semilla ya la sabemos cuando la elegimos nosotros; solo hay
+    // que leerla del registro en la via sin jjs, donde la escoge el randomizer.
+    let seed: string | null = jjs ? semilla : null;
     let summary: RandomizeSummary = { changed: [], starters: [] };
     for (const name of await readdir(workdir)) {
       if (!name.endsWith('.log')) continue;
       const log = await readFile(join(workdir, name), 'utf8');
-      seed = extractSeed(log);
+      seed = seed ?? extractSeed(log);
       summary = summarize(log, chosen);
       break;
     }
@@ -429,10 +507,17 @@ const handleRandomize = async (req: IncomingMessage, res: ServerResponse): Promi
       'content-length': payload.length,
       [ENCODING_HEADER]: 'gzip',
       ...(seed ? { 'x-seed': seed } : {}),
+      // La cadena de ajustes viaja en base64 porque lleva caracteres que una
+      // cabecera HTTP no admite tal cual.
+      ...(ajustesUsados
+        ? { 'x-settings': Buffer.from(ajustesUsados, 'utf8').toString('base64') }
+        : {}),
+      // Solo se puede rehacer lo que se hizo con semilla elegida.
+      'x-reproducible': jjs ? '1' : '0',
       // En base64 porque lleva acentos y las cabeceras HTTP son ASCII.
       'x-summary': Buffer.from(JSON.stringify(summary), 'utf8').toString('base64'),
       // Estas cabeceras deben ser legibles desde el navegador.
-      'access-control-expose-headers': `x-seed, x-summary, ${ENCODING_HEADER}`,
+      'access-control-expose-headers': `x-seed, x-settings, x-reproducible, x-summary, ${ENCODING_HEADER}`,
     });
     res.end(payload);
     console.log(

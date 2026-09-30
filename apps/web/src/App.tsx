@@ -220,6 +220,7 @@ export const App = () => {
         onRandomized={emulator.openRomBytes}
         onContinuar={emulator.openSavedGame}
         onBorrar={emulator.deleteSavedGame}
+        existeGuardada={emulator.existeGuardada}
       />
 
       <RoomModal
