@@ -5,3 +5,5 @@
 // salas solo necesita lo primero.
 export * from './games';
 export * from './compatibility';
+export * from './savestate';
+export * from './gen3';

@@ -28,7 +28,10 @@
     "test:audio": "node tools/test-audio.mjs",
     "test:reconexion": "node tools/test-reconexion.mjs",
     "tunnel": "node tools/tunnel.mjs",
-    "test:partidas": "node tools/test-randomizer-limpio.mjs"
+    "test:partidas": "node tools/test-randomizer-limpio.mjs",
+    "test:gen3": "npx tsx tools/memoria/test-gen3.mjs",
+    "memoria:volcar": "node tools/memoria/volcar-savestate.mjs",
+    "memoria:analizar": "npx tsx tools/memoria/analizar-savestate.mjs"
   },
   "engines": {
     "node": ">=20"
