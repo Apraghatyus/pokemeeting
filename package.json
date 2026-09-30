@@ -32,7 +32,9 @@
     "test:gen3": "npx tsx tools/memoria/test-gen3.mjs",
     "memoria:volcar": "node tools/memoria/volcar-savestate.mjs",
     "memoria:analizar": "npx tsx tools/memoria/analizar-savestate.mjs",
-    "memoria:nombres": "npx tsx tools/memoria/buscar-nombres.mjs"
+    "memoria:nombres": "npx tsx tools/memoria/buscar-nombres.mjs",
+    "test:estadisticas": "npx tsx tools/memoria/test-estadisticas.mjs",
+    "memoria:intercambiar": "npx tsx tools/memoria/intercambiar.mjs"
   },
   "engines": {
     "node": ">=20"

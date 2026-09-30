@@ -10,3 +10,5 @@ export * from './gen3';
 export * from './texto';
 export * from './rom';
 export * from './equipo';
+export * from './estadisticas';
+export * from './intercambio';

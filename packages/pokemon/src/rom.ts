@@ -86,3 +86,121 @@ export const encontrarTablaNombres = (rom: Uint8Array): TablaNombres | null => {
 
   return null;
 };
+
+/** Cada especie tiene 28 bytes de datos base. */
+export const ANCHO_ESTADISTICAS = 28;
+
+/**
+ * Los datos base de una especie: lo que el randomizer cambia y el nombre no.
+ *
+ * Esto es lo que hace que un intercambio entre copias aleatorizadas por
+ * separado sea interesante en vez de un error: el Pokemon que llega conserva su
+ * especie y su nombre, pero en la ROM que lo recibe esa especie puede tener
+ * otras estadisticas, otro tipo y otra habilidad.
+ */
+export type EstadisticasBase = {
+  ps: number;
+  ataque: number;
+  defensa: number;
+  velocidad: number;
+  ataqueEspecial: number;
+  defensaEspecial: number;
+  tipos: readonly [number, number];
+  habilidades: readonly [number, number];
+  /** Suma de las seis: la medida rapida de lo fuerte que es una especie. */
+  total: number;
+};
+
+export type TablaEstadisticas = {
+  /** Donde empieza la especie 0. */
+  offset: number;
+  /** Cuantas entradas seguidas son validas. */
+  especies: number;
+  estadisticas: (especie: number) => EstadisticasBase | null;
+};
+
+// Topes de los campos que no son estadisticas. El randomizer se mueve dentro de
+// ellos, asi que sirven de filtro tanto en una ROM original como en una
+// aleatorizada, que es justo lo que hace falta aqui.
+const TIPOS = 17;
+const CRECIMIENTO = 5;
+const GRUPO_HUEVO = 15;
+const HABILIDADES = 77;
+
+const entradaEstadisticasValida = (rom: Uint8Array, offset: number): boolean => {
+  if (offset + ANCHO_ESTADISTICAS > rom.length) return false;
+  const e = rom.subarray(offset, offset + ANCHO_ESTADISTICAS);
+  // Ninguna especie de verdad tiene una estadistica a cero.
+  for (let i = 0; i < 6; i += 1) if (e[i]! < 1) return false;
+  if (e[6]! > TIPOS || e[7]! > TIPOS) return false;
+  if (e[19]! > CRECIMIENTO) return false;
+  if (e[20]! > GRUPO_HUEVO || e[21]! > GRUPO_HUEVO) return false;
+  if (e[22]! > HABILIDADES || e[23]! > HABILIDADES) return false;
+  // Los dos ultimos bytes son relleno y estan siempre a cero: es la condicion
+  // que descarta cualquier otra tabla de 28 bytes de la ROM.
+  return e[26] === 0 && e[27] === 0;
+};
+
+/**
+ * Localiza la tabla de datos base de las especies.
+ *
+ * Igual que con los nombres, la especie 0 es un hueco -aqui, 28 bytes a cero- y
+ * no pasa el filtro, asi que la racha encontrada empieza en la especie 1. Se
+ * comprueba si justo antes hay una entrada vacia para recuperar el origen; sin
+ * eso, todas las estadisticas saldrian corridas una especie.
+ *
+ * No se usan anclas de especies conocidas a proposito: en una copia
+ * aleatorizada no coincidiria ninguna, y esta funcion tiene que servir
+ * exactamente para ese caso.
+ */
+export const encontrarTablaEstadisticas = (rom: Uint8Array): TablaEstadisticas | null => {
+  const suficientes = 350;
+
+  for (let offset = 0; offset + ANCHO_ESTADISTICAS * suficientes < rom.length; offset += 4) {
+    let seguidas = 0;
+    while (entradaEstadisticasValida(rom, offset + seguidas * ANCHO_ESTADISTICAS)) seguidas += 1;
+    if (seguidas < suficientes) {
+      offset += Math.max(0, seguidas - 1) * ANCHO_ESTADISTICAS;
+      continue;
+    }
+
+    const anterior = offset - ANCHO_ESTADISTICAS;
+    const huecoDetras =
+      anterior >= 0 && rom.subarray(anterior, offset).every((byte) => byte === 0);
+    const inicio = huecoDetras ? anterior : offset;
+
+    const estadisticas = (especie: number): EstadisticasBase | null => {
+      const off = inicio + especie * ANCHO_ESTADISTICAS;
+      if (especie < 0 || !entradaEstadisticasValida(rom, off)) return null;
+      const e = rom.subarray(off, off + ANCHO_ESTADISTICAS);
+      const [ps, ataque, defensa, velocidad, ataqueEspecial, defensaEspecial] = e as unknown as number[];
+      return {
+        ps: ps!,
+        ataque: ataque!,
+        defensa: defensa!,
+        velocidad: velocidad!,
+        ataqueEspecial: ataqueEspecial!,
+        defensaEspecial: defensaEspecial!,
+        tipos: [e[6]!, e[7]!],
+        habilidades: [e[22]!, e[23]!],
+        total: ps! + ataque! + defensa! + velocidad! + ataqueEspecial! + defensaEspecial!,
+      };
+    };
+
+    return { offset: inicio, especies: seguidas + (huecoDetras ? 1 : 0), estadisticas };
+  }
+
+  return null;
+};
+
+/** Nombres de los tipos, para poder explicar un intercambio en palabras. */
+export const TIPOS_GEN3: readonly string[] = [
+  'Normal', 'Lucha', 'Volador', 'Veneno', 'Tierra', 'Roca', 'Bicho', 'Fantasma', 'Acero',
+  '???', 'Fuego', 'Agua', 'Planta', 'Electrico', 'Psiquico', 'Hielo', 'Dragon', 'Siniestro',
+];
+
+/** Como se lee un tipo doble: "Planta/Veneno", o solo uno si se repite. */
+export const describirTipos = (tipos: readonly [number, number]): string => {
+  const nombre = (t: number) => TIPOS_GEN3[t] ?? `#${t}`;
+  return tipos[0] === tipos[1] ? nombre(tipos[0]) : `${nombre(tipos[0])}/${nombre(tipos[1])}`;
+};

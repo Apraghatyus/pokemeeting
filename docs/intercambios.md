@@ -183,8 +183,67 @@ Rellenarla con `0x7FFFFFFF` creyendo poner los IV al maximo enciende esa
 bandera, y el Pokemon aparece en el equipo sin nivel ni PS porque el juego lo
 trata como un huevo. Lo correcto es `0x3FFFFFFF`.
 
+## Un intercambio de verdad, entre dos copias aleatorizadas
+
+Este es el escenario que importa, y ya esta hecho: dos aleatorizaciones
+distintas de la misma edicion, cada una con su ROM y su partida.
+
+Se generaron dos copias de Rojo Fuego espanol con el randomizer del propio
+proyecto, con semillas distintas, y se cruzaron un Bulbasaur y un Charmander.
+Cada lado leyo de su partida lo que entregaba y escribio en su partida lo que
+recibia; ningun lado toco el estado del otro.
+
+| | jugador A | jugador B |
+|---|---|---|
+| ROM | `becc1ebf` | `57466f14` |
+| entrega | BULBASAUR "CCC" Nv6 | CHARMANDER Nv5 |
+| esa especie, en su copia | Tierra, 45/40/19/25/88/102 | Volador, 38/70/29/61/67/44 |
+| esa especie, en la del otro | Dragon, 60/37/38/86/69/29 | Siniestro, 47/45/45/49/51/73 |
+
+Las dos partidas se cargaron despues en el emulador, cada una con su ROM, y el
+menu del equipo enseña lo que tiene que ensenar: A tiene un CHARMANDER de nivel
+5 con 19 PS, y B tiene el Bulbasaur del otro, con su mote CCC intacto, nivel 6 y
+24 PS.
+
+### Lo que se aprendio por el camino
+
+Que el juego acepte el Pokemon no basta: **hay que rehacerle las estadisticas**.
+
+Un Pokemon guarda sus estadisticas ya calculadas, y el juego solo las rehace
+cuando sube de nivel o evoluciona. El Charmander llego con 18 PS maximos, que
+son los que le salen en la copia de B, donde su especie tiene 38 de PS base; en
+la copia de A esa especie tiene 47, y le tocaban 19. Sin recalcular, un Pokemon
+intercambiado arrastra los numeros de la partida de origen durante media
+aventura, y nadie entiende por que.
+
+La formula esta comprobada de la unica forma que vale: recalculando las seis
+estadisticas de un Pokemon que creo el propio juego, con los datos base de su
+propia ROM, y comprobando que salen exactamente las que ya tenia guardadas.
+Eso es `tools/memoria/test-estadisticas.mjs`, y sale seis de seis.
+
+Lo que **no** hace el intercambio es curar. Un Pokemon herido llega herido, con
+los PS en la misma proporcion; uno debilitado llega debilitado. Curar de regalo
+seria un cambio en la partida que nadie ha pedido.
+
+### Como repetirlo
+
+```
+npm run dev:randomizer          # en otra terminal
+npm run dev                     # y en otra
+
+npx tsx tools/memoria/preparar-companero.mjs <estado.bin> <romB.gba> 0x202402C estado-B.bin
+npx tsx tools/memoria/intercambiar.mjs estado-A.bin romA.gba 0 estado-B.bin romB.gba 0 .
+node    tools/memoria/probar-intercambio.mjs romA.gba tras-intercambio-A.bin romB.gba tras-intercambio-B.bin .
+```
+
+`intercambiar.mjs` comprueba ademas donde cayeron los cambios: todos los bytes
+distintos tienen que estar dentro de la ranura intercambiada y del contador del
+equipo. Si aparece uno fuera, algo se salio de su sitio y el intercambio no es
+de fiar.
+
 ## Lo que falta
 
-La mitad que viaja por la red, que es la facil: los cien bytes por el canal de
-datos que ya esta abierto, el protocolo de dos fases para que nadie duplique ni
-pierda un Pokemon, y el dialogo que enseña que se entrega y que se recibe.
+Conectarlo a la interfaz y al canal de datos, que ya esta abierto y sin usar:
+elegir el Pokemon, mandar los cien bytes, confirmar en dos fases para que nadie
+duplique ni pierda nada si se corta la conexion, y ensenar antes de aceptar lo
+que `describirTrato` ya sabe decir.

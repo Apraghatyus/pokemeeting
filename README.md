@@ -124,9 +124,17 @@ ventana que desaparecía sin forma de recuperarla. Merece la pena mantenerlas.
 ## Qué falta
 
 Las ideas pendientes, con lo que costaría cada una, están en
-[docs/ideas-pendientes.md](docs/ideas-pendientes.md). Lo más gordo: el Soul Link
-y los intercambios de Pokémon, que dependen los dos de poder leer la memoria del
-juego.
+[docs/ideas-pendientes.md](docs/ideas-pendientes.md).
+
+Los intercambios ya funcionan por dentro: leer la memoria del juego, sacar un
+Pokémon de una partida, meterlo en otra con sus estadísticas rehechas para la
+ROM que lo recibe, y que el juego lo acepte. Está probado entre dos copias
+aleatorizadas distintas de la misma edición, que es como se juega esto, y
+contado en [docs/intercambios.md](docs/intercambios.md). Lo que falta es
+conectarlo a la interfaz y al canal de datos, que ya está abierto.
+
+El Soul Link sigue siendo cosa de los jugadores: las reglas las lleváis
+vosotros, el programa no las impone.
 
 ## Documentación
 
