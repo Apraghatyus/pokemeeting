@@ -6,7 +6,7 @@
 // mGBA engancha el teclado a nivel de documento via SDL, asi que sin cederselo
 // a la interfaz las pulsaciones no llegan a los campos.
 //
-// Uso: node tools/test-session.mjs <rom.gba> [directorio-de-capturas]
+// Uso: node tools/tests/test-session.mjs <rom.gba> [directorio-de-capturas]
 import { chromium } from 'playwright';
 
 // Se admiten dos ROMs distintas: el caso real es Rojo Fuego contra Verde Hoja.
@@ -20,7 +20,7 @@ const PASSWORD = 'kanto26';
 
 if (!ROM_HOST) {
   console.error(
-    'Falta la ROM.\nUso: node tools/test-session.mjs <rom-anfitrion.gba> [rom-invitado.gba] [carpeta]',
+    'Falta la ROM.\nUso: node tools/tests/test-session.mjs <rom-anfitrion.gba> [rom-invitado.gba] [carpeta]',
   );
   process.exit(2);
 }

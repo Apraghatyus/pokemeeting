@@ -8,7 +8,7 @@
 // volver a entrar con ese codigo es imposible por diseno. Eso no es un fallo
 // de reconexion, es otra cosa distinta, y se comprueba aparte.
 //
-// Uso: node tools/test-reconexion.mjs <rom.gba> [carpeta]
+// Uso: node tools/tests/test-reconexion.mjs <rom.gba> [carpeta]
 import { chromium } from 'playwright';
 
 const ROM = process.argv[2];
@@ -17,7 +17,7 @@ const URL = process.env.SMOKE_URL ?? 'http://localhost:5173/';
 const PASSWORD = 'kanto26';
 
 if (!ROM) {
-  console.error('Falta la ROM.\nUso: node tools/test-reconexion.mjs <rom.gba> [carpeta]');
+  console.error('Falta la ROM.\nUso: node tools/tests/test-reconexion.mjs <rom.gba> [carpeta]');
   process.exit(2);
 }
 

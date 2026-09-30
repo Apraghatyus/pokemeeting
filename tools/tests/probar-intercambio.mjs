@@ -4,7 +4,7 @@
 // que ver es el Pokemon recibido dentro del menu del equipo, en la copia
 // aleatorizada del que lo recibe. Si aparece ahi, el intercambio funciona.
 //
-// Uso: node tools/memoria/probar-intercambio.mjs <romA> <estadoA> <romB> <estadoB> <carpeta>
+// Uso: node tools/tests/probar-intercambio.mjs <romA> <estadoA> <romB> <estadoB> <carpeta>
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 

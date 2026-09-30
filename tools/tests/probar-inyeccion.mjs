@@ -3,7 +3,7 @@
 // Es la unica prueba que vale de verdad: que los bytes cuadren no significa
 // que el juego los acepte. Si aparece en el menu, el intercambio funciona.
 //
-// Uso: node tools/memoria/probar-inyeccion.mjs <rom.gba> <estado.bin> <carpeta>
+// Uso: node tools/tests/probar-inyeccion.mjs <rom.gba> <estado.bin> <carpeta>
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 

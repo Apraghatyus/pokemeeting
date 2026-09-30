@@ -10,13 +10,13 @@
 //      tirado, y la partida se rehace desde su receta: la ROM que sale es la
 //      misma, byte a byte.
 //
-// Uso: node tools/test-receta.mjs <rom.gba>
+// Uso: node tools/tests/test-receta.mjs <rom.gba>
 import { chromium } from 'playwright';
 
 const ROM = process.argv[2];
 const URL = process.env.SMOKE_URL ?? 'http://localhost:5173/';
 if (!ROM) {
-  console.error('Falta la ROM.\nUso: node tools/test-receta.mjs <rom.gba>');
+  console.error('Falta la ROM.\nUso: node tools/tests/test-receta.mjs <rom.gba>');
   process.exit(2);
 }
 

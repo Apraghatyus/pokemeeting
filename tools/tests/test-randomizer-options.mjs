@@ -8,7 +8,7 @@
 // Cada opcion se prueba SOLA: si se probaran juntas, una rota se escondería
 // detras de las demas.
 //
-// Uso: node tools/test-randomizer-options.mjs <rom.gba>
+// Uso: node tools/tests/test-randomizer-options.mjs <rom.gba>
 import { readFileSync } from 'node:fs';
 import { gunzipSync, gzipSync } from 'node:zlib';
 
@@ -16,7 +16,7 @@ const ROM = process.argv[2];
 const BASE = process.env.RANDOMIZER_URL ?? 'http://127.0.0.1:8788';
 
 if (!ROM) {
-  console.error('Falta la ROM.\nUso: node tools/test-randomizer-options.mjs <rom.gba>');
+  console.error('Falta la ROM.\nUso: node tools/tests/test-randomizer-options.mjs <rom.gba>');
   process.exit(2);
 }
 

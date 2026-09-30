@@ -8,7 +8,7 @@
 // Se compara el hash de la ROM entera, no una muestra: aqui un solo byte
 // distinto ya es un juego distinto.
 //
-// Uso: node tools/test-semilla.mjs <rom.gba>
+// Uso: node tools/tests/test-semilla.mjs <rom.gba>
 import { readFileSync } from 'node:fs';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { createHash } from 'node:crypto';

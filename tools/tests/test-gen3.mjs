@@ -5,7 +5,7 @@
 // encuentra sin ayuda. Esa es la operacion real: localizar el equipo dentro de
 // 256 KB sin saber su direccion.
 //
-// Uso: npx tsx tools/memoria/test-gen3.mjs
+// Uso: npx tsx tools/tests/test-gen3.mjs
 const g3 = await import(new URL('../../packages/pokemon/src/gen3.ts', import.meta.url).href);
 
 let fallos = 0;

@@ -8,14 +8,14 @@
 // Ahora cada copia tiene nombre propio, ninguna pisa a la otra, y las dos
 // quedan en la lista para poder volver a cualquiera.
 //
-// Uso: node tools/test-randomizer-limpio.mjs <rom.gba>
+// Uso: node tools/tests/test-randomizer-limpio.mjs <rom.gba>
 import { chromium } from 'playwright';
 
 const ROM = process.argv[2];
 const URL = process.env.SMOKE_URL ?? 'http://localhost:5173/';
 
 if (!ROM) {
-  console.error('Falta la ROM.\nUso: node tools/test-randomizer-limpio.mjs <rom.gba>');
+  console.error('Falta la ROM.\nUso: node tools/tests/test-randomizer-limpio.mjs <rom.gba>');
   process.exit(2);
 }
 

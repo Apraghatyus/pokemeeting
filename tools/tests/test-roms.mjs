@@ -5,11 +5,11 @@
 // que motivo este codigo era tratar el codigo de cabecera como un bloque, con
 // lo que Rojo Fuego y Verde Hoja parecian juegos incompatibles.
 //
-// Uso: npx tsx tools/test-roms.mjs
+// Uso: npx tsx tools/tests/test-roms.mjs
 // La ruta se resuelve como URL y no como cadena: el proyecto vive en una
 // carpeta con espacios y en Windows, donde concatenar rutas a mano falla.
 const { compareRoms, parseGameCode, describeGame } = await import(
-  new URL('../packages/pokemon/src/index.ts', import.meta.url).href
+  new URL('../../packages/pokemon/src/index.ts', import.meta.url).href
 );
 
 let failures = 0;

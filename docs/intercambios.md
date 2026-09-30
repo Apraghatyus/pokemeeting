@@ -219,7 +219,7 @@ aventura, y nadie entiende por que.
 La formula esta comprobada de la unica forma que vale: recalculando las seis
 estadisticas de un Pokemon que creo el propio juego, con los datos base de su
 propia ROM, y comprobando que salen exactamente las que ya tenia guardadas.
-Eso es `tools/memoria/test-estadisticas.mjs`, y sale seis de seis.
+Eso es `tools/tests/test-estadisticas.mjs`, y sale seis de seis.
 
 Lo que **no** hace el intercambio es curar. Un Pokemon herido llega herido, con
 los PS en la misma proporcion; uno debilitado llega debilitado. Curar de regalo
@@ -233,7 +233,7 @@ npm run dev                     # y en otra
 
 npx tsx tools/memoria/preparar-companero.mjs <estado.bin> <romB.gba> 0x202402C estado-B.bin
 npx tsx tools/memoria/intercambiar.mjs estado-A.bin romA.gba 0 estado-B.bin romB.gba 0 .
-node    tools/memoria/probar-intercambio.mjs romA.gba tras-intercambio-A.bin romB.gba tras-intercambio-B.bin .
+node    tools/tests/probar-intercambio.mjs romA.gba tras-intercambio-A.bin romB.gba tras-intercambio-B.bin .
 ```
 
 `intercambiar.mjs` comprueba ademas donde cayeron los cambios: todos los bytes

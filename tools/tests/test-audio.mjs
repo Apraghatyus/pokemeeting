@@ -9,7 +9,7 @@
 // (70) cuando espera un multiplicador (0.7), o sea un 7000%. El sonido salia
 // roto y ninguna prueba lo veia.
 //
-// Uso: node tools/test-audio.mjs <rom.gba> [carpeta-de-capturas]
+// Uso: node tools/tests/test-audio.mjs <rom.gba> [carpeta-de-capturas]
 import { chromium } from 'playwright';
 
 const ROM = process.argv[2];
@@ -17,7 +17,7 @@ const SHOTS = process.argv[3] ?? '.';
 const URL = process.env.SMOKE_URL ?? 'http://localhost:5173/';
 
 if (!ROM) {
-  console.error('Falta la ROM.\nUso: node tools/test-audio.mjs <rom.gba> [carpeta]');
+  console.error('Falta la ROM.\nUso: node tools/tests/test-audio.mjs <rom.gba> [carpeta]');
   process.exit(2);
 }
 

@@ -4,7 +4,7 @@
 // randomizer de verdad por debajo y verifica que lo que vuelve es una ROM de
 // GBA valida, del mismo juego y **distinta** de la que se mando.
 //
-// Uso: node tools/test-randomizer.mjs <rom.gba>
+// Uso: node tools/tests/test-randomizer.mjs <rom.gba>
 import { readFileSync } from 'node:fs';
 import { gunzipSync, gzipSync } from 'node:zlib';
 
@@ -12,7 +12,7 @@ const ROM = process.argv[2];
 const BASE = process.env.RANDOMIZER_URL ?? 'http://127.0.0.1:8788';
 
 if (!ROM) {
-  console.error('Falta la ROM.\nUso: node tools/test-randomizer.mjs <rom.gba>');
+  console.error('Falta la ROM.\nUso: node tools/tests/test-randomizer.mjs <rom.gba>');
   process.exit(2);
 }
 

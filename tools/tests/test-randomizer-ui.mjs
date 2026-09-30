@@ -5,7 +5,7 @@
 // es que los botones respondan, sino que despues el juego sigue corriendo con
 // la copia que corresponde.
 //
-// Uso: node tools/test-randomizer-ui.mjs <rom.gba> [carpeta-de-capturas]
+// Uso: node tools/tests/test-randomizer-ui.mjs <rom.gba> [carpeta-de-capturas]
 import { chromium } from 'playwright';
 
 const ROM = process.argv[2];
@@ -13,7 +13,7 @@ const SHOTS = process.argv[3] ?? '.';
 const URL = process.env.SMOKE_URL ?? 'http://localhost:5173/';
 
 if (!ROM) {
-  console.error('Falta la ROM.\nUso: node tools/test-randomizer-ui.mjs <rom.gba> [carpeta]');
+  console.error('Falta la ROM.\nUso: node tools/tests/test-randomizer-ui.mjs <rom.gba> [carpeta]');
   process.exit(2);
 }
 

@@ -5,7 +5,7 @@
 // cambie de color, sino que al otro lado llega una pista de audio y que deja
 // de estar en silencio, que es la senal de que hay sonido circulando.
 //
-// Uso: node tools/test-voice.mjs <rom.gba> [carpeta-de-capturas]
+// Uso: node tools/tests/test-voice.mjs <rom.gba> [carpeta-de-capturas]
 import { chromium } from 'playwright';
 
 const ROM = process.argv[2];
@@ -14,7 +14,7 @@ const URL = process.env.SMOKE_URL ?? 'http://localhost:5173/';
 const PASSWORD = 'kanto26';
 
 if (!ROM) {
-  console.error('Falta la ROM.\nUso: node tools/test-voice.mjs <rom.gba> [carpeta]');
+  console.error('Falta la ROM.\nUso: node tools/tests/test-voice.mjs <rom.gba> [carpeta]');
   process.exit(2);
 }
 

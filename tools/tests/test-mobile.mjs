@@ -4,7 +4,7 @@
 // sino que una pulsacion con el dedo llegue al nucleo y mueva el juego. Por eso
 // la comprobacion final es que la pantalla cambie al pulsar Start en el titulo.
 //
-// Uso: node tools/test-mobile.mjs <rom.gba> [directorio-de-capturas]
+// Uso: node tools/tests/test-mobile.mjs <rom.gba> [directorio-de-capturas]
 import { chromium, devices } from 'playwright';
 
 const ROM = process.argv[2];
@@ -12,7 +12,7 @@ const SHOTS = process.argv[3] ?? '.';
 const URL = process.env.SMOKE_URL ?? 'http://localhost:5173/';
 
 if (!ROM) {
-  console.error('Falta la ROM.\nUso: node tools/test-mobile.mjs <rom.gba> [carpeta]');
+  console.error('Falta la ROM.\nUso: node tools/tests/test-mobile.mjs <rom.gba> [carpeta]');
   process.exit(2);
 }
 

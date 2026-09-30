@@ -73,7 +73,9 @@ apps/signaling    empareja a los dos jugadores y se aparta
 apps/randomizer   puente hacia el randomizer de escritorio (Java)
 packages/protocol lo que se dicen el navegador y el servidor
 packages/pokemon  conocimiento del dominio: qué es cada ROM
-tools             pruebas y utilidades
+tools/tests       las pruebas
+tools/memoria     leer y escribir la memoria de una partida
+tools/randomizer  donde va el jar del randomizer (no se versiona)
 docs              las decisiones y por qué se tomaron
 ```
 
@@ -117,9 +119,14 @@ comprueban cosas que solo se pueden comprobar así.
 | `npm run test:receta -- <rom>` | Recuperar una partida sin haberla descargado |
 | `npm run test:gen3` | El descifrado de un Pokémon de tercera generación |
 | `npm run test:estadisticas -- <estado> <rom>` | Que las estadísticas se calculan como el juego |
+| `npm run test:inyeccion -- <rom> <estado> <carpeta>` | Que el juego acepta un Pokémon metido a mano |
+| `npm run test:intercambio -- <romA> <estadoA> <romB> <estadoB> <carpeta>` | Un intercambio entre dos copias aleatorizadas |
 
-La mayoría necesita la aplicación levantada. Todas piden una ROM porque no hay
-ninguna en el repositorio.
+Viven en [tools/tests/](tools/tests/), y el resto de utilidades están al lado,
+ordenadas por lo que hacen: [tools/LEEME.md](tools/LEEME.md) lo explica.
+
+La mayoría necesita la aplicación levantada. Casi todas piden una ROM porque no
+hay ninguna en el repositorio.
 
 Han encontrado bastantes fallos que una lectura del código no habría visto: un
 micrófono que funcionaba en un solo sentido, un volumen que arrancaba mudo, una

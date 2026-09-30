@@ -4,7 +4,7 @@
 // con aislamiento cross-origin, que carga una ROM y que el canvas acaba
 // dibujando algo distinto de negro. Sin esto, "compila" no significa "emula".
 //
-// Uso: node tools/smoke.mjs <ruta-a-rom.gba> [salida.png]
+// Uso: node tools/tests/smoke.mjs <ruta-a-rom.gba> [salida.png]
 import { chromium } from 'playwright';
 
 const rom = process.argv[2];
@@ -12,7 +12,7 @@ const out = process.argv[3] ?? 'smoke.png';
 const url = process.env.SMOKE_URL ?? 'http://localhost:5173/';
 
 if (!rom) {
-  console.error('Falta la ruta de la ROM.\nUso: node tools/smoke.mjs <rom.gba> [salida.png]');
+  console.error('Falta la ruta de la ROM.\nUso: node tools/tests/smoke.mjs <rom.gba> [salida.png]');
   process.exit(2);
 }
 

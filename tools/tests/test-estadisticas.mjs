@@ -5,13 +5,13 @@
 // que salir exactamente las que el juego ya habia guardado. Si sale un solo
 // numero distinto, la formula esta mal.
 //
-// Uso: npx tsx tools/memoria/test-estadisticas.mjs <estado.bin> <rom.gba>
+// Uso: npx tsx tools/tests/test-estadisticas.mjs <estado.bin> <rom.gba>
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 const [, , ESTADO, ROM] = process.argv;
 if (!ROM) {
-  console.error('Uso: npx tsx tools/memoria/test-estadisticas.mjs <estado.bin> <rom.gba>');
+  console.error('Uso: npx tsx tools/tests/test-estadisticas.mjs <estado.bin> <rom.gba>');
   process.exit(2);
 }
 
