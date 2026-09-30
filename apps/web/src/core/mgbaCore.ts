@@ -121,9 +121,19 @@ export class CoreUnavailableError extends Error {}
  */
 export const startCore = async (canvas: HTMLCanvasElement): Promise<MgbaModule> => {
   if (!globalThis.crossOriginIsolated) {
+    // Dos causas distintas dan exactamente el mismo sintoma, y conviene no
+    // confundirlas: sin contexto seguro no hay aislamiento por muy bien puestas
+    // que esten las cabeceras. Es lo que pasa al entrar por la IP de la red
+    // local desde el movil, y el mensaje de antes mandaba a revisar el servidor
+    // cuando el servidor no tenia nada que ver.
     throw new CoreUnavailableError(
-      'El nucleo necesita aislamiento cross-origin (COOP/COEP) para usar SharedArrayBuffer. ' +
-        'Comprueba las cabeceras del servidor.',
+      globalThis.isSecureContext
+        ? 'El servidor no manda Cross-Origin-Opener-Policy: same-origin y ' +
+          'Cross-Origin-Embedder-Policy: require-corp, y sin las dos el nucleo no puede ' +
+          'usar SharedArrayBuffer.'
+        : 'Esta pagina no llega por HTTPS, y sin contexto seguro el navegador no da ' +
+          'SharedArrayBuffer aunque las cabeceras esten bien. Entra por localhost, o ' +
+          'arranca con npm run dev:https si juegas desde otro aparato.',
     );
   }
   const create = await loadFactory();
