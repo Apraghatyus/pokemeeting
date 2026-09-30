@@ -156,10 +156,35 @@ Asi la sorpresa es una decision, no un accidente. Y leer la tabla de nombres de
 la ROM en vez de llevarla codificada es lo mismo que ya hace falta para que los
 nombres salgan bien en una ROM randomizada o traducida.
 
-## Primer paso de implementacion
+## Lo que ya esta comprobado contra una partida real
 
-Antes que nada hay que resolver una incognita concreta: **en que desplazamiento
-del fichero de savestate de mGBA empieza la EWRAM**. Se determina una sola vez,
-de forma empirica: guardar un estado con una partida conocida, buscar en el
-fichero la firma del equipo y fijar el desplazamiento. A partir de ahi, leer y
-escribir memoria del juego es aritmetica.
+Todo lo de arriba dejo de ser teoria. Sobre una partida de Rojo Fuego espanol
+con un Bulbasaur llamado CCC y un entrenador llamado AAA:
+
+| Pieza | Resultado |
+|---|---|
+| La memoria dentro del estado | empieza en `0x21000` |
+| El equipo del jugador | `0x02024284`, encontrado por checksum, sin saber la direccion |
+| El contador del equipo | `0x02024029`, valia 1 |
+| El equipo rival | `0x0202402C` |
+| Descifrado | mote "CCC", entrenador "AAA", nivel 6, movimientos 33 y 45 |
+| Tabla de nombres de la ROM | `0x24164C`, confirmada con cuatro nombres conocidos |
+
+Y la mitad dificil, escribir en la partida de alguien, tambien: se inyecto un
+Pikachu de nivel 22 llamado REGALO en la segunda ranura y **el juego lo
+acepto**, con su sprite, su nivel, sus PS y su simbolo de genero, junto al
+Bulbasaur intacto.
+
+### Una trampa que costo encontrar
+
+En la subestructura de misceláneo, la palabra en el desplazamiento 4 guarda los
+seis IV en sus treinta primeros bits **y la bandera de HUEVO en el bit 30**.
+Rellenarla con `0x7FFFFFFF` creyendo poner los IV al maximo enciende esa
+bandera, y el Pokemon aparece en el equipo sin nivel ni PS porque el juego lo
+trata como un huevo. Lo correcto es `0x3FFFFFFF`.
+
+## Lo que falta
+
+La mitad que viaja por la red, que es la facil: los cien bytes por el canal de
+datos que ya esta abierto, el protocolo de dos fases para que nadie duplique ni
+pierda un Pokemon, y el dialogo que enseña que se entrega y que se recibe.
