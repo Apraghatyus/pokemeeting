@@ -41,7 +41,13 @@ const jugador = (etiqueta, estadoRuta, romRuta, ranura) => {
     contexto: pk.contextoDeRom(rom),
     huella: readRomHeader(rom),
 
-    contador: pk.DIRECCIONES_CONOCIDAS[cabecera.codigoJuego.slice(0, 3)]?.contador,
+    // No se coge la direccion documentada tal cual: se comprueba que el byte
+    // que hay ahi es el numero de Pokemon que se encontraron de verdad. Si no
+    // cuadra vale null, y un intercambio normal no lo necesita.
+    contador: (() => {
+      const equipo = pk.localizarEquipo(estado);
+      return equipo ? pk.localizarContador(estado, cabecera.codigoJuego, equipo) : null;
+    })(),
     romRuta,
   };
 };

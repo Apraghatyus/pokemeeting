@@ -114,10 +114,15 @@ export type Recepcion = {
  * Se valida siempre contra los limites de **la ROM que recibe**, no de la que
  * envia: un indice que existe en la copia del companero puede no existir en la
  * nuestra, y eso no da un Pokemon raro, da un "Bad Egg".
+ *
+ * El contador puede venir a null, y casi siempre da igual: en un intercambio
+ * normal el que llega ocupa el hueco del que se fue y el equipo sigue teniendo
+ * los mismos Pokemon. Solo hace falta saber donde esta el contador cuando el
+ * equipo crece, y entonces se dice en vez de escribir a ciegas.
  */
 export const aplicarRecepcion = (
   estado: Uint8Array,
-  direccionContador: number,
+  direccionContador: number | null,
   indice: number,
   bloque: Uint8Array,
   contexto: ContextoRom,
@@ -136,10 +141,17 @@ export const aplicarRecepcion = (
   const ajustado = base ? recalcularEnBloque(bloque, base) : bloque;
 
   const nuevo = escribirEnRanura(estado, equipo.direccion, indice, ajustado);
-  // El contador solo sube si el Pokemon va a una ranura que antes estaba
-  // vacia. En un intercambio normal ocupa el hueco del que se fue y no cambia.
+
   const cuantos = Math.max(equipo.ranuras.length, indice + 1);
-  const conContador = escribirContador(nuevo, direccionContador, cuantos);
+  let conContador = nuevo;
+  if (cuantos !== equipo.ranuras.length) {
+    if (direccionContador === null) {
+      throw new IntercambioInvalidoError(
+        'El equipo crecería y no se donde guarda este juego cuantos Pokemon lleva, asi que no lo toco.',
+      );
+    }
+    conContador = escribirContador(nuevo, direccionContador, cuantos);
+  }
 
   const comprobado = localizarEquipo(conContador);
   if (!comprobado || !comprobado.ranuras[indice]?.pokemon.valido) {

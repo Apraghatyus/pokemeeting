@@ -115,6 +115,7 @@ comprueban cosas que solo se pueden comprobar así.
 | `npm run test:randomizer:options -- <rom>` | Que **cada** opción cambia la ROM |
 | `npm run test:randomizer:ui -- <rom>` | El menú de aleatorización |
 | `npm run test:partidas -- <rom>` | Las partidas guardadas y su tope |
+| `npm run test:juegos` | Que los juegos que decimos aceptar los acepta el jar |
 | `npm run test:semilla -- <rom>` | Que la misma semilla da la misma ROM |
 | `npm run test:receta -- <rom>` | Recuperar una partida sin haberla descargado |
 | `npm run test:gen3` | El descifrado de un Pokémon de tercera generación |

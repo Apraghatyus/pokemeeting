@@ -19,6 +19,7 @@ import {
   todasLasPartidas,
   type PartidaGuardada,
 } from '../core/partidas';
+import { parseGameCode } from '@emupoke/pokemon';
 import { crc32 } from '../core/romHeader';
 import { codificarReceta, descodificarReceta } from '../core/receta';
 import { Modal } from './Modal';
@@ -59,8 +60,8 @@ type Progress =
     }
   | { fase: 'error'; message: string };
 
-/** Alcance acordado: de momento solo Rojo Fuego y Verde Hoja. */
-const SUPPORTED = new Set(['BPR', 'BPG']);
+/** Los cinco juegos de tercera generacion de GBA. */
+const SUPPORTED = new Set(['BPR', 'BPG', 'AXV', 'AXP', 'BPE']);
 
 /** Lo que viene marcado al abrir: la mezcla habitual de una partida aleatoria. */
 const DEFAULT_SELECTION = ['salvajes', 'iniciales', 'entrenadores', 'movimientos'];
@@ -119,6 +120,9 @@ export const RandomizerModal = ({
   }, [open]);
 
   const supported = gameCode !== null && SUPPORTED.has(gameCode.slice(0, 3));
+  // Un juego que aceptamos pero que nadie ha llegado a jugar por aqui.
+  const juego = gameCode !== null ? parseGameCode(gameCode).game : null;
+  const sinProbar = supported && juego && !juego.tested ? juego.label : null;
   const options = status.estado === 'listo' ? status.health.options : [];
   const guardadas = partidas.length + otras.length;
   const lleno = guardadas >= MAX_PARTIDAS;
@@ -320,7 +324,8 @@ export const RandomizerModal = ({
 
           {status.estado === 'listo' && !supported && (
             <p className="warn">
-              La aleatorizacion solo esta disponible para Rojo Fuego y Verde Hoja. Tu ROM es "
+              La aleatorizacion solo esta disponible para los juegos de GBA: Rubi, Zafiro,
+              Esmeralda, Rojo Fuego y Verde Hoja. Tu ROM es "
               {gameCode}".
             </p>
           )}
@@ -339,6 +344,18 @@ export const RandomizerModal = ({
               ) : (
                 <p className="hint">
                   Se aleatoriza tu propia copia en este ordenador. La ROM no sale de aqui.
+                </p>
+              )}
+
+              {/* Rojo Fuego y Verde Hoja se han arrancado y jugado de verdad;
+                  los otros tres comparten la misma estructura y el randomizer
+                  los acepta, pero nadie los ha probado aqui todavia. Decirlo
+                  cuesta una linea y evita que alguien pierda una tarde sin
+                  saber si el raro es el juego o es el. */}
+              {sinProbar && (
+                <p className="hint">
+                  De {sinProbar} todavia no hemos comprobado una partida entera por aqui. Deberia
+                  funcionar igual: si algo sale raro, es util saberlo.
                 </p>
               )}
 

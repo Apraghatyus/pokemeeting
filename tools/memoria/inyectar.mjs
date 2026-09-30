@@ -117,7 +117,14 @@ if (!veredicto.ok) process.exit(1);
 
 // --- escritura ---
 const conPokemon = eq.escribirEnRanura(estado, equipo.direccion, equipo.ranuras.length, regalo);
-const contador = eq.DIRECCIONES_CONOCIDAS.BPR.contador;
+// Aqui el equipo SI crece, asi que el contador hace falta de verdad, y se
+// confirma antes de tocarlo: si el byte no coincide con los Pokemon que hay,
+// no es el contador y no se escribe nada.
+const contador = eq.localizarContador(estado, ss.leerCabecera(estado).codigoJuego, equipo);
+if (contador === null) {
+  console.error('No he podido confirmar donde guarda este juego cuantos Pokemon lleva.');
+  process.exit(1);
+}
 const finalBytes = eq.escribirContador(conPokemon, contador, equipo.ranuras.length + 1);
 
 writeFileSync(SALIDA, Buffer.from(finalBytes));

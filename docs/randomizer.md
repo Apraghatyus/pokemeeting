@@ -1,6 +1,12 @@
 # Integrar el Universal Pokemon Randomizer ZX
 
-Estado: **implementado** para Rojo Fuego y Verde Hoja.
+Estado: **implementado** para los cinco juegos de GBA de tercera generacion:
+Rubi, Zafiro, Esmeralda, Rojo Fuego y Verde Hoja, en cualquiera de sus idiomas.
+
+De esos cinco, los unicos jugados de verdad por aqui son Rojo Fuego y Verde
+Hoja. Los otros tres los acepta el randomizer -esta comprobado contra el propio
+jar, no supuesto- y comparten la estructura de datos, pero nadie ha llegado a
+terminar una partida con ellos: la interfaz lo dice cuando cargas uno.
 
 ## Como se usa
 

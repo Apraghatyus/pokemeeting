@@ -5,7 +5,7 @@
 // sincronia ciclo a ciclo entre dos emuladores por internet.
 
 import { leerPokemon, pareceValido, TAMANO_EN_EQUIPO, TAMANO_EQUIPO, type PokemonGen3 } from './gen3';
-import { escribirEn, region, type Region } from './savestate';
+import { desplazamientoDe, DIRECCION_BASE, escribirEn, region, type Region } from './savestate';
 
 /**
  * Donde vive el equipo, por juego.
@@ -13,12 +13,26 @@ import { escribirEn, region, type Region } from './savestate';
  * Estas direcciones no se dan por buenas: son un punto de partida, y el
  * localizador las confirma buscando bloques validos. Si un hack las mueve, el
  * barrido las encuentra igual.
+ *
+ * Rubi y Zafiro son el caso raro: guardan el equipo en IWRAM, no en EWRAM como
+ * los otros tres. Por eso el barrido mira las dos regiones y no solo una.
+ *
+ * Las de Rojo Fuego y Verde Hoja estan comprobadas contra una partida real.
+ * Las otras tres vienen de la documentacion de la comunidad y aqui solo se
+ * usan como pista: nada se escribe sin que `localizarContador` confirme que
+ * el byte que hay en esa direccion es el numero de Pokemon que el barrido
+ * encontro de verdad.
  */
-export const DIRECCIONES_CONOCIDAS: Readonly<Record<string, { equipo: number; contador: number }>> = {
+export const DIRECCIONES_CONOCIDAS: Readonly<
+  Record<string, { equipo: number; contador: number; region: Region }>
+> = {
   // Comprobado contra una partida real de la edicion espanola: el equipo
   // aparecio exactamente aqui, con el contador a 1.
-  BPR: { equipo: 0x02024284, contador: 0x02024029 },
-  BPG: { equipo: 0x02024284, contador: 0x02024029 },
+  BPR: { equipo: 0x02024284, contador: 0x02024029, region: 'ewram' },
+  BPG: { equipo: 0x02024284, contador: 0x02024029, region: 'ewram' },
+  AXV: { equipo: 0x03004360, contador: 0x03004350, region: 'iwram' },
+  AXP: { equipo: 0x03004360, contador: 0x03004350, region: 'iwram' },
+  BPE: { equipo: 0x020244ec, contador: 0x020244e9, region: 'ewram' },
 };
 
 export type RanuraEquipo = {
@@ -33,20 +47,17 @@ export type RanuraEquipo = {
 
 export type Equipo = {
   direccion: number;
+  /** En que region aparecio. Rubi y Zafiro lo tienen en IWRAM. */
+  region: Region;
   ranuras: RanuraEquipo[];
 };
 
-/**
- * Busca el equipo en la memoria.
- *
- * El filtro es el checksum del propio Pokemon: la probabilidad de que cien
- * bytes cualesquiera cuadren por casualidad es de una entre 65536. Comprobado
- * sobre memoria real de una partida sin Pokemon, donde no encuentra nada, y
- * sobre una con equipo, donde lo encuentra en la direccion documentada.
- */
-export const localizarEquipo = (estado: Uint8Array, cual: Region = 'ewram'): Equipo | null => {
+/** Donde puede estar un equipo, en el orden en que conviene mirar. */
+const REGIONES_CON_EQUIPO: readonly Region[] = ['ewram', 'iwram'];
+
+const buscarEn = (estado: Uint8Array, cual: Region): Equipo | null => {
   const memoria = region(estado, cual);
-  const base = cual === 'ewram' ? 0x02000000 : 0x03000000;
+  const base = DIRECCION_BASE[cual];
 
   const candidatos: number[] = [];
   for (let off = 0; off + TAMANO_EN_EQUIPO <= memoria.length; off += 4) {
@@ -61,10 +72,7 @@ export const localizarEquipo = (estado: Uint8Array, cual: Region = 'ewram'): Equ
   let mejor = { inicio: candidatos[candidatos.length - 1]!, largo: 1 };
   for (const inicio of candidatos) {
     let largo = 1;
-    while (
-      largo < TAMANO_EQUIPO &&
-      candidatos.includes(inicio + largo * TAMANO_EN_EQUIPO)
-    ) {
+    while (largo < TAMANO_EQUIPO && candidatos.includes(inicio + largo * TAMANO_EN_EQUIPO)) {
       largo += 1;
     }
     if (largo > mejor.largo) mejor = { inicio, largo };
@@ -77,7 +85,53 @@ export const localizarEquipo = (estado: Uint8Array, cual: Region = 'ewram'): Equ
     ranuras.push({ indice: i, direccion: base + off, pokemon: leerPokemon(bloque), bloque });
   }
 
-  return { direccion: base + mejor.inicio, ranuras };
+  return { direccion: base + mejor.inicio, region: cual, ranuras };
+};
+
+/**
+ * Busca el equipo en la memoria.
+ *
+ * El filtro es el checksum del propio Pokemon: la probabilidad de que cien
+ * bytes cualesquiera cuadren por casualidad es de una entre 65536. Comprobado
+ * sobre memoria real de una partida sin Pokemon, donde no encuentra nada, y
+ * sobre una con equipo, donde lo encuentra en la direccion documentada.
+ *
+ * Sin decirle region mira EWRAM y IWRAM y se queda con el equipo mas largo,
+ * porque los cinco juegos de tercera generacion no lo guardan en el mismo
+ * sitio: Rubi y Zafiro usan IWRAM y los otros tres EWRAM.
+ */
+export const localizarEquipo = (estado: Uint8Array, cual?: Region): Equipo | null => {
+  const donde = cual ? [cual] : REGIONES_CON_EQUIPO;
+  let mejor: Equipo | null = null;
+  for (const region of donde) {
+    const hallado = buscarEn(estado, region);
+    if (hallado && (!mejor || hallado.ranuras.length > mejor.ranuras.length)) mejor = hallado;
+  }
+  return mejor;
+};
+
+/**
+ * Localiza el contador del equipo, comprobandolo antes de darlo por bueno.
+ *
+ * El contador es lo unico que no se puede encontrar por su forma: es un solo
+ * byte y no hay nada que lo distinga de cualquier otro byte con el mismo
+ * valor. Asi que se parte de la direccion documentada del juego y se
+ * comprueba: si el byte que hay ahi no coincide con los Pokemon que el barrido
+ * encontro, no es el contador, y se devuelve null en vez de escribir a ciegas
+ * en la partida de alguien.
+ */
+export const localizarContador = (
+  estado: Uint8Array,
+  codigoJuego: string,
+  equipo: Equipo,
+): number | null => {
+  const conocida = DIRECCIONES_CONOCIDAS[codigoJuego.slice(0, 3).toUpperCase()];
+  if (!conocida) return null;
+
+  const destino = desplazamientoDe(conocida.contador);
+  if (!destino) return null;
+
+  return estado[destino.offset] === equipo.ranuras.length ? conocida.contador : null;
 };
 
 export class IntercambioInvalidoError extends Error {}

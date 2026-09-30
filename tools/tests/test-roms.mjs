@@ -64,5 +64,34 @@ const iguales = compareRoms(rom('BPRS', 'aaa'), rom('BPRS', 'aaa'));
 check('la misma copia se reconoce como identica', iguales.level === 'identica');
 check('y no genera avisos', iguales.notes.length === 0);
 
+
+// --- el resto de la tercera generacion ---
+check('AXVS se lee como Rubi en espanol',
+  parseGameCode('AXVS').game?.label === 'Rubi' && parseGameCode('AXVS').language === 'espanol',
+  describeGame('AXVS'));
+check('AXPS se reconoce como Zafiro', parseGameCode('AXPS').game?.label === 'Zafiro');
+check('BPES se reconoce como Esmeralda', parseGameCode('BPES').game?.label === 'Esmeralda');
+
+const rubiZafiro = compareRoms(rom('AXVS', 'aaa'), rom('AXPS', 'bbb'));
+check('Rubi y Zafiro NO comparten sala, igual que Rojo Fuego y Verde Hoja',
+  !rubiZafiro.canPlayTogether, rubiZafiro.headline);
+
+const dosRubies = compareRoms(rom('AXVS', 'aaa'), rom('AXVS', 'bbb'));
+check('dos aleatorizaciones de Rubi si se permiten', dosRubies.canPlayTogether);
+check('y se pueden intercambiar', dosRubies.canTrade);
+
+const esmeraldas = compareRoms(rom('BPES', 'aaa'), rom('BPES', 'bbb'));
+check('dos Esmeraldas distintas tambien', esmeraldas.canPlayTogether && esmeraldas.canTrade);
+
+// Rubi y Zafiro son pareja de versiones, aunque la regla no deje mezclarlas.
+check('Rubi sabe que su pareja es Zafiro',
+  parseGameCode('AXVS').game?.sibling === 'AXP');
+check('Esmeralda no tiene pareja, y esta bien que no la tenga',
+  parseGameCode('BPES').game?.sibling === undefined);
+
+// Lo que todavia no se ha comprobado jugando, marcado como tal.
+check('Rojo Fuego consta como probado de verdad', parseGameCode('BPRS').game?.tested === true);
+check('Rubi consta como NO probado todavia', parseGameCode('AXVS').game?.tested === false);
+
 console.log(failures === 0 ? '\nCOMPATIBILIDAD CORRECTA' : `\n${failures} COMPROBACIONES FALLIDAS`);
 process.exit(failures === 0 ? 0 : 1);

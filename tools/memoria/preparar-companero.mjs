@@ -64,7 +64,11 @@ console.log(`se cura antes de empezar: PS ${u16(bloque, 0x56)}/${u16(bloque, 0x5
 // Pasa a ser el unico Pokemon del equipo: el companero tiene su propia partida
 // con su propio Pokemon, que es lo que hace falta para que haya intercambio.
 const equipo = pk.localizarEquipo(estado);
-const contador = pk.DIRECCIONES_CONOCIDAS[pk.leerCabecera(estado).codigoJuego.slice(0, 3)].contador;
+const contador = pk.localizarContador(estado, pk.leerCabecera(estado).codigoJuego, equipo);
+if (contador === null) {
+  console.error('No he podido confirmar donde guarda este juego cuantos Pokemon lleva.');
+  process.exit(1);
+}
 const conPokemon = pk.escribirEnRanura(estado, equipo.direccion, 0, curado);
 const resultado = pk.escribirContador(conPokemon, contador, 1);
 

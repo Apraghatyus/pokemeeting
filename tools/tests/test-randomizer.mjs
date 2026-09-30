@@ -82,16 +82,31 @@ if (!health.jar.found || !health.java.available) {
   process.exit(1);
 }
 
-// --- 2. una ROM que no es Rojo Fuego ni Verde Hoja se rechaza ---
+// --- 2. una ROM que no es de Pokemon se rechaza ---
 //
 // Se fabrica una cabecera minima en vez de usar otra ROM: lo que se prueba es
 // la comprobacion del codigo de juego, no el emulador.
+//
+// Antes aqui se usaba AXVE, que es Rubi, y valia porque solo se aceptaban
+// Rojo Fuego y Verde Hoja. Al abrir el resto de la tercera generacion esa
+// cabecera paso a ser valida y la prueba empezo a fallar, que es justo lo que
+// tenia que hacer. Ahora se usa un juego de GBA que no es Pokemon.
 const fake = Buffer.alloc(0x200);
-fake.write('AXVE', 0xac, 'ascii');
+fake.write('AZLE', 0xac, 'ascii');
 fake[0xb2] = 0x96;
 const rejected = await post({ options: ['salvajes'] }, fake);
 const rejectedBody = await rejected.json().catch(() => ({}));
-check('otro juego se rechaza antes de tocar Java', rejected.status === 400, rejectedBody.message ?? '');
+check('una ROM que no es Pokemon se rechaza antes de tocar Java',
+  rejected.status === 400, rejectedBody.message ?? '');
+
+// Y uno de los que SI aceptamos ahora no se rechaza por el codigo. La cabecera
+// es de mentira, asi que fallara mas adelante, pero no aqui.
+const rubi = Buffer.alloc(0x200);
+rubi.write('AXVS', 0xac, 'ascii');
+rubi[0xb2] = 0x96;
+const rubiRes = await post({ options: ['salvajes'] }, rubi);
+check('Rubi ya no se rechaza por ser Rubi', rubiRes.status !== 400,
+  `respondio ${rubiRes.status}`);
 
 // --- 3. el caso real ---
 const original = readFileSync(ROM);

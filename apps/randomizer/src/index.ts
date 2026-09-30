@@ -34,8 +34,16 @@ const PORT = Number(process.env['PORT'] ?? 8788);
 const DEFAULT_JAR = resolve(import.meta.dirname, '../../../tools/randomizer/PokeRandoZX.jar');
 const jarPath = (): string => process.env['UPR_JAR'] ?? DEFAULT_JAR;
 
-/** Solo Rojo Fuego y Verde Hoja, que es el alcance acordado. */
-const SUPPORTED_GAMES = new Set(['BPR', 'BPG']);
+/**
+ * Toda la tercera generacion de GBA.
+ *
+ * No es una lista elegida a ojo: el jar trae dentro su fichero de posiciones
+ * de tercera generacion, con una entrada por ROM, y ahi aparecen los cinco
+ * juegos en todos sus idiomas, el espanol incluido. La prueba
+ * test-juegos-soportados.mjs lo comprueba contra el jar que haya instalado, en
+ * vez de fiarse de esta lista.
+ */
+const SUPPORTED_GAMES = new Set(['BPR', 'BPG', 'AXV', 'AXP', 'BPE']);
 
 /** Tamano maximo aceptado, con holgura sobre los 32 MB de la ROM mas grande. */
 const MAX_BODY_BYTES = 48 * 1024 * 1024;
@@ -328,7 +336,7 @@ const handleRandomize = async (req: IncomingMessage, res: ServerResponse): Promi
   if (!SUPPORTED_GAMES.has(gameCode.slice(0, 3))) {
     sendJson(res, 400, {
       error: 'juego-no-soportado',
-      message: `De momento solo Rojo Fuego y Verde Hoja. Esa ROM es "${gameCode}".`,
+      message: `Solo los juegos de GBA: Rubi, Zafiro, Esmeralda, Rojo Fuego y Verde Hoja. Esa ROM es "${gameCode}".`,
     });
     return;
   }
