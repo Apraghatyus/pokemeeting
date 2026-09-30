@@ -93,5 +93,38 @@ check('Esmeralda no tiene pareja, y esta bien que no la tenga',
 check('Rojo Fuego consta como probado de verdad', parseGameCode('BPRS').game?.tested === true);
 check('Rubi consta como NO probado todavia', parseGameCode('AXVS').game?.tested === false);
 
+// --- segunda generacion, Game Boy Color ---
+check('AAUS se lee como Oro en espanol',
+  parseGameCode('AAUS').game?.label === 'Oro' && parseGameCode('AAUS').language === 'espanol',
+  describeGame('AAUS'));
+check('AAXS se reconoce como Plata', parseGameCode('AAXS').game?.label === 'Plata');
+check('BYTS se reconoce como Cristal', parseGameCode('BYTS').game?.label === 'Cristal');
+check('y el Cristal japones, que usa otro codigo, tambien',
+  parseGameCode('BXTJ').game?.label === 'Cristal', describeGame('BXTJ'));
+
+check('Oro sabe que es de segunda generacion', parseGameCode('AAUS').game?.generacion === 2);
+check('y que corre en Game Boy Color', parseGameCode('AAUS').game?.consola === 'gbc');
+check('Rojo Fuego sigue siendo de tercera en GBA',
+  parseGameCode('BPRS').game?.generacion === 3 && parseGameCode('BPRS').game?.consola === 'gba');
+
+const oroPlata = compareRoms(rom('AAUS', 'aaa'), rom('AAXS', 'bbb'));
+check('Oro y Plata NO comparten sala, como toda pareja de versiones',
+  !oroPlata.canPlayTogether, oroPlata.headline);
+
+const dosOros = compareRoms(rom('AAUS', 'aaa'), rom('AAUS', 'bbb'));
+check('dos aleatorizaciones de Oro si se permiten', dosOros.canPlayTogether);
+check('y al avisar NO se nombran habilidades, que en Gen 2 no existen',
+  dosOros.notes.some((n) => /estadisticas y el tipo/.test(n)) &&
+    !dosOros.notes.some((n) => /habilidad/.test(n)),
+  dosOros.notes[1] ?? '');
+
+const gen3 = compareRoms(rom('BPRS', 'aaa'), rom('BPRS', 'bbb'));
+check('y en tercera generacion si se nombran',
+  gen3.notes.some((n) => /habilidad/.test(n)));
+
+const cruzado = compareRoms(rom('AAUS', 'aaa'), rom('BPRS', 'bbb'));
+check('Oro y Rojo Fuego no comparten sala: ni el mismo juego ni la misma consola',
+  !cruzado.canPlayTogether, cruzado.headline);
+
 console.log(failures === 0 ? '\nCOMPATIBILIDAD CORRECTA' : `\n${failures} COMPROBACIONES FALLIDAS`);
 process.exit(failures === 0 ? 0 : 1);

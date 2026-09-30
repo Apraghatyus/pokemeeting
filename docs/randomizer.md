@@ -1,12 +1,20 @@
 # Integrar el Universal Pokemon Randomizer ZX
 
-Estado: **implementado** para los cinco juegos de GBA de tercera generacion:
-Rubi, Zafiro, Esmeralda, Rojo Fuego y Verde Hoja, en cualquiera de sus idiomas.
+Estado: **implementado** para ocho juegos, en cualquiera de sus idiomas:
 
-De esos cinco, los unicos jugados de verdad por aqui son Rojo Fuego y Verde
-Hoja. Los otros tres los acepta el randomizer -esta comprobado contra el propio
-jar, no supuesto- y comparten la estructura de datos, pero nadie ha llegado a
-terminar una partida con ellos: la interfaz lo dice cuando cargas uno.
+- Segunda generacion, Game Boy Color: Oro, Plata y Cristal.
+- Tercera generacion, Game Boy Advance: Rubi, Zafiro, Esmeralda, Rojo Fuego y
+  Verde Hoja.
+
+De los ocho, los unicos jugados de verdad por aqui son Rojo Fuego y Verde Hoja.
+El resto los acepta el randomizer -esta comprobado contra el propio jar, no
+supuesto- pero nadie ha llegado a terminar una partida con ellos: la interfaz
+lo dice cuando cargas uno.
+
+El menu se adapta a lo que ese juego tiene. En segunda generacion no existen
+las habilidades, asi que esa casilla no aparece; y si llegara pedida de todos
+modos, el servicio la aparta y lo cuenta en el resumen, en vez de decir que la
+ha cambiado.
 
 ## Como se usa
 

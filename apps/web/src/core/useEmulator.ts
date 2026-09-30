@@ -223,7 +223,7 @@ export const useEmulator = () => {
       const bytes = new Uint8Array(await file.arrayBuffer());
       const header = readRomHeader(bytes);
       if (!header.valid) {
-        fail(new Error(`"${file.name}" no parece una ROM de GBA: falta el byte fijo de cabecera.`));
+        fail(new Error(`"${file.name}" no parece una ROM de Game Boy ni de GBA: su cabecera no cuadra.`));
         return;
       }
 

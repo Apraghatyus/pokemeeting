@@ -9,6 +9,9 @@
 // Poner true en la 0 significa "no cambiar nada", no "la primera opcion". Un
 // ejemplo anterior se equivoco justo ahi y producia una ROM sin aleatorizar.
 
+/** Generaciones de Pokemon que este servicio sabe aleatorizar. */
+export type Generacion = 2 | 3;
+
 export type RandomizerOption = {
   id: string;
   label: string;
@@ -19,7 +22,18 @@ export type RandomizerOption = {
   index: number;
   /** Cuantos valores tiene ese enum. */
   total: number;
+  /**
+   * En que generaciones existe lo que esta opcion cambia.
+   *
+   * No es un detalle: si se ofreciera una opcion que ese juego no tiene, el
+   * randomizer la ignoraria en silencio y luego le diriamos al jugador que la
+   * habia cambiado. Ya paso una vez con unos ajustes que no tocaban nada.
+   */
+  generaciones: readonly Generacion[];
 };
+
+/** Casi todo existe en las dos; se nombra una vez para no repetirlo catorce. */
+const AMBAS: readonly Generacion[] = [2, 3];
 
 export const OPTIONS: readonly RandomizerOption[] = [
   {
@@ -29,6 +43,7 @@ export const OPTIONS: readonly RandomizerOption[] = [
     setter: 'setWildPokemonMod',
     index: 1, // RANDOM
     total: 4,
+    generaciones: AMBAS,
   },
   {
     id: 'iniciales',
@@ -37,6 +52,7 @@ export const OPTIONS: readonly RandomizerOption[] = [
     setter: 'setStartersMod',
     index: 2, // COMPLETELY_RANDOM
     total: 4,
+    generaciones: AMBAS,
   },
   {
     id: 'fijos',
@@ -45,6 +61,7 @@ export const OPTIONS: readonly RandomizerOption[] = [
     setter: 'setStaticPokemonMod',
     index: 3, // SIMILAR_STRENGTH
     total: 4,
+    generaciones: AMBAS,
   },
   {
     id: 'entrenadores',
@@ -55,6 +72,7 @@ export const OPTIONS: readonly RandomizerOption[] = [
     setter: 'setTrainersMod',
     index: 1, // RANDOM
     total: 6,
+    generaciones: AMBAS,
   },
   {
     id: 'intercambios',
@@ -63,14 +81,16 @@ export const OPTIONS: readonly RandomizerOption[] = [
     setter: 'setInGameTradesMod',
     index: 1, // RANDOMIZE_GIVEN: se aleatoriza el que te dan, no el que piden
     total: 3,
+    generaciones: AMBAS,
   },
   {
     id: 'tutores',
     label: 'Tutores de movimientos',
-    description: 'Que ensena cada tutor repartido por el mapa.',
+    description: 'Que ensena cada tutor repartido por el mapa. En segunda generacion solo Cristal tiene.',
     setter: 'setMoveTutorMovesMod',
     index: 1, // RANDOM
     total: 2,
+    generaciones: AMBAS,
   },
   {
     id: 'evoluciones',
@@ -79,6 +99,7 @@ export const OPTIONS: readonly RandomizerOption[] = [
     setter: 'setEvolutionsMod',
     index: 1, // RANDOM
     total: 3,
+    generaciones: AMBAS,
   },
   {
     id: 'tipos',
@@ -87,6 +108,7 @@ export const OPTIONS: readonly RandomizerOption[] = [
     setter: 'setTypesMod',
     index: 1, // RANDOM_FOLLOW_EVOLUTIONS
     total: 3,
+    generaciones: AMBAS,
   },
   {
     id: 'movimientos',
@@ -95,6 +117,7 @@ export const OPTIONS: readonly RandomizerOption[] = [
     setter: 'setMovesetsMod',
     index: 1, // RANDOM_PREFER_SAME_TYPE, mas jugable que el aleatorio total
     total: 4,
+    generaciones: AMBAS,
   },
   {
     id: 'mts',
@@ -103,6 +126,7 @@ export const OPTIONS: readonly RandomizerOption[] = [
     setter: 'setTmsMod',
     index: 1, // RANDOM
     total: 2,
+    generaciones: AMBAS,
   },
   {
     id: 'objetos',
@@ -111,6 +135,7 @@ export const OPTIONS: readonly RandomizerOption[] = [
     setter: 'setFieldItemsMod',
     index: 2, // RANDOM
     total: 4,
+    generaciones: AMBAS,
   },
   {
     id: 'tiendas',
@@ -119,6 +144,7 @@ export const OPTIONS: readonly RandomizerOption[] = [
     setter: 'setShopItemsMod',
     index: 2, // RANDOM
     total: 3,
+    generaciones: AMBAS,
   },
   {
     id: 'estadisticas',
@@ -127,6 +153,7 @@ export const OPTIONS: readonly RandomizerOption[] = [
     setter: 'setBaseStatisticsMod',
     index: 2, // RANDOM
     total: 3,
+    generaciones: AMBAS,
   },
   {
     id: 'habilidades',
@@ -135,6 +162,8 @@ export const OPTIONS: readonly RandomizerOption[] = [
     setter: 'setAbilitiesMod',
     index: 1, // RANDOMIZE
     total: 2,
+    // Las habilidades no existen hasta la tercera generacion.
+    generaciones: [3],
   },
 ];
 
@@ -143,7 +172,16 @@ export const optionById = (id: string): RandomizerOption | undefined =>
 
 /** Lo que ve la interfaz: sin los detalles de como se aplica. */
 export const publicOptions = () =>
-  OPTIONS.map(({ id, label, description }) => ({ id, label, description }));
+  OPTIONS.map(({ id, label, description, generaciones }) => ({
+    id,
+    label,
+    description,
+    generaciones,
+  }));
+
+/** Las opciones que tienen sentido en un juego de esa generacion. */
+export const optionsFor = (generacion: Generacion): RandomizerOption[] =>
+  OPTIONS.filter((option) => option.generaciones.includes(generacion));
 
 /**
  * Construye el script de jjs que escribe el fichero de ajustes.

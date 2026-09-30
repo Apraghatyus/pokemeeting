@@ -34,6 +34,8 @@
     "memoria:analizar": "npx tsx tools/memoria/analizar-savestate.mjs",
     "memoria:nombres": "npx tsx tools/memoria/buscar-nombres.mjs",
     "test:receta": "node tools/tests/test-receta.mjs",
+    "test:gbc": "node tools/tests/test-gbc.mjs",
+    "test:cabeceras": "npx tsx tools/tests/test-cabeceras.mjs",
     "test:juegos": "node tools/tests/test-juegos-soportados.mjs",
     "test:semilla": "node tools/tests/test-semilla.mjs",
     "test:estadisticas": "npx tsx tools/tests/test-estadisticas.mjs",

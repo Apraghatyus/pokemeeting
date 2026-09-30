@@ -84,12 +84,20 @@ export const compareRoms = (mine: RomFingerprint, theirs: RomFingerprint): RomCo
     };
   }
 
+  // Comprobado generando dos copias aleatorizadas de la misma ROM: la tabla de
+  // nombres queda identica en las dos. Lo que el randomizer cambia son los
+  // datos de cada especie, no como se llama.
+  //
+  // Las habilidades no se nombran en segunda generacion porque ahi no existen:
+  // decirlo seria explicarle al jugador algo que en su juego no pasa.
+  const cambian =
+    a.game.generacion === 2
+      ? 'las estadisticas y el tipo'
+      : 'las estadisticas, el tipo y la habilidad';
+
   const notes = [
     'Misma edicion pero copias distintas: es lo esperado si cada uno randomiza la suya.',
-    // Comprobado generando dos copias aleatorizadas de la misma ROM: la tabla
-    // de nombres queda identica en las dos. Lo que el randomizer cambia son
-    // los datos de cada especie, no como se llama.
-    'Al estar randomizadas por separado, un Pokemon intercambiado llega con su nombre intacto, pero con las estadisticas, el tipo y la habilidad que tenga esa especie en la ROM que lo recibe.',
+    `Al estar randomizadas por separado, un Pokemon intercambiado llega con su nombre intacto, pero con ${cambian} que tenga esa especie en la ROM que lo recibe.`,
   ];
 
   if (mine.version !== theirs.version) {

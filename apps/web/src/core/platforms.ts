@@ -1,13 +1,15 @@
 // Registro de plataformas.
 //
-// Hoy solo GBA esta implementado, pero la interfaz existe para que anadir una
-// consola sea rellenar una entrada y escribir su adaptador, no reescribir la app.
+// Anadir una consola es rellenar una entrada y, si hace falta, escribir su
+// adaptador; no reescribir la aplicacion.
 //
 // Nota sobre el reparto de trabajo real:
-//   - GB / GBC: el MISMO nucleo mGBA ya los emula. Falta poco mas que activarlos.
-//   - NDS:      necesita otro nucleo (melonDS a wasm). Trabajo aparte, viable.
-//   - 3DS:      hoy no es realista en navegador. Queda listado para no perderlo
-//               de vista, pero no lo damos por planificado.
+//   - GBA / GBC / GB: el MISMO nucleo mGBA los emula los tres. Comprobado
+//     cargando una ROM de Game Boy Color escrita a mano (test-gbc.mjs).
+//   - NDS: necesita otro nucleo (melonDS a wasm), que ademas es GPL-3 y pide
+//     BIOS del usuario. Trabajo aparte, viable pero no barato.
+//   - 3DS: hoy no es realista en navegador. Queda listado para no perderlo de
+//     vista, pero no lo damos por planificado.
 
 export type PlatformId = 'gba' | 'gbc' | 'gb' | 'nds' | '3ds';
 
@@ -45,19 +47,19 @@ export const PLATFORMS: readonly PlatformDescriptor[] = [
     id: 'gbc',
     label: 'Game Boy Color',
     extensions: ['.gbc'],
-    support: 'planned',
+    support: 'supported',
     core: 'mgba',
     screens: [{ width: 160, height: 144 }],
-    note: 'El nucleo mGBA ya lo soporta; falta el perfil de memoria de los juegos de Gen 2.',
+    note: 'Se juega y se aleatoriza. Los intercambios todavia no: la memoria de segunda generacion se guarda de otra forma.',
   },
   {
     id: 'gb',
     label: 'Game Boy',
     extensions: ['.gb'],
-    support: 'planned',
+    support: 'supported',
     core: 'mgba',
     screens: [{ width: 160, height: 144 }],
-    note: 'Igual que GBC. Gen 1 tiene estructuras de datos distintas a Gen 3.',
+    note: 'Se juega, pero el randomizer solo trae Rojo, Azul, Verde y Amarillo, y de primera generacion aqui no se lee la memoria.',
   },
   {
     id: 'nds',

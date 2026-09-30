@@ -25,7 +25,13 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { buildSettingsScript, optionById, publicOptions, type RandomizerOption } from './options.ts';
+import {
+  buildSettingsScript,
+  optionById,
+  publicOptions,
+  type Generacion,
+  type RandomizerOption,
+} from './options.ts';
 import { buildFromStringScript, buildRandomizeScript } from './semilla.ts';
 
 const PORT = Number(process.env['PORT'] ?? 8788);
@@ -35,15 +41,32 @@ const DEFAULT_JAR = resolve(import.meta.dirname, '../../../tools/randomizer/Poke
 const jarPath = (): string => process.env['UPR_JAR'] ?? DEFAULT_JAR;
 
 /**
- * Toda la tercera generacion de GBA.
+ * Los juegos que sabemos aleatorizar, con su generacion.
  *
- * No es una lista elegida a ojo: el jar trae dentro su fichero de posiciones
- * de tercera generacion, con una entrada por ROM, y ahi aparecen los cinco
- * juegos en todos sus idiomas, el espanol incluido. La prueba
- * test-juegos-soportados.mjs lo comprueba contra el jar que haya instalado, en
- * vez de fiarse de esta lista.
+ * No es una lista elegida a ojo: el jar trae dentro sus ficheros de posiciones
+ * por generacion, con una entrada por ROM, y de ahi salen estos codigos. La
+ * prueba test-juegos-soportados.mjs lo comprueba contra el jar que haya
+ * instalado, en vez de fiarse de esta lista.
+ *
+ * La generacion hace falta para no ofrecer opciones que ese juego no tiene: en
+ * segunda generacion no existen las habilidades, por ejemplo.
  */
-const SUPPORTED_GAMES = new Set(['BPR', 'BPG', 'AXV', 'AXP', 'BPE']);
+const SUPPORTED_GAMES: Readonly<Record<string, Generacion>> = {
+  // Segunda generacion, Game Boy Color. Cristal japones usa otro codigo.
+  AAU: 2,
+  AAX: 2,
+  BYT: 2,
+  BXT: 2,
+  // Tercera generacion, Game Boy Advance.
+  BPR: 3,
+  BPG: 3,
+  AXV: 3,
+  AXP: 3,
+  BPE: 3,
+};
+
+const generacionDe = (gameCode: string): Generacion | null =>
+  SUPPORTED_GAMES[gameCode.slice(0, 3).toUpperCase()] ?? null;
 
 /** Tamano maximo aceptado, con holgura sobre los 32 MB de la ROM mas grande. */
 const MAX_BODY_BYTES = 48 * 1024 * 1024;
@@ -264,6 +287,8 @@ export type RandomizeSummary = {
   changed: string[];
   /** Los tres iniciales resultantes, si se aleatorizaron. */
   starters: string[];
+  /** Lo que se pidio pero ese juego no tiene, como habilidades en Gen 2. */
+  omitidas: string[];
 };
 
 /**
@@ -281,6 +306,7 @@ export type RandomizeSummary = {
 const summarize = (log: string, requested: readonly RandomizerOption[]): RandomizeSummary => {
   const changed: string[] = requested.map((option) => option.label);
   const starters: string[] = [];
+  const omitidas: string[] = [];
 
   // Solo se lee el registro cuando no sabemos que se pidio, es decir, con un
   // fichero .rnqs traido de fuera. Con el menu, mezclar ambas fuentes duplica
@@ -297,7 +323,7 @@ const summarize = (log: string, requested: readonly RandomizerOption[]): Randomi
     if (starter?.[1]) starters.push(starter[1].trim());
   }
 
-  return { changed, starters };
+  return { changed, starters, omitidas };
 };
 
 /**
@@ -333,10 +359,11 @@ const handleRandomize = async (req: IncomingMessage, res: ServerResponse): Promi
   }
 
   const gameCode = gameCodeOf(rom);
-  if (!SUPPORTED_GAMES.has(gameCode.slice(0, 3))) {
+  const generacion = generacionDe(gameCode);
+  if (generacion === null) {
     sendJson(res, 400, {
       error: 'juego-no-soportado',
-      message: `Solo los juegos de GBA: Rubi, Zafiro, Esmeralda, Rojo Fuego y Verde Hoja. Esa ROM es "${gameCode}".`,
+      message: `Se pueden aleatorizar Oro, Plata, Cristal, Rubi, Zafiro, Esmeralda, Rojo Fuego y Verde Hoja. Esa ROM es "${gameCode}".`,
     });
     return;
   }
@@ -363,6 +390,23 @@ const handleRandomize = async (req: IncomingMessage, res: ServerResponse): Promi
       return;
     }
     chosen = ids.map((id) => optionById(id)!);
+  }
+
+  // Se apartan las opciones que ese juego no tiene. Aplicarlas no romperia
+  // nada -el randomizer las ignora-, pero luego le diriamos al jugador que ha
+  // cambiado algo que no ha cambiado, que es peor que no ofrecerlo.
+  const omitidas = chosen.filter((option) => !option.generaciones.includes(generacion));
+  chosen = chosen.filter((option) => option.generaciones.includes(generacion));
+
+  if (!request.settingsBase64 && !request.settingsString && chosen.length === 0) {
+    sendJson(res, 400, {
+      error: 'sin-opciones-validas',
+      message:
+        omitidas.length > 0
+          ? `Nada de lo que marcaste existe en este juego: ${omitidas.map((o) => o.label).join(', ')}.`
+          : 'No has marcado nada que aleatorizar.',
+    });
+    return;
   }
 
   // Todo ocurre dentro de una carpeta temporal que se borra pase lo que pase.
@@ -497,12 +541,12 @@ const handleRandomize = async (req: IncomingMessage, res: ServerResponse): Promi
     // cambiado. La semilla ya la sabemos cuando la elegimos nosotros; solo hay
     // que leerla del registro en la via sin jjs, donde la escoge el randomizer.
     let seed: string | null = jjs ? semilla : null;
-    let summary: RandomizeSummary = { changed: [], starters: [] };
+    let summary: RandomizeSummary = { changed: [], starters: [], omitidas: [] };
     for (const name of await readdir(workdir)) {
       if (!name.endsWith('.log')) continue;
       const log = await readFile(join(workdir, name), 'utf8');
       seed = seed ?? extractSeed(log);
-      summary = summarize(log, chosen);
+      summary = { ...summarize(log, chosen), omitidas: omitidas.map((o) => o.label) };
       break;
     }
 
@@ -551,7 +595,7 @@ const server = createServer((req, res) => {
         ok: true,
         java,
         jar: { path: jar, found: existsSync(jar) },
-        games: [...SUPPORTED_GAMES],
+        games: Object.keys(SUPPORTED_GAMES),
         // Sin jjs el menu no puede construir ajustes y hay que traer un .rnqs.
         menu: { available: jjs !== null, jjs },
         options: publicOptions(),

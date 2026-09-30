@@ -60,8 +60,26 @@ type Progress =
     }
   | { fase: 'error'; message: string };
 
-/** Los cinco juegos de tercera generacion de GBA. */
-const SUPPORTED = new Set(['BPR', 'BPG', 'AXV', 'AXP', 'BPE']);
+/**
+ * Los juegos que el servicio sabe aleatorizar.
+ *
+ * Se repite aqui a proposito, para no pedirle la lista al servicio antes de
+ * poder decirle al jugador si su ROM entra o no. La prueba
+ * test-juegos-soportados.mjs comprueba que las dos listas coinciden.
+ */
+const SUPPORTED = new Set([
+  // Segunda generacion, Game Boy Color
+  'AAU',
+  'AAX',
+  'BYT',
+  'BXT',
+  // Tercera generacion, Game Boy Advance
+  'BPR',
+  'BPG',
+  'AXV',
+  'AXP',
+  'BPE',
+]);
 
 /** Lo que viene marcado al abrir: la mezcla habitual de una partida aleatoria. */
 const DEFAULT_SELECTION = ['salvajes', 'iniciales', 'entrenadores', 'movimientos'];
@@ -123,7 +141,13 @@ export const RandomizerModal = ({
   // Un juego que aceptamos pero que nadie ha llegado a jugar por aqui.
   const juego = gameCode !== null ? parseGameCode(gameCode).game : null;
   const sinProbar = supported && juego && !juego.tested ? juego.label : null;
-  const options = status.estado === 'listo' ? status.health.options : [];
+  // Solo se ofrece lo que ese juego tiene de verdad: en segunda generacion no
+  // existen las habilidades, y marcar una casilla que no hace nada es peor que
+  // no verla.
+  const todas = status.estado === 'listo' ? status.health.options : [];
+  const options = juego
+    ? todas.filter((option) => option.generaciones.includes(juego.generacion))
+    : todas;
   const guardadas = partidas.length + otras.length;
   const lleno = guardadas >= MAX_PARTIDAS;
   const canRandomize =
@@ -324,7 +348,7 @@ export const RandomizerModal = ({
 
           {status.estado === 'listo' && !supported && (
             <p className="warn">
-              La aleatorizacion solo esta disponible para los juegos de GBA: Rubi, Zafiro,
+              La aleatorizacion esta disponible para Oro, Plata y Cristal, y para Rubi, Zafiro,
               Esmeralda, Rojo Fuego y Verde Hoja. Tu ROM es "
               {gameCode}".
             </p>
@@ -560,6 +584,13 @@ const Resultado = ({
       ) : (
         <p className="note">
           Ha cambiado: <strong>{progress.summary.changed.join(', ')}</strong>.
+        </p>
+      )}
+
+      {progress.summary.omitidas.length > 0 && (
+        <p className="warn">
+          Este juego no tiene {progress.summary.omitidas.join(', ').toLowerCase()}, asi que eso se
+          quedo como estaba.
         </p>
       )}
 

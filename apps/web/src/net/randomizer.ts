@@ -9,6 +9,8 @@ export type RandomizerOption = {
   id: string;
   label: string;
   description: string;
+  /** En que generaciones existe lo que cambia. Gen 2 no tiene habilidades. */
+  generaciones: number[];
 };
 
 export type RandomizerHealth = {
@@ -80,6 +82,8 @@ export const checkRandomizer = async (): Promise<RandomizerStatus> => {
 };
 
 export type RandomizeSummary = {
+  /** Lo que se pidio pero ese juego no tiene. */
+  omitidas: string[];
   /** Apartados que cambiaron de verdad. */
   changed: string[];
   /** Los tres iniciales resultantes, si se aleatorizaron. */
@@ -194,6 +198,6 @@ export const randomizeRom = async (
     reproducible: response.headers.get('x-reproducible') === '1',
     summary: encoded
       ? (JSON.parse(new TextDecoder().decode(desdeBase64(encoded))) as RandomizeSummary)
-      : { changed: [], starters: [] },
+      : { changed: [], starters: [], omitidas: [] },
   };
 };
