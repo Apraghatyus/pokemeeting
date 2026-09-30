@@ -156,4 +156,5 @@ vosotros, el programa no las impone.
 - [docs/randomizer.md](docs/randomizer.md) — la integración con el randomizer
 - [docs/jugar-con-alguien-de-fuera.md](docs/jugar-con-alguien-de-fuera.md) —
   abrir un enlace público
+- [docs/despliegue.md](docs/despliegue.md) — montarlo en un servidor propio
 - [docs/ideas-pendientes.md](docs/ideas-pendientes.md) — lo que falta
