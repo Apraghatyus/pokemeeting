@@ -1787,7 +1787,17 @@ details.partidas[open] > summary::before {
     min-height: 0;
   }
 
-  /* Aqui no hay contenedor que medir -se quita arriba-, asi que las unidades
+  /* Apilado, el contenedor vuelve a ocupar el ancho entero.
+   *
+   * Hace falta decirlo: arriba se ajusta al tamano de la partida para que la
+   * ventana flotante caiga en SU esquina, y con un contenedor que se ajusta al
+   * contenido un "100%" de dentro no resuelve contra nada. El resultado era que
+   * la partida se quedaba en sus 240 pixeles nativos en tablet y en movil. */
+  .pantallas {
+    width: 100%;
+  }
+
+  /* Y aqui no hay contenedor que medir -se quita arriba-, asi que las unidades
      cq se irian al ancho de la ventana entera y se comerian los margenes. Se
      mide con el 100% del hueco, que es lo que vale cuando la partida manda. */
   .pantalla--grande {
