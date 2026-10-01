@@ -83,8 +83,17 @@ export const App = () => {
     state.status === 'running',
     state.romName,
     especies,
-    session.enviarEquipo,
   );
+
+  // Mandarle el equipo al companero. Se hace desde un solo sitio y no al
+  // leerlo, para que tambien salga cuando abre el canal: quien ya estaba
+  // jugando no tiene por que cambiar de equipo justo cuando el otro entra, y
+  // asi el recien llegado no se quedaba sin verlo.
+  const { enviarEquipo } = session;
+  const equipoPropio = miEquipo.equipo;
+  useEffect(() => {
+    if (equipoPropio) enviarEquipo(equipoPropio);
+  }, [equipoPropio, session.state.canalListo, enviarEquipo]);
 
   // Soul Link: las parejas se reconocen por el mote, que es el mismo en las dos
   // partidas. Si a uno se le cae el suyo, al otro se le marca el emparejado.
@@ -119,12 +128,23 @@ export const App = () => {
         <Stage
           canvasRef={emulator.canvasRef}
           remoteStream={session.state.remoteStream}
-          partnerLabel={session.state.peerRom?.fileName ?? 'Tu companero'}
+          /* El nombre del fichero de su ROM no le dice nada a nadie, y ademas
+             delata como lo tiene guardado. */
+          partnerLabel="Tu companero"
           hasRom={hasRom}
           proporcion={
             state.platform
               ? state.platform.screens[0]!.width / state.platform.screens[0]!.height
               : 240 / 160
+          }
+          controles={
+            <VoiceBar
+              voice={session.state.voice}
+              connected={session.state.phase === 'conectada'}
+              onToggleMic={() => void session.toggleMic()}
+              onToggleMute={session.togglePartnerMute}
+              onVolume={session.setPartnerVolume}
+            />
           }
           dropzone={
             <RomDropZone
@@ -146,18 +166,11 @@ export const App = () => {
               equipo={session.state.equipoCompanero}
               especies={especies}
               caidosDelOtro={caidosMios}
-              motivo="Todavia no ha mandado su equipo."
+              motivo=""
             />
           )}
         </div>
 
-        <VoiceBar
-          voice={session.state.voice}
-          connected={session.state.phase === 'conectada'}
-          onToggleMic={() => void session.toggleMic()}
-          onToggleMute={session.togglePartnerMute}
-          onVolume={session.setPartnerVolume}
-        />
 
         {touchPad && hasRom && <TouchControls coreRef={emulator.coreRef} />}
 

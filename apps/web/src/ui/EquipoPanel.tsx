@@ -278,9 +278,6 @@ export const EquipoPanel = ({
     ranuras.find((r) => r.ranura === i) ?? null,
   );
 
-  // El companero crece desde abajo, asi que su primera ranura va la ultima.
-  const enOrden = lado === 'companero' ? [...huecos].reverse() : huecos;
-
   return (
     <aside className={`equipo equipo--${lado}`} aria-label={titulo}>
       <h2 className="equipo__titulo">{titulo}</h2>
@@ -289,7 +286,7 @@ export const EquipoPanel = ({
         <p className="equipo__vacio">{motivo}</p>
       ) : (
         <ul className="equipo__lista">
-          {enOrden.map((pokemon, i) =>
+          {huecos.map((pokemon, i) =>
             pokemon ? (
               // La personalidad no cambia nunca, asi que cambiar dos Pokemon de
               // sitio mueve la ficha en vez de rehacerla.

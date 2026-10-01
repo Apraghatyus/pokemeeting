@@ -37,9 +37,12 @@ await page.waitForFunction(() => !document.querySelector('.dropzone button')?.di
 // --- antes de cargar nada ---
 check('tu columna esta ahi desde el principio',
   (await page.locator('.equipo--propio').count()) === 1);
-check('y vacia, sin fichas ni frases de relleno',
-  (await page.locator('.equipo--propio .ficha').count()) === 0 &&
-    (await page.locator('.equipo--propio .equipo__vacio').count()) === 0);
+// Las seis ranuras existen siempre, para que al entrar un Pokemon nuevo los
+// demas no se muevan. Vacias no se ven, pero ocupan su sitio.
+check('con sus seis huecos reservados',
+  (await page.locator('.equipo--propio .ficha').count()) === 6);
+check('y ninguno con Pokemon todavia',
+  (await page.locator('.equipo--propio .ficha:not(.ficha--hueco)').count()) === 0);
 
 // Jugando solo esa columna no existe: su sitio se lo queda la partida.
 check('jugando solo no hay columna del companero',
@@ -64,17 +67,24 @@ check('el estado de la partida se carga', cargado === 1 || cargado === true, Str
 
 // El equipo se mira cada tres segundos: hay que darle una vuelta de margen.
 const aparecio = await page
-  .waitForFunction(() => document.querySelectorAll('.equipo--propio .ficha').length > 0, null,
-    { timeout: 20_000 })
+  .waitForFunction(
+    () =>
+      [...document.querySelectorAll('.equipo--propio .ficha')].filter(
+        (f) => !f.classList.contains('ficha--hueco'),
+      ).length > 0,
+    null,
+    { timeout: 20_000 },
+  )
   .then(() => true)
   .catch(() => false);
 check('el panel se llena solo, sin tocar nada', aparecio);
 
 if (aparecio) {
-  const fichas = await page.locator('.equipo--propio .ficha').count();
+  const conPokemon = page.locator('.equipo--propio .ficha:not(.ficha--hueco)');
+  const fichas = await conPokemon.count();
   check('con tantas fichas como Pokemon hay en la partida', fichas === 1, `${fichas} ficha(s)`);
 
-  const texto = ((await page.locator('.equipo--propio .ficha').first().textContent()) ?? '')
+  const texto = ((await conPokemon.first().textContent()) ?? '')
     .replace(/\s+/g, ' ')
     .trim();
   check('y la ficha lleva el mote que le puso el jugador', /CCC/.test(texto), texto);
@@ -83,7 +93,7 @@ if (aparecio) {
 
   // El sprite se pide a PokeAPI por su numero de Pokedex nacional, que sale de
   // una tabla de la propia ROM: la conversion no es una resta.
-  const sprite = await page.locator('.equipo--propio .ficha__sprite--imagen').first();
+  const sprite = conPokemon.locator('.ficha__sprite--imagen').first();
   const src = (await sprite.getAttribute('src').catch(() => null)) ?? '';
   check('la ficha pide el sprite de la especie', /\/1\.png$/.test(src), src.slice(-60));
   // Hay que esperarla: la imagen va con carga diferida y mirarla nada mas
@@ -103,7 +113,7 @@ if (aparecio) {
 
   // El tipo sale de la ROM que corre, no de una lista: con una copia
   // aleatorizada, una lista diria el tipo de siempre y seria falso.
-  const tipos = await page.locator('.equipo--propio .ficha .tipo').allTextContents();
+  const tipos = await conPokemon.locator('.tipo').allTextContents();
   check('la ficha enseña el tipo de la especie', tipos.length >= 1, tipos.join(' / '));
   check('y es el que tiene en ESTA ROM, que aqui no esta aleatorizada',
     tipos.map((t) => t.toLowerCase()).join('/') === 'planta/veneno', tipos.join('/'));

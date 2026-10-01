@@ -205,148 +205,262 @@ body {
   min-height: 0;
 }
 
-.stage {
+/* ---------- las pantallas: la tuya y la de tu companero ---------- */
+
+/*
+ * Van una encima de otra, no una sobre otra. La del companero estaba antes
+ * flotando sobre la partida y tapaba justo la esquina donde el juego escribe
+ * los mensajes de combate.
+ */
+.pantallas {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.pantalla {
   position: relative;
-  /* Lo mas ancha que quepa sin pasarse del alto disponible, medido de verdad.
-     Antes se restaba un numero fijo al alto de la ventana, y ese numero no
-     sabia de la barra de voz ni del mando tactil: sobraba hueco abajo y la
-     partida se veia mas pequeña de lo que podia. */
-  width: min(100%, calc(100cqh * var(--proporcion, 1.5)));
-  aspect-ratio: var(--proporcion, 1.5);
-  margin: 0 auto;
   background: #000;
   border: 1px solid var(--border);
   border-radius: 14px;
   overflow: hidden;
-}
-
-.stage--fullscreen {
-  border-radius: 0;
-  border: none;
-  max-height: none;
-  height: 100%;
+  /* Al intercambiar, la que crece lo hace sin saltos. */
+  transition: width 180ms ease;
 }
 
 /*
- * Los dos huecos son fijos en el arbol: intercambiar cual es grande y cual
- * pequena solo cambia estas clases. El canvas no puede moverse de nodo sin
- * romper el nucleo de mGBA.
+ * El reparto del alto entre las dos.
+ *
+ * Jugando solo, la tuya se lleva todo. Con companero, la grande se queda con
+ * tres cuartos y la pequena con el resto, que a esa escala sigue dejando ver
+ * por donde va.
  */
-.slot {
-  position: absolute;
-  overflow: hidden;
+.pantalla--grande {
+  width: min(100%, calc(72cqh * var(--proporcion, 1.5)));
 }
 
-/* El apilado es explicito y no depende del orden en el DOM: al intercambiar,
-   el hueco grande pasa a ir despues y taparia a la ventana pequena. */
-.slot--main {
-  inset: 0;
-  z-index: 1;
+.pantallas--solo .pantalla--grande {
+  width: min(100%, calc(100cqh * var(--proporcion, 1.5)));
 }
 
-.slot--pip {
-  z-index: 2;
-  /* La esquina la elige quien juega arrastrandola; estas son las de partida,
-     y las sobrescriben las reglas .slot--arriba-izq y companía. */
-  right: 18px;
-  bottom: 18px;
-  /* Que se vea que se puede coger. */
-  cursor: grab;
-  touch-action: none;
-  width: 32%;
-  min-width: 190px;
-  max-width: 360px;
-  aspect-ratio: 3 / 2;
-  border-radius: 12px;
-  border: 2px solid rgba(255, 255, 255, 0.22);
-  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.6);
+.pantalla--pequena {
+  width: min(42%, calc(23cqh * var(--proporcion, 1.5)));
+  align-self: flex-end;
+  border-color: rgba(255, 255, 255, 0.22);
 }
 
-.slot__media {
+/* Intercambiar no mueve nada en el arbol: solo cambia cual va primero. El
+   canvas se queda donde estaba, que es lo que el nucleo necesita. */
+.pantallas > .pantalla--grande {
+  order: 1;
+}
+
+.pantallas > .pantalla--pequena {
+  order: 2;
+}
+
+.pantalla__media {
   display: block;
   width: 100%;
-  height: 100%;
-  /* Sin suavizado: el pixel art debe verse nitido al escalar. */
+  aspect-ratio: var(--proporcion, 1.5);
+  /* Los pixeles del juego, duros. Difuminarlos emborrona la letra. */
   image-rendering: pixelated;
-  object-fit: contain;
   background: #000;
 }
 
-.slot__label {
+.pantalla__etiqueta {
   position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
   display: flex;
   align-items: center;
-  gap: 7px;
-  font-size: 12.5px;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  font-size: 11.5px;
   color: #fff;
   pointer-events: none;
 }
 
-.slot--main > .slot__label {
-  top: 14px;
-  left: 14px;
-  padding: 5px 11px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(6px);
+.pantalla--pequena .pantalla__etiqueta {
+  top: 6px;
+  left: 6px;
+  padding: 2px 7px;
+  font-size: 10px;
 }
 
-.slot--pip > .slot__label {
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 7px 10px;
-  background: rgba(0, 0, 0, 0.72);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.slot__action,
-.stage__fullscreen {
+/* Los botones de la esquina. Por encima del canvas: sin z-index quedaban
+   debajo y no se veian, aunque estuvieran ahi. */
+.pantalla__boton {
   position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 32px;
-  height: 32px;
-  padding: 0;
+  z-index: 3;
   display: grid;
   place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.55);
   border: 1px solid rgba(255, 255, 255, 0.16);
   color: #fff;
   font-size: 15px;
+  cursor: pointer;
 }
 
-.stage__fullscreen {
-  top: 14px;
-  right: 14px;
-  width: 38px;
-  height: 38px;
-  /* Por encima de las dos pantallas. Sin esto quedaba debajo del canvas, que
-     lleva z-index 1, y el boton estaba ahi sin que se viera. */
-  z-index: 3;
+.pantalla__boton:hover {
+  background: rgba(0, 0, 0, 0.75);
 }
 
-.slot--pip .stage__fullscreen {
+.pantalla__boton--completa {
+  top: 12px;
+  right: 12px;
+}
+
+.pantalla__boton--intercambiar {
+  top: 12px;
+  right: 56px;
+}
+
+/* Intercambiar solo tiene sentido desde la pequena: desde la grande ya estas
+   viendo lo que quieres ver. */
+.pantalla--grande > .pantalla__boton--intercambiar,
+.pantalla--pequena > .pantalla__boton--completa {
   display: none;
 }
 
-/* El intercambio se ofrece siempre desde la ventana pequena, sea cual sea de
-   las dos: asi nunca se queda uno sin poder volver. */
-.slot--main > .slot__action {
-  display: none;
+.pantalla--pequena > .pantalla__boton--intercambiar {
+  top: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
 }
 
-.slot__overlay {
+.pantalla__encima {
   position: absolute;
   inset: 0;
+  z-index: 4;
   display: grid;
   place-items: center;
-  background: rgba(11, 15, 20, 0.94);
   padding: 16px;
+  background: rgba(8, 11, 15, 0.82);
 }
+
+.pantallas--completa {
+  gap: 0;
+  background: #000;
+}
+
+.pantallas--completa .pantalla {
+  border: none;
+  border-radius: 0;
+}
+
+/* ---------- los controles que flotan sobre la partida ---------- */
+
+.pantalla__controles {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* Que no atrapen el raton donde no hay boton: entre ellos se ve el juego. */
+  pointer-events: none;
+}
+
+.pantalla__controles > * {
+  pointer-events: auto;
+}
+
+.flotante {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+
+.flotante:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.flotante:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* El microfono abierto se ve de un vistazo: es lo que mas vale la pena saber
+   sin tener que acordarse. */
+.flotante.is-on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.flotante.is-activo {
+  background: var(--rojo);
+  border-color: var(--rojo);
+}
+
+.flotante__grupo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.flotante__volumen {
+  width: 0;
+  opacity: 0;
+  transition:
+    width 160ms ease,
+    opacity 160ms ease,
+    margin 160ms ease;
+}
+
+.flotante__grupo:hover .flotante__volumen,
+.flotante__grupo:focus-within .flotante__volumen,
+.flotante__grupo.is-abierto .flotante__volumen {
+  width: 90px;
+  opacity: 1;
+  margin-right: 10px;
+}
+
+.flotante__error {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(238, 21, 21, 0.85);
+  font-size: 11.5px;
+  color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pantalla,
+  .flotante__volumen {
+    transition: none;
+  }
+}
+
 
 /* ---------- seleccion de ROM ---------- */
 
@@ -730,10 +844,8 @@ button.is-active {
     justify-content: center;
   }
 
-  .slot--pip {
-    right: 10px;
-    bottom: 10px;
-    width: 40%;
+  .pantalla--pequena {
+    width: 55%;
   }
 }
 
@@ -921,7 +1033,7 @@ button.is-active {
 
   /* En una pantalla pequena la etiqueta se come el juego, y ahi no hace falta
      aclarar cual de las dos partidas es la tuya: es la grande. */
-  .slot--main > .slot__label {
+  .pantalla--grande > .pantalla__etiqueta {
     display: none;
   }
 
@@ -1074,70 +1186,12 @@ button.is-active {
 
 /* ---------- llamada de voz ---------- */
 
-.voice {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  margin-top: 12px;
-  padding: 10px 12px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-}
 
-/* Oculto pero montado: el elemento de audio tiene que existir antes de que
-   llegue la pista remota. */
-.voice--oculta {
-  display: none;
-}
-
-.voice__mic {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.voice__mic.is-on {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-ink);
-  font-weight: 600;
-}
-
-.voice__partner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-}
-
-.voice__partner input[type='range'] {
-  width: 120px;
-  accent-color: var(--accent);
-}
-
-.voice__partner input[type='range']:disabled {
-  opacity: 0.4;
-}
-
-.voice__hint,
-.voice__error {
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.voice__error {
-  color: var(--danger);
-}
-
+/* En movil el volumen abierto no cabe junto a los dos botones. */
 @media (max-width: 560px) {
-  .voice__partner {
-    margin-left: 0;
-  }
-
-  .voice__partner input[type='range'] {
-    width: 90px;
+  .flotante__grupo:hover .flotante__volumen,
+  .flotante__grupo.is-abierto .flotante__volumen {
+    width: 70px;
   }
 }
 
@@ -1399,6 +1453,17 @@ details.partidas[open] > summary::before {
   align-items: stretch;
 }
 
+/* Jugando solo no hay equipo del companero que enseñar, asi que esa columna no
+   ocupa: la partida se queda su sitio y se ve mas grande.
+ *
+ * Va aqui, pegada a .mesa, y no al final del fichero: estaba despues del
+ * @media de pantalla estrecha y lo pisaba, asi que en una ventana pequeña la
+ * partida seguia encajonada en una columna de doscientos pixeles.
+ */
+.mesa--solo {
+  grid-template-columns: var(--columna-equipo) minmax(0, 1fr);
+}
+
 :root {
   --columna-equipo: 230px;
   /* Lo que ocupa todo lo que no es la partida: barra de arriba, margenes y la
@@ -1428,6 +1493,18 @@ details.partidas[open] > summary::before {
 .equipo--companero {
   justify-content: flex-end;
 }
+
+/* La columna del companero crece de abajo hacia arriba: su primera ranura va
+   en la fila de abajo. Se hace colocando cada una en su fila y no dando la
+   vuelta a la lista, porque en pantalla estrecha la lista se pone horizontal y
+   ahi darle la vuelta dejaria el equipo del reves. El orden del documento
+   sigue siendo el del juego, que es el que lee un lector de pantalla. */
+.equipo--companero .equipo__lista > :nth-child(1) { grid-row: 6; }
+.equipo--companero .equipo__lista > :nth-child(2) { grid-row: 5; }
+.equipo--companero .equipo__lista > :nth-child(3) { grid-row: 4; }
+.equipo--companero .equipo__lista > :nth-child(4) { grid-row: 3; }
+.equipo--companero .equipo__lista > :nth-child(5) { grid-row: 2; }
+.equipo--companero .equipo__lista > :nth-child(6) { grid-row: 1; }
 
 .equipo__titulo {
   margin: 0;
@@ -1477,6 +1554,7 @@ details.partidas[open] > summary::before {
 .ficha {
   display: flex;
   align-items: center;
+  gap: 8px;
   /* Casi sin margen: lo que tiene que verse es el Pokemon, no su recuadro. */
   padding: 2px 4px;
   min-width: 0;
@@ -1588,68 +1666,70 @@ details.partidas[open] > summary::before {
 
 /* En pantallas estrechas las columnas no caben a los lados: pasan debajo, la
    tuya primero. */
+/* En pantalla estrecha las columnas no caben a los lados: la partida se pone
+   arriba, a todo el ancho, y los equipos debajo como una lista. */
 @media (max-width: 1100px) {
-  .mesa {
+  .app {
+    /* Deja de ser una columna de alto fijo: aqui se hace scroll. */
+    height: auto;
+  }
+
+  .mesa,
+  .mesa--solo {
     grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
   }
 
   .mesa__centro {
     order: -1;
+    /* La partida manda sobre el alto de la ventana, no sobre el hueco: debajo
+       ya no hay nada que repartir. */
+    container-type: normal;
+    min-height: 0;
   }
 
+  .stage {
+    width: min(100%, calc((100svh - 190px) * var(--proporcion, 1.5)));
+  }
+
+  /* Las seis filas fijas tenian sentido en una columna alta; en una lista
+     ocupan toda la pantalla de vacio. Aqui se encogen a su contenido y los
+     huecos desaparecen. */
   .equipo__lista {
+    display: flex;
     flex-direction: row;
     flex-wrap: wrap;
+    gap: 6px;
   }
 
   .equipo__lista .ficha {
     flex: 1 1 150px;
   }
 
+  .ficha--hueco {
+    display: none;
+  }
+
+  /* En horizontal las dos columnas se leen igual: las filas fijas de arriba no
+     aplican porque esto ya no es una rejilla. */
+
   .equipo--companero .equipo__titulo {
     text-align: left;
   }
-}
 
-/* --- La ventana del companero se lleva a la esquina que uno quiera --- */
+  .equipo__sprite,
+  .ficha__sprite {
+    width: 56px;
+    height: 56px;
+  }
 
-/* Cada esquina fija dos lados y suelta los otros dos. Hace falta el "auto"
-   explicito: sin el, los 18px de la regla general seguirian aplicando y la
-   ventana se quedaria estirada entre dos esquinas. */
-.slot--pip.slot--arriba-izq { top: 18px; left: 18px; right: auto; bottom: auto; }
-.slot--pip.slot--arriba-der { top: 18px; right: 18px; left: auto; bottom: auto; }
-.slot--pip.slot--abajo-izq { bottom: 18px; left: 18px; right: auto; top: auto; }
-.slot--pip.slot--abajo-der { bottom: 18px; right: 18px; left: auto; top: auto; }
-
-.slot--pip.slot--arrastrando {
-  cursor: grabbing;
-  /* Mientras se arrastra va pegada al puntero, sin la transicion de sitio:
-     animar la posicion y seguir al raton a la vez se ve a tirones. */
-  transition: none;
-  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.75);
-  opacity: 0.92;
-}
-
-/* Al soltarla, viaja a su esquina en vez de aparecer ahi de golpe. */
-.slot--pip:not(.slot--arrastrando) {
-  transition:
-    top 160ms ease,
-    right 160ms ease,
-    bottom 160ms ease,
-    left 160ms ease;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .slot--pip:not(.slot--arrastrando) {
-    transition: none;
+  .ficha__sprite--imagen {
+    width: 56px;
+    height: 56px;
   }
 }
 
-/* La etiqueta no se selecciona al arrastrar: en movil, mantener pulsado sobre
-   texto abre el menu de seleccion y se come el gesto. */
-.slot--pip .slot__label {
-  user-select: none;
-}
+
 
 /* Texto solo para quien usa un lector de pantalla: la especie de cada
    Pokemon, que en la ficha se distingue por el color y las dos letras.
@@ -1688,12 +1768,6 @@ details.partidas[open] > summary::before {
 /* Un debilitado se ve apagado tambien en el sprite. */
 .ficha--debilitado .ficha__sprite--imagen {
   filter: grayscale(1);
-}
-
-/* Jugando solo no hay equipo del companero que enseñar, asi que esa columna no
-   ocupa: la partida se queda su sitio y se ve mas grande. */
-.mesa--solo {
-  grid-template-columns: var(--columna-equipo) minmax(0, 1fr);
 }
 
 /* --- Tipos --- */
@@ -1745,11 +1819,16 @@ details.partidas[open] > summary::before {
   color: #fff;
 }
 
+/* Se ve igual que un debilitado, y es a proposito: en un Soul Link los dos
+   Pokemon de una pareja caen juntos, asi que los dos jugadores tienen que ver
+   lo mismo en su columna. Lo unico que los distingue es la etiqueta, que dice
+   si cayo el o si cayo su pareja. */
 .ficha--pareja-caida {
-  background: rgba(238, 21, 21, 0.08);
+  opacity: 0.5;
+  background: rgba(238, 21, 21, 0.1);
   box-shadow: inset 3px 0 0 0 var(--rojo);
 }
 
 .ficha--pareja-caida .ficha__sprite--imagen {
-  filter: grayscale(0.7) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
+  filter: grayscale(1) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
 }

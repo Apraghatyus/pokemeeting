@@ -51,14 +51,12 @@ export type EstadoEquipo = {
  * @param jugando   si hay una partida en marcha
  * @param romName   para olvidar lo aprendido al cambiar de juego
  * @param especies  para completar lo que esta en la ROM y no en la partida
- * @param onCambio  se llama solo cuando el equipo cambia de verdad
  */
 export const useEquipo = (
   coreRef: { current: MgbaModule | null },
   jugando: boolean,
   romName: string | null,
   especies: Especies,
-  onCambio?: (equipo: EquipoResumen) => void,
 ): EstadoEquipo => {
   const [equipo, setEquipo] = useState<EquipoResumen | null>(null);
   const [disponible, setDisponible] = useState(true);
@@ -66,11 +64,6 @@ export const useEquipo = (
   const direccionRef = useRef<number | null>(null);
   const juegoRef = useRef<string>('');
   const ultimoRef = useRef<EquipoResumen | null>(null);
-
-  // El aviso se guarda en una referencia para que cambiarlo no reinicie el
-  // bucle: viene de una funcion nueva en cada render del componente de arriba.
-  const avisoRef = useRef(onCambio);
-  avisoRef.current = onCambio;
 
   // Igual que el aviso: cambia en cada render y no debe reiniciar el bucle.
   const especiesRef = useRef(especies);
@@ -126,7 +119,6 @@ export const useEquipo = (
 
       ultimoRef.current = leido;
       setEquipo(leido);
-      if (leido) avisoRef.current?.(leido);
     } catch {
       // Un estado que no sabemos interpretar -por ahora, cualquiera que no sea
       // de GBA- cae aqui. No es un fallo: es un juego para el que todavia no

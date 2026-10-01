@@ -149,7 +149,7 @@ await guest.page.keyboard.press('Escape');
 // --- esperamos a que aparezca la ventana pequena en ambos lados ---
 const waitPip = (p) =>
   p
-    .locator('.slot--pip')
+    .locator('.pantalla--pequena')
     .waitFor({ timeout: 30_000 })
     .then(() => true)
     .catch(() => false);
@@ -161,7 +161,7 @@ check('el invitado ve la ventana del companero', guestOk);
 // --- el video debe tener imagen de verdad ---
 const videoOf = (p) =>
   p.evaluate(async () => {
-    const v = document.querySelector('video.slot__media');
+    const v = document.querySelector('video.pantalla__media');
     if (!v) return { found: false };
     for (let i = 0; i < 30 && v.videoWidth === 0; i += 1) {
       await new Promise((r) => setTimeout(r, 500));
@@ -175,13 +175,13 @@ check('el anfitrion recibe el video del invitado', hostVideo.width > 0, JSON.str
 check('el invitado recibe el video del anfitrion', guestVideo.width > 0, JSON.stringify(guestVideo));
 
 // --- intercambiar pantalla grande y pequena ---
-await host.page.locator('.slot--pip .slot__action').click();
+await host.page.locator('.pantalla--pequena .pantalla__boton--intercambiar').click();
 const swapped = await host.page.evaluate(
-  () => document.querySelector('.slot--pip')?.querySelector('canvas') !== null,
+  () => document.querySelector('.pantalla--pequena')?.querySelector('canvas') !== null,
 );
 check('el boton de intercambio pone tu partida en pequeno', swapped);
 await host.page.screenshot({ path: `${SHOTS}/ui-juego-intercambiado.png` });
-await host.page.locator('.slot--pip .slot__action').click();
+await host.page.locator('.pantalla--pequena .pantalla__boton--intercambiar').click();
 
 await host.page.screenshot({ path: `${SHOTS}/ui-juego.png` });
 await guest.page.screenshot({ path: `${SHOTS}/ui-juego-invitado.png` });
@@ -189,8 +189,10 @@ await guest.page.screenshot({ path: `${SHOTS}/ui-juego-invitado.png` });
 // --- salida limpia ---
 await guest.page.locator('.roomchip').click();
 await guest.page.getByRole('button', { name: 'Salir de la sala' }).click();
+// La barra ya no escribe el estado: es un punto de color, y la frase va en su
+// etiqueta accesible, que es lo que se mira aqui.
 const noticed = await host.page
-  .locator('.status', { hasText: 'Esperando' })
+  .locator('.status[aria-label*="Esperando"]')
   .waitFor({ timeout: 15_000 })
   .then(() => true)
   .catch(() => false);

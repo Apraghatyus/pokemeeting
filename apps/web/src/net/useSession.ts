@@ -59,6 +59,14 @@ export type SessionState = {
    * propia ROM, asi que por el cable no viaja nada del juego.
    */
   equipoCompanero: EquipoResumen | null;
+  /**
+   * Momento en que el canal de datos quedo listo, o null si no lo esta.
+   *
+   * Sirve de disparador: al cambiar, quien tenga algo que contar lo vuelve a
+   * contar. Sin esto, el que ya estaba jugando no le mandaba su equipo al que
+   * acababa de entrar, porque solo se manda cuando cambia algo.
+   */
+  canalListo: number | null;
 };
 
 const initialState: SessionState = {
@@ -79,6 +87,7 @@ const initialState: SessionState = {
     partnerMuted: false,
   },
   equipoCompanero: null,
+  canalListo: null,
 };
 
 /** Fotogramas por segundo del video que enviamos. El GBA corre a 60, pero para
@@ -169,6 +178,7 @@ export const useSession = (
               reconnectRef.current();
             }
           },
+          onCanalListo: () => patch({ canalListo: Date.now() }),
           onData: (crudo) => {
             // Al otro lado hay un navegador que no controlamos: lo que no
             // cuadre se descarta y la partida sigue.

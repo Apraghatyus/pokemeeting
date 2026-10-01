@@ -74,8 +74,8 @@ await guest.locator('.form button[type=submit]').click();
 await guest.keyboard.press('Escape');
 
 const conectados = await Promise.all([
-  host.locator('.slot--pip').waitFor({ timeout: 30_000 }).then(() => true).catch(() => false),
-  guest.locator('.slot--pip').waitFor({ timeout: 30_000 }).then(() => true).catch(() => false),
+  host.locator('.pantalla--pequena').waitFor({ timeout: 30_000 }).then(() => true).catch(() => false),
+  guest.locator('.pantalla--pequena').waitFor({ timeout: 30_000 }).then(() => true).catch(() => false),
 ]);
 check('los dos jugadores se conectan', conectados.every(Boolean));
 
@@ -96,14 +96,14 @@ console.log('devolviendo la red...');
 await host.context().setOffline(false);
 
 const reenganchado = await host
-  .locator('.slot--pip')
+  .locator('.pantalla--pequena')
   .waitFor({ timeout: 60_000 })
   .then(() => true)
   .catch(() => false);
 check('vuelve a ver a su companero sin tocar nada', reenganchado);
 
 const videoVuelve = await host.evaluate(async () => {
-  const v = document.querySelector('video.slot__media');
+  const v = document.querySelector('video.pantalla__media');
   for (let i = 0; i < 40 && (!v || v.videoWidth === 0); i += 1) {
     await new Promise((r) => setTimeout(r, 500));
   }
@@ -131,7 +131,7 @@ await host.context().setOffline(false);
 await host.getByRole('button', { name: 'Reintentar ahora' }).click();
 
 const reintentoOk = await host
-  .locator('.slot--pip')
+  .locator('.pantalla--pequena')
   .waitFor({ timeout: 60_000 })
   .then(() => true)
   .catch(() => false);

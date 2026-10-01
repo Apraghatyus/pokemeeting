@@ -16,113 +16,23 @@ type Props = {
   proporcion: number;
   /** Selector de ROM, mostrado encima mientras no haya juego cargado. */
   dropzone: ReactNode;
+  /** Botones que flotan sobre la partida: voz y demas. */
+  controles?: ReactNode;
 };
 
 /**
- * La vista de juego: tu partida a pantalla completa y la de tu companero en una
- * ventana pequena sobre ella.
+ * La vista de juego: tu partida y, al lado, la de tu companero.
  *
- * Detalle que condiciona todo el componente: el canvas NO puede cambiar de sitio
- * en el arbol. mGBA guarda una referencia a ese nodo concreto y si React lo
- * desmonta para recolocarlo, el nucleo deja de dibujar. Por eso intercambiar
- * cual es grande y cual pequena se hace cambiando clases sobre dos huecos fijos,
- * nunca moviendo elementos.
+ * Antes la suya iba encima de la tuya, como una ventana flotante. Ahora va
+ * fuera: tapar el juego para ver el juego del otro no compensaba, y en los
+ * combates la esquina de abajo es justo donde el juego escribe.
+ *
+ * Detalle que condiciona todo el componente: el canvas NO puede cambiar de
+ * sitio en el arbol. mGBA guarda una referencia a ese nodo concreto y si React
+ * lo desmonta para recolocarlo, el nucleo deja de dibujar. Por eso intercambiar
+ * cual se ve grande se hace cambiando clases y el orden visual, nunca moviendo
+ * elementos: el canvas se queda donde esta y solo cambia de tamano.
  */
-/**
- * Permite llevar la ventana pequena a la esquina que uno quiera.
- *
- * Mientras se arrastra, la ventana sigue al dedo o al raton con un
- * desplazamiento; al soltar, se queda en la esquina mas cercana a donde estaba.
- * Es como funciona la de Google Meet, y se eligio asi en vez de dejarla donde
- * se suelte porque con el borde pegado nunca tapa el centro de la partida.
- *
- * La esquina se recuerda en este navegador: quien la quiere arriba a la
- * izquierda la quiere siempre.
- */
-type Esquina = 'arriba-izq' | 'arriba-der' | 'abajo-izq' | 'abajo-der';
-
-const CLAVE_ESQUINA = 'emupoke.esquina-companero';
-
-const esEsquina = (valor: unknown): valor is Esquina =>
-  valor === 'arriba-izq' || valor === 'arriba-der' || valor === 'abajo-izq' || valor === 'abajo-der';
-
-const esquinaGuardada = (): Esquina => {
-  try {
-    const guardada = globalThis.localStorage?.getItem(CLAVE_ESQUINA);
-    return esEsquina(guardada) ? guardada : 'abajo-der';
-  } catch {
-    return 'abajo-der';
-  }
-};
-
-/** Cuanto hay que mover el dedo para que cuente como arrastrar y no como clic. */
-const UMBRAL = 6;
-
-const useArrastre = (
-  stageRef: { current: HTMLDivElement | null },
-): {
-  esquina: Esquina;
-  arrastrando: boolean;
-  desplazamiento: { x: number; y: number };
-  alPulsar: (evento: React.PointerEvent<HTMLElement>) => void;
-} => {
-  const [esquina, setEsquina] = useState<Esquina>(esquinaGuardada);
-  const [desplazamiento, setDesplazamiento] = useState({ x: 0, y: 0 });
-  const [arrastrando, setArrastrando] = useState(false);
-
-  const alPulsar = (evento: React.PointerEvent<HTMLElement>) => {
-    // Los botones de dentro -intercambiar pantallas- tienen que seguir
-    // funcionando: si el gesto empieza encima de uno, no se arrastra.
-    if ((evento.target as HTMLElement).closest('button')) return;
-
-    const ventana = evento.currentTarget;
-    const inicio = { x: evento.clientX, y: evento.clientY };
-    let movido = false;
-    ventana.setPointerCapture(evento.pointerId);
-
-    const alMover = (e: PointerEvent) => {
-      const dx = e.clientX - inicio.x;
-      const dy = e.clientY - inicio.y;
-      if (!movido && Math.hypot(dx, dy) < UMBRAL) return;
-      movido = true;
-      setArrastrando(true);
-      setDesplazamiento({ x: dx, y: dy });
-    };
-
-    const alSoltar = (e: PointerEvent) => {
-      ventana.removeEventListener('pointermove', alMover);
-      ventana.removeEventListener('pointerup', alSoltar);
-      ventana.removeEventListener('pointercancel', alSoltar);
-      setArrastrando(false);
-      setDesplazamiento({ x: 0, y: 0 });
-      if (!movido) return;
-
-      // La esquina mas cercana al centro de la ventana al soltarla.
-      const marco = stageRef.current?.getBoundingClientRect();
-      const caja = ventana.getBoundingClientRect();
-      if (!marco) return;
-      const centro = { x: caja.left + caja.width / 2, y: caja.top + caja.height / 2 };
-      const arriba = centro.y < marco.top + marco.height / 2;
-      const izquierda = centro.x < marco.left + marco.width / 2;
-      const elegida: Esquina = `${arriba ? 'arriba' : 'abajo'}-${izquierda ? 'izq' : 'der'}`;
-
-      setEsquina(elegida);
-      try {
-        globalThis.localStorage?.setItem(CLAVE_ESQUINA, elegida);
-      } catch {
-        // Sin almacenamiento se pierde al recargar, pero la sesion sigue.
-      }
-      e.preventDefault();
-    };
-
-    ventana.addEventListener('pointermove', alMover);
-    ventana.addEventListener('pointerup', alSoltar);
-    ventana.addEventListener('pointercancel', alSoltar);
-  };
-
-  return { esquina, arrastrando, desplazamiento, alPulsar };
-};
-
 export const Stage = ({
   canvasRef,
   remoteStream,
@@ -130,11 +40,11 @@ export const Stage = ({
   hasRom,
   proporcion,
   dropzone,
+  controles,
 }: Props) => {
-  const stageRef = useRef<HTMLDivElement | null>(null);
+  const marcoRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [swapped, setSwapped] = useState(false);
-  const { esquina, arrastrando, desplazamiento, alPulsar } = useArrastre(stageRef);
   const [fullscreen, setFullscreen] = useState(false);
 
   useEffect(() => {
@@ -145,75 +55,76 @@ export const Stage = ({
   }, [remoteStream]);
 
   useEffect(() => {
-    const onChange = () => setFullscreen(document.fullscreenElement === stageRef.current);
+    const onChange = () => setFullscreen(document.fullscreenElement === marcoRef.current);
     document.addEventListener('fullscreenchange', onChange);
     return () => document.removeEventListener('fullscreenchange', onChange);
   }, []);
 
   const toggleFullscreen = () => {
     if (document.fullscreenElement) void document.exitFullscreen();
-    else void stageRef.current?.requestFullscreen().catch(() => {});
+    else void marcoRef.current?.requestFullscreen().catch(() => {});
   };
 
   const connected = remoteStream !== null;
-  const slotClass = (isMine: boolean) => {
-    const main = isMine !== swapped;
-    // Sin companero no hay ventana pequena: tu partida ocupa todo.
-    return `slot ${main || !connected ? 'slot--main' : 'slot--pip'}`;
-  };
+  // Sin companero no hay segunda pantalla: la tuya se queda todo el alto.
+  const tamano = (mia: boolean) =>
+    !connected || mia !== swapped ? 'pantalla--grande' : 'pantalla--pequena';
 
   return (
     <div
-      className={`stage${fullscreen ? ' stage--fullscreen' : ''}`}
-      ref={stageRef}
+      className={`pantallas${connected ? '' : ' pantallas--solo'}${
+        fullscreen ? ' pantallas--completa' : ''
+      }`}
+      ref={marcoRef}
       style={{ '--proporcion': proporcion } as React.CSSProperties}
     >
-      <div className={slotClass(true)}>
-        <canvas ref={canvasRef} className="slot__media" width={240} height={160} />
-        {/* El boton va en los dos huecos y el CSS lo muestra solo en el pequeno.
-            Si estuviera solo en el del companero, al intercambiar desapareceria
-            y no habria forma de volver. */}
-        {connected && <SwapButton onSwap={() => setSwapped((v) => !v)} />}
-        {!hasRom && <div className="slot__overlay">{dropzone}</div>}
+      <div className={`pantalla ${tamano(true)}`}>
+        <canvas ref={canvasRef} className="pantalla__media" width={240} height={160} />
+        <span className="pantalla__etiqueta">
+          <span className="dot dot--on" />
+          Tu partida
+        </span>
+
+        {/* Los controles flotan sobre la partida en vez de ocupar una barra
+            aparte: asi la pantalla se lleva todo el sitio que hay. */}
+        {hasRom && controles && <div className="pantalla__controles">{controles}</div>}
+
+        <button
+          type="button"
+          className="pantalla__boton pantalla__boton--completa"
+          onClick={toggleFullscreen}
+          title={fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+          aria-label={fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+        >
+          {fullscreen ? '⤡' : '⤢'}
+        </button>
+
+        {/* El boton de intercambiar va en las dos pantallas y el CSS lo enseña
+            solo en la pequena. Si estuviera solo en la del companero, al
+            intercambiar desapareceria y no habria forma de volver. */}
+        {connected && <BotonIntercambiar onSwap={() => setSwapped((v) => !v)} />}
+        {!hasRom && <div className="pantalla__encima">{dropzone}</div>}
       </div>
 
       {connected && (
-        <div
-          className={`${slotClass(false)} slot--${esquina}${arrastrando ? ' slot--arrastrando' : ''}`}
-          onPointerDown={alPulsar}
-          style={
-            arrastrando
-              ? { transform: `translate(${desplazamiento.x}px, ${desplazamiento.y}px)` }
-              : undefined
-          }
-        >
-          <video ref={videoRef} className="slot__media" playsInline muted />
-          <div className="slot__label">
+        <div className={`pantalla ${tamano(false)}`}>
+          <video ref={videoRef} className="pantalla__media" playsInline muted />
+          <span className="pantalla__etiqueta">
             <span className="dot dot--on" />
             {partnerLabel}
-          </div>
-          <SwapButton onSwap={() => setSwapped((v) => !v)} />
+          </span>
+          <BotonIntercambiar onSwap={() => setSwapped((v) => !v)} />
         </div>
       )}
-
-      <button
-        type="button"
-        className="stage__fullscreen"
-        onClick={toggleFullscreen}
-        title={fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
-        aria-label={fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
-      >
-        {fullscreen ? '⤡' : '⤢'}
-      </button>
     </div>
   );
 };
 
 /** Intercambia cual de las dos partidas se ve grande. */
-const SwapButton = ({ onSwap }: { onSwap: () => void }) => (
+const BotonIntercambiar = ({ onSwap }: { onSwap: () => void }) => (
   <button
     type="button"
-    className="slot__action"
+    className="pantalla__boton pantalla__boton--intercambiar"
     onClick={onSwap}
     title="Intercambiar pantallas"
     aria-label="Intercambiar pantallas"

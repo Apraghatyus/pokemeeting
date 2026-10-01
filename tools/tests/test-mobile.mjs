@@ -114,7 +114,7 @@ await page.setViewportSize({ width: 851, height: 393 });
 await page.waitForTimeout(600);
 const landscapeOk = await page.evaluate(() => {
   const dpadEl = document.querySelector('.dpad');
-  const stage = document.querySelector('.stage');
+  const stage = document.querySelector('.pantallas');
   if (!dpadEl || !stage) return false;
   return getComputedStyle(dpadEl).position === 'absolute';
 });

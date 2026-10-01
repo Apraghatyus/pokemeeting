@@ -13,6 +13,14 @@ export type PeerHandlers = {
   onState: (state: PeerState) => void;
   /** Mensajes del canal de datos: aqui iran Soul Link e intercambios. */
   onData: (data: string) => void;
+  /**
+   * El canal de datos ya acepta mensajes.
+   *
+   * Hace falta saberlo: la conexion se declara establecida antes de que el
+   * canal abra, y lo que se mande en ese hueco se pierde en silencio. Es lo
+   * que hacia que el equipo no le apareciera al que acababa de entrar.
+   */
+  onCanalListo: () => void;
   /** Envia una carga util de WebRTC al otro par a traves del servidor. */
   sendSignal: (data: unknown) => void;
 };
@@ -116,6 +124,9 @@ export class PeerLink {
   #adoptChannel(channel: RTCDataChannel): void {
     this.#channel = channel;
     channel.addEventListener('message', (event) => this.#handlers.onData(String(event.data)));
+    // Si ya estaba abierto al adoptarlo, el evento no volvera a saltar.
+    if (channel.readyState === 'open') this.#handlers.onCanalListo();
+    else channel.addEventListener('open', () => this.#handlers.onCanalListo());
   }
 
   /** Lo llama quien inicia: crea el canal de datos y manda la oferta. */
