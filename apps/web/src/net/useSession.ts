@@ -90,9 +90,17 @@ const initialState: SessionState = {
   canalListo: null,
 };
 
-/** Fotogramas por segundo del video que enviamos. El GBA corre a 60, pero para
- *  acompanar a alguien 30 basta y consume la mitad de ancho de banda. */
-const CAPTURE_FPS = 30;
+/**
+ * Fotogramas por segundo del video que enviamos.
+ *
+ * Tiene que ser los mismos que da la consola. Estuvo en 30 pensando que para
+ * acompanar a alguien bastaba, y se midio: llegaban 29,3 por segundo sin que
+ * se descartara practicamente ninguno por el camino. Es decir, la red iba
+ * bien y lo que faltaba era la mitad de los fotogramas, que no se enviaban.
+ * Y no se nota como "va a la mitad" sino como tirones, porque en estos juegos
+ * el movimiento va por casillas y saltarse uno de cada dos se ve.
+ */
+const CAPTURE_FPS = 60;
 
 export const useSession = (
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
@@ -153,7 +161,14 @@ export const useSession = (
     const canvas = canvasRef.current;
     if (!canvas) return null;
     try {
-      localStreamRef.current = canvas.captureStream(CAPTURE_FPS);
+      const captura = canvas.captureStream(CAPTURE_FPS);
+
+      // Con esto el codificador sabe que esto es movimiento y no un documento:
+      // ante un apuro prefiere bajar la nitidez antes que saltarse fotogramas,
+      // que para ver jugar a alguien es justo lo que se quiere.
+      for (const pista of captura.getVideoTracks()) pista.contentHint = 'motion';
+
+      localStreamRef.current = captura;
       return localStreamRef.current;
     } catch {
       return null;

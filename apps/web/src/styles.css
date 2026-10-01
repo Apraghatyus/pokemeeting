@@ -1934,3 +1934,27 @@ details.partidas[open] > summary::before {
 .ficha--pareja-caida .ficha__sprite--imagen {
   filter: grayscale(1) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
 }
+
+/* Copiar la receta de una partida ya creada, desde su fila de la lista. */
+.partida__receta {
+  flex: none;
+  width: 34px;
+  padding: 0;
+  border-radius: 10px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.partida__receta:hover {
+  color: var(--text);
+  border-color: var(--accent-dim);
+}
+
+.partida__receta.is-copiada {
+  color: var(--accent-ink);
+  background: var(--accent);
+  border-color: var(--accent);
+}

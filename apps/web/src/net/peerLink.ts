@@ -48,7 +48,8 @@ export class PeerLink {
     // respuesta ya lo incluyan y la conexion sea bidireccional de una vez.
     if (localStream) {
       for (const track of localStream.getTracks()) {
-        this.#pc.addTrack(track, localStream);
+        const emisor = this.#pc.addTrack(track, localStream);
+        if (track.kind === 'video') void this.#ajustarVideo(emisor);
       }
     }
 
@@ -119,6 +120,32 @@ export class PeerLink {
    */
   async setVoiceTrack(track: MediaStreamTrack | null): Promise<void> {
     await this.#voiceTransceiver()?.sender.replaceTrack(track);
+  }
+
+  /**
+   * Le dice al emisor que lo primero son los fotogramas.
+   *
+   * Por omision, cuando la red aprieta el navegador baja el ritmo antes que la
+   * resolucion. Aqui interesa lo contrario: la consola ya es de 240x160, asi
+   * que hay poco que bajar, y lo que arruina ver jugar a alguien es el tiron.
+   *
+   * Se le pone ademas un techo de bitrate generoso para lo pequeña que es la
+   * imagen: sin el, el navegador parte de muy abajo y tarda en subir.
+   */
+  async #ajustarVideo(emisor: RTCRtpSender): Promise<void> {
+    try {
+      const parametros = emisor.getParameters();
+      parametros.degradationPreference = 'maintain-framerate';
+      // getParameters puede volver sin encodings antes de negociar.
+      parametros.encodings = parametros.encodings?.length ? parametros.encodings : [{}];
+      for (const codificacion of parametros.encodings) {
+        codificacion.maxBitrate = 2_500_000;
+        codificacion.maxFramerate = 60;
+      }
+      await emisor.setParameters(parametros);
+    } catch {
+      // Si el navegador no deja tocarlos, se envia igual con lo que haya.
+    }
   }
 
   #adoptChannel(channel: RTCDataChannel): void {

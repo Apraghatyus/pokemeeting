@@ -414,6 +414,7 @@ export const RandomizerModal = ({
                             {aqui ? '' : rehacible ? ' · hay que rehacerla' : ' · ya no esta'}
                           </em>
                         </button>
+                        <BotonReceta partida={partida} />
                         <button
                           type="button"
                           className="partida__borrar"
@@ -551,6 +552,48 @@ export const RandomizerModal = ({
         </>
       )}
     </Modal>
+  );
+};
+
+/**
+ * Copia al portapapeles la receta de una partida ya creada.
+ *
+ * Existe porque antes la receta solo se veia en el momento de generarla: quien
+ * cerraba la pestaña se quedaba sin forma de volver a copiarla, y es justo lo
+ * que hace falta para seguir en otro ordenador o para darsela al companero.
+ */
+const BotonReceta = ({ partida }: { partida: PartidaGuardada }) => {
+  const [copiada, setCopiada] = useState(false);
+
+  if (!sePuedeRehacer(partida) || !partida.crc32) return null;
+
+  const receta = codificarReceta({
+    baseCrc32: partida.baseCrc32,
+    crc32: partida.crc32,
+    semilla: partida.semilla!,
+    ajustes: partida.ajustes!,
+  });
+
+  const copiar = async () => {
+    try {
+      await navigator.clipboard.writeText(receta);
+      setCopiada(true);
+      setTimeout(() => setCopiada(false), 2200);
+    } catch {
+      // Si el navegador no deja, al menos queda seleccionable en el titulo.
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      className={`partida__receta${copiada ? ' is-copiada' : ''}`}
+      onClick={() => void copiar()}
+      title={copiada ? 'Copiada' : `Copiar la receta de esta partida:\n${receta}`}
+      aria-label="Copiar la receta de esta partida"
+    >
+      {copiada ? '✓' : '⧉'}
+    </button>
   );
 };
 

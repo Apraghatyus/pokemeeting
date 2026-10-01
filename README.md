@@ -128,6 +128,7 @@ comprueban cosas que solo se pueden comprobar así.
 | `npm run test:soullink` | Que las parejas de un Soul Link se emparejan bien |
 | `npm run test:equipo -- <rom> <estado>` | Que al entrar en una sala se ve el equipo del otro |
 | `npm run test:arrastre -- <rom>` | Llevar la ventana del compañero a cada esquina |
+| `npm run test:fluidez -- <rom>` | A cuántos fps llega la partida del compañero |
 | `npm run test:resumen -- <estado> [rom]` | El resumen del equipo y lo que viaja al compañero |
 | `npm run test:cabeceras` | Que reconocemos de qué consola es una ROM |
 | `npm run test:semilla -- <rom>` | Que la misma semilla da la misma ROM |
