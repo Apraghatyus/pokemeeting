@@ -36,6 +36,13 @@ condiciona decisiones por todo el código:
 
 ## Cómo se arranca
 
+En Windows, doble clic en **`Emupoke.bat`**: instala lo que falte la primera
+vez, levanta las tres piezas y abre el navegador. Si prefieres la terminal, o
+no estás en Windows, `npm run dev:all` hace lo mismo sin el doble clic.
+
+Antes de arrancar comprueba que los puertos estén libres y avisa de cuál está
+ocupado, que es lo que pasa cuando quedó una sesión anterior viva.
+
 Necesitas Node 20 o superior.
 
 ```bash

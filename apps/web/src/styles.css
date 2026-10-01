@@ -208,19 +208,19 @@ body {
 /* ---------- las pantallas: la tuya y la de tu companero ---------- */
 
 /*
- * Van una encima de otra, no una sobre otra. La del companero estaba antes
- * flotando sobre la partida y tapaba justo la esquina donde el juego escribe
- * los mensajes de combate.
+ * La tuya ocupa el sitio y la de tu companero se apoya en su esquina de abajo a
+ * la derecha, asomando un poco por fuera.
+ *
+ * El contenedor se ajusta al tamano de la partida en vez de ocupar todo el
+ * ancho. Es lo que hace que la ventana pequena caiga en la esquina de la
+ * PARTIDA y no en la del hueco: cuando la partida no llena el ancho -que pasa
+ * siempre que manda el alto- la esquina del hueco esta en otro sitio.
  */
 .pantallas {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  margin: auto;
 }
 
 .pantalla {
@@ -234,34 +234,37 @@ body {
 }
 
 /*
- * El reparto del alto entre las dos.
- *
- * Jugando solo, la tuya se lleva todo. Con companero, la grande se queda con
- * tres cuartos y la pequena con el resto, que a esa escala sigue dejando ver
- * por donde va.
+ * La grande manda sobre el tamano: lo mas ancha que quepa sin pasarse de alto.
+ * Las unidades cq miden el hueco de verdad, barra de arriba y controles ya
+ * descontados.
  */
 .pantalla--grande {
-  width: min(100%, calc(72cqh * var(--proporcion, 1.5)));
+  width: min(100cqw, calc(100cqh * var(--proporcion, 1.5)));
 }
 
-.pantallas--solo .pantalla--grande {
-  width: min(100%, calc(100cqh * var(--proporcion, 1.5)));
-}
-
+/*
+ * La pequena se apoya en la esquina de abajo a la derecha y asoma por fuera,
+ * como la camara propia en una videollamada. Asi se ve que es otra cosa y no
+ * un trozo de tu partida, y deja libre el centro, que es donde se juega.
+ *
+ * Tapa un poco la esquina de abajo a la derecha. Es el precio de tenerla a
+ * mano; quien necesite esa esquina tiene el boton de intercambiar.
+ */
 .pantalla--pequena {
-  width: min(42%, calc(23cqh * var(--proporcion, 1.5)));
-  align-self: flex-end;
-  border-color: rgba(255, 255, 255, 0.22);
-}
-
-/* Intercambiar no mueve nada en el arbol: solo cambia cual va primero. El
-   canvas se queda donde estaba, que es lo que el nucleo necesita. */
-.pantallas > .pantalla--grande {
-  order: 1;
-}
-
-.pantallas > .pantalla--pequena {
-  order: 2;
+  position: absolute;
+  /* Por encima tambien de las columnas de equipo: asoma por fuera de la
+     partida y tiene que leerse como una ventana suelta, no como algo
+     encajado entre las dos cosas. */
+  z-index: 20;
+  /* Los porcentajes se miden sobre la partida, asi que asoma siempre lo mismo
+     se vea grande o pequeña. Mas o menos la mitad de la ventana queda fuera por
+     el lado, que es como se ve en una videollamada. */
+  right: -11%;
+  bottom: -9%;
+  width: 26%;
+  min-width: 150px;
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.65);
 }
 
 .pantalla__media {
@@ -845,7 +848,9 @@ button.is-active {
   }
 
   .pantalla--pequena {
-    width: 55%;
+    width: 38%;
+    right: -8px;
+    bottom: -8px;
   }
 }
 
@@ -1019,7 +1024,7 @@ button.is-active {
     padding: 10px;
   }
 
-  .stage {
+  .pantalla--grande {
     border-radius: 10px;
     /* En vertical, la pantalla deja sitio al mando en lugar de comerse
        todo el alto disponible. */
@@ -1088,7 +1093,7 @@ button.is-active {
     padding: 6px;
   }
 
-  .stage {
+  .pantalla--grande {
     max-height: calc(100vh - 20px);
   }
 
@@ -1481,6 +1486,21 @@ details.partidas[open] > summary::before {
   place-items: center;
 }
 
+/*
+ * Con companero se reserva un poco de sitio por donde asoma su ventana.
+ *
+ * Es un reparto entre tres cosas que no caben del todo: que la ventana asome
+ * por fuera, que tape lo menos posible de la partida y que no se coma las
+ * fichas del equipo de al lado. Reservando este poco, lo que pisa de la
+ * partida es una esquina pequeña y de la columna de al lado, casi nada.
+ * Reservando lo que asoma entero, la partida perdia mas de cien pixeles de
+ * ancho, que es peor negocio.
+ */
+.mesa__centro:has(.pantalla--pequena) {
+  padding-right: 48px;
+  padding-bottom: 26px;
+}
+
 .equipo {
   display: flex;
   flex-direction: column;
@@ -1688,7 +1708,10 @@ details.partidas[open] > summary::before {
     min-height: 0;
   }
 
-  .stage {
+  /* Aqui no hay contenedor que medir -se quita arriba-, asi que las unidades
+     cq se irian al ancho de la ventana entera y se comerian los margenes. Se
+     mide con el 100% del hueco, que es lo que vale cuando la partida manda. */
+  .pantalla--grande {
     width: min(100%, calc((100svh - 190px) * var(--proporcion, 1.5)));
   }
 

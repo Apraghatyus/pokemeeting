@@ -9,6 +9,7 @@
 *.state
 roms/
 saves/
+Emupoke.bat
 
 # Dependencias y build
 node_modules/
