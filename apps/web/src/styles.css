@@ -1743,30 +1743,56 @@ details.partidas[open] > summary::before {
 /* En pantalla estrecha las columnas no caben a los lados: la partida se pone
    arriba, a todo el ancho, y los equipos debajo como una lista. */
 @media (max-width: 1100px) {
-  /* En movil la ventana del companero no se arrastra -lo decide Stage.tsx- asi
-     que no hay esquina que elegir: se queda abajo a la derecha y el dedo vuelve
-     a servir para desplazar la pagina. */
+  /* En movil se ve UNA pantalla a la vez y se cambia con el boton: las dos a la
+     vez, con la pequeña encima, dejan la partida en nada.
+   *
+   * La que no se ve NO se quita con display:none. Un canvas que no se compone
+   * puede dejar de producir fotogramas, y entonces al companero le llegaria tu
+   * partida congelada sin que tu notaras nada. Se queda de dos pixeles y casi
+   * transparente, que sigue pintandose. */
   .pantalla--pequena,
   .pantalla--pequena.pantalla--abajo-der,
   .pantalla--pequena.pantalla--abajo-izq,
   .pantalla--pequena.pantalla--arriba-der,
   .pantalla--pequena.pantalla--arriba-izq {
-    width: 38%;
-    right: -8px;
-    bottom: -8px;
+    position: absolute;
+    right: 0;
+    bottom: 0;
     left: auto;
     top: auto;
+    width: 2px;
+    min-width: 0;
+    height: 2px;
+    opacity: 0.01;
+    pointer-events: none;
+    border: none;
+    box-shadow: none;
     cursor: default;
     touch-action: auto;
   }
 
-  /* Y sin esquina elegida tampoco hay que reservarle sitio a los lados. */
+  /* El boton de cambiar pasa a la pantalla que se ve, que es la unica desde la
+     que se puede pulsar. */
+  .pantalla--grande > .pantalla__boton--intercambiar {
+    display: grid;
+    top: 12px;
+    right: 56px;
+  }
+
+  .pantalla--pequena > .pantalla__boton--intercambiar,
+  .pantalla--pequena > .pantalla__etiqueta,
+  .pantalla--pequena > .pantalla__controles {
+    display: none;
+  }
+
+  /* Y sin ventana flotante no hay sitio que reservarle. */
   .mesa__centro:has(.pantalla--abajo-der),
   .mesa__centro:has(.pantalla--abajo-izq),
   .mesa__centro:has(.pantalla--arriba-der),
   .mesa__centro:has(.pantalla--arriba-izq) {
     padding: 0;
   }
+
 
   .app {
     /* Deja de ser una columna de alto fijo: aqui se hace scroll. */
