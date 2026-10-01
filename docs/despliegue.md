@@ -114,6 +114,18 @@ ExecStart=/usr/bin/npm start
 Environment=PORT=8788
 # Solo si dejaste el jar en otro sitio:
 # Environment=UPR_JAR=/opt/randomizer/PokeRandoZX.jar
+#
+# Cuantas aleatorizaciones a la vez. Por defecto son cuatro, o los nucleos que
+# haya si son menos. Subirlo no va mas rapido: medido, pasadas cuatro el
+# rendimiento total EMPEORA y lo unico que crece es la espera de cada uno.
+# Environment=RANDOMIZER_CONCURRENCIA=4
+#
+# Cuantos pueden esperar antes de responder "ahora no". Mejor rechazar que
+# aceptar a cualquiera y hacerle esperar media hora.
+# Environment=RANDOMIZER_MAX_COLA=100
+#
+# Techo de memoria de cada JVM. El pico real medido son 143 MB.
+# Environment=RANDOMIZER_XMX=1024M
 Restart=always
 User=emupoke
 
@@ -125,8 +137,21 @@ WantedBy=multi-user.target
 sudo systemctl enable --now emupoke-salas emupoke-randomizer
 ```
 
-El de aleatorizacion dice al arrancar si encuentra Java y si es de 64 bits. Si
-avisa de algo, el resto no va a funcionar.
+El de aleatorizacion dice al arrancar si encuentra Java y si es de 64 bits, y
+con que limites corre. Si avisa de algo sobre Java, el resto no va a funcionar.
+
+### Cuanta maquina pide cada pieza
+
+Si vas a tener mas de un par de jugadores, los numeros medidos estan en
+[capacidad.md](capacidad.md). El resumen: las salas aguantan 1000 jugadores en
+137 MB, y la unica pieza que pide maquina de verdad es esta de aleatorizar.
+
+Para ver como va la cola en cualquier momento:
+
+```bash
+curl -s http://127.0.0.1:8788/cola
+# {"atendiendo":2,"enCola":5,"segundosPorCopia":4.1,"limite":4}
+```
 
 ### Cuidado con el puerto 8787
 

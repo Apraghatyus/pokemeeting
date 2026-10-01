@@ -18,12 +18,13 @@
 // decida.
 
 import { randomBytes } from 'node:crypto';
+import { promisify } from 'node:util';
 import { spawn } from 'node:child_process';
-import { gunzipSync, gzipSync } from 'node:zlib';
+import { gunzip as gunzipCallback, gzip as gzipCallback } from 'node:zlib';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { existsSync, readdirSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { cpus, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
   buildSettingsScript,
@@ -33,6 +34,7 @@ import {
   type RandomizerOption,
 } from './options.ts';
 import { buildFromStringScript, buildRandomizeScript } from './semilla.ts';
+import { Abandonada, Cola, ColaLlena } from './cola.ts';
 
 const PORT = Number(process.env['PORT'] ?? 8788);
 
@@ -67,6 +69,41 @@ const SUPPORTED_GAMES: Readonly<Record<string, Generacion>> = {
 
 const generacionDe = (gameCode: string): Generacion | null =>
   SUPPORTED_GAMES[gameCode.slice(0, 3).toUpperCase()] ?? null;
+
+/**
+ * Cuantas aleatorizaciones a la vez, y cuantos pueden esperar.
+ *
+ * El limite por defecto es cuatro porque es donde deja de haber ganancia:
+ * medido en doce nucleos, cuatro a la vez dan 0,54 por segundo y ocho dan 0,59,
+ * mientras que la espera de cada uno pasa de 7 a 13 segundos. En una maquina mas
+ * pequena interesa bajarlo; de ahi que sea una variable de entorno.
+ *
+ * El maximo en cola existe para poder decir "ahora no" en vez de aceptar a
+ * cualquiera y mentirle: cien esperando a cuatro por vez ya son varios minutos.
+ */
+const CONCURRENCIA = Math.max(
+  1,
+  Number(process.env['RANDOMIZER_CONCURRENCIA'] ?? Math.min(4, cpus().length)),
+);
+const MAX_EN_COLA = Math.max(1, Number(process.env['RANDOMIZER_MAX_COLA'] ?? 100));
+
+const cola = new Cola(CONCURRENCIA, MAX_EN_COLA);
+
+/**
+ * Techo de memoria de cada JVM.
+ *
+ * Antes era 4096 MB y no se usaban: medido, el pico real de una aleatorizacion
+ * de GBA son 143 MB. El problema de un techo que no se usa es que sigue siendo
+ * un permiso: con varias copias a la vez, son varios procesos autorizados a
+ * pedir 4 GB cada uno en una maquina que no los tiene.
+ *
+ * 1024 es siete veces el pico medido, que es holgura de sobra para una ROM mas
+ * grande, y acota el peor caso a algo que cabe.
+ */
+const JVM_MEMORIA = process.env['RANDOMIZER_XMX'] ?? '1024M';
+
+/** Para soltar la ROM de la memoria en cuanto esta en disco. */
+const VACIO = Buffer.alloc(0);
 
 /** Tamano maximo aceptado, con holgura sobre los 32 MB de la ROM mas grande. */
 const MAX_BODY_BYTES = 48 * 1024 * 1024;
@@ -135,6 +172,16 @@ type RandomizeRequest = {
    * anotada, porque es lo que permite reconstruirla sin guardar el fichero.
    */
   seed?: string;
+  /**
+   * Un identificador que se inventa el cliente para poder preguntar por su
+   * puesto en la cola.
+   *
+   * Lo elige el cliente y no el servidor por un motivo practico: la respuesta de
+   * `/randomize` no llega hasta que todo ha terminado, asi que si el servidor lo
+   * repartiera, quien espera no tendria con que preguntar justo cuando le hace
+   * falta.
+   */
+  ticket?: string;
 };
 
 /**
@@ -290,6 +337,30 @@ const findJjs = async (): Promise<string | null> => {
   });
 };
 
+/**
+ * Los ficheros de ajustes ya construidos, por conjunto de opciones.
+ *
+ * Construirlos cuesta **una JVM entera**: medido, 1,0 s de los 3,5 que tardaba
+ * una peticion, solo para escribir 88 bytes. Y es trabajo repetido, porque el
+ * resultado depende unicamente de que opciones se marcaron.
+ *
+ * La clave va ordenada porque el orden no influye en el resultado. Eso no se
+ * supuso, se comprobo: con las cinco opciones en un orden y en el inverso salen
+ * los mismos 88 bytes. Importaba asegurarlo antes de cachear, porque la cadena
+ * de ajustes es media receta y una receta que dejara de rehacer la misma copia
+ * seria el peor fallo posible de este proyecto.
+ *
+ * Cabe en memoria de sobra: son 88 bytes por combinacion y las combinaciones
+ * posibles del menu son unas pocas docenas.
+ */
+const ajustesEnCache = new Map<string, Buffer>();
+
+const claveDeAjustes = (chosen: readonly RandomizerOption[]): string =>
+  chosen
+    .map((option) => option.id)
+    .sort()
+    .join('|');
+
 type JavaRun = { code: number | null; stdout: string; stderr: string; timedOut: boolean };
 
 const run = (command: string, args: string[]): Promise<JavaRun> =>
@@ -401,10 +472,19 @@ const summarize = (log: string, requested: readonly RandomizerOption[]): Randomi
  * Comprimir merece la pena de verdad: una ROM de GBA baja de 16 MB a algo mas
  * de 5, y comprimir cuesta medio segundo. En una conexion domestica de subida
  * lenta eso es la diferencia entre cuatro minutos y poco mas de uno.
+ *
+ * Lo que no puede ser es comprimir en el hilo principal. Medido: 389 ms para
+ * comprimir los 16 MB y 66 ms para descomprimirlos, y con las versiones
+ * sincronas ese casi medio segundo es tiempo en el que el servicio ENTERO esta
+ * congelado, no solo esa peticion. Las asincronas hacen el mismo trabajo en el
+ * grupo de hilos de Node, asi que las demas peticiones siguen avanzando.
  */
-const maybeDecompress = (body: Buffer, req: IncomingMessage): Buffer =>
+const gzip = promisify(gzipCallback);
+const gunzip = promisify(gunzipCallback);
+
+const maybeDecompress = async (body: Buffer, req: IncomingMessage): Promise<Buffer> =>
   req.headers[ENCODING_HEADER] === 'gzip'
-    ? gunzipSync(body, { maxOutputLength: MAX_BODY_BYTES })
+    ? await gunzip(body, { maxOutputLength: MAX_BODY_BYTES })
     : body;
 
 const handleRandomize = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
@@ -420,7 +500,7 @@ const handleRandomize = async (req: IncomingMessage, res: ServerResponse): Promi
   let request: RandomizeRequest;
   let rom: Buffer;
   try {
-    ({ request, rom } = unpack(maybeDecompress(await readBody(req), req)));
+    ({ request, rom } = unpack(await maybeDecompress(await readBody(req), req)));
   } catch (error) {
     sendJson(res, 400, {
       error: 'peticion-invalida',
@@ -482,12 +562,45 @@ const handleRandomize = async (req: IncomingMessage, res: ServerResponse): Promi
 
   // Todo ocurre dentro de una carpeta temporal que se borra pase lo que pase.
   const workdir = await mkdtemp(join(tmpdir(), 'emupoke-rnd-'));
+  // Se declara aqui, fuera del try, para poder soltarlo en el finally que ya
+  // existe: si un turno se quedara cogido, la cola se iria estrechando con cada
+  // fallo hasta atascarse del todo.
+  let soltarTurno: (() => void) | null = null;
   try {
     const input = join(workdir, 'entrada.gba');
     const output = join(workdir, 'salida.gba');
     const settingsFile = join(workdir, 'ajustes.rnqs');
 
     await writeFile(input, rom);
+    // La ROM se suelta de la memoria ANTES de ponerse a esperar, y por eso se
+    // escribe al disco antes de pedir turno: cien peticiones en cola agarrando
+    // 16 MB cada una serian 1,6 GB de memoria esperando a no hacer nada. En
+    // disco son 1,6 GB de un sitio que sobra y que se borra solo.
+    rom = VACIO;
+
+    // Si quien espera cierra la pestana, su turno se cancela: nadie va a
+    // recoger esa copia, y hacerla seria quitarle el sitio a alguien que si
+    // sigue ahi.
+    const abandono = new AbortController();
+    res.on('close', () => {
+      if (!res.writableFinished) abandono.abort();
+    });
+
+    try {
+      soltarTurno = await cola.turno(request.ticket ?? null, abandono.signal);
+    } catch (error) {
+      if (error instanceof ColaLlena) {
+        sendJson(res, 503, {
+          error: 'cola-llena',
+          message: 'Ahora mismo hay demasiada gente aleatorizando. Prueba en unos minutos.',
+          cola: cola.estado(),
+        });
+      } else if (!(error instanceof Abandonada)) {
+        throw error;
+      }
+      // Si se fue, no hay a quien responder.
+      return;
+    }
 
     // Los ajustes pueden venir de tres sitios: un fichero .rnqs del randomizer
     // de escritorio, la cadena de ajustes de una partida que se esta
@@ -534,22 +647,32 @@ const handleRandomize = async (req: IncomingMessage, res: ServerResponse): Promi
         });
         return;
       }
-      const scriptPath = join(workdir, 'ajustes.js');
-      await writeFile(scriptPath, buildSettingsScript(chosen), 'utf8');
-      const built = await run(jjs, [
-        '-cp',
-        `"${jar}"`,
-        `"${scriptPath}"`,
-        '--',
-        `"${settingsFile}"`,
-      ]);
-      if (!existsSync(settingsFile)) {
-        sendJson(res, 500, {
-          error: 'ajustes-no-generados',
-          message: 'No se pudieron construir los ajustes.',
-          detalle: (built.stderr || built.stdout).slice(-1500),
-        });
-        return;
+      // Si ya se construyeron estos mismos ajustes antes, se reusan y nos
+      // ahorramos arrancar una JVM solo para esto.
+      const clave = claveDeAjustes(chosen);
+      const guardados = ajustesEnCache.get(clave);
+
+      if (guardados) {
+        await writeFile(settingsFile, guardados);
+      } else {
+        const scriptPath = join(workdir, 'ajustes.js');
+        await writeFile(scriptPath, buildSettingsScript(chosen), 'utf8');
+        const built = await run(jjs, [
+          '-cp',
+          `"${jar}"`,
+          `"${scriptPath}"`,
+          '--',
+          `"${settingsFile}"`,
+        ]);
+        if (!existsSync(settingsFile)) {
+          sendJson(res, 500, {
+            error: 'ajustes-no-generados',
+            message: 'No se pudieron construir los ajustes.',
+            detalle: (built.stderr || built.stdout).slice(-1500),
+          });
+          return;
+        }
+        ajustesEnCache.set(clave, await readFile(settingsFile));
       }
     }
 
@@ -565,7 +688,7 @@ const handleRandomize = async (req: IncomingMessage, res: ServerResponse): Promi
       const scriptPath = join(workdir, 'aleatorizar.js');
       await writeFile(scriptPath, buildRandomizeScript(), 'utf8');
       execution = await run(jjs, [
-        '-J-Xmx4096M',
+        `-J-Xmx${JVM_MEMORIA}`,
         '-cp',
         `"${jar}"`,
         `"${scriptPath}"`,
@@ -579,7 +702,7 @@ const handleRandomize = async (req: IncomingMessage, res: ServerResponse): Promi
     } else {
       // Sin jjs tampoco hay busqueda previa que valga: se usa lo que haya.
       execution = await run((await buscarJava()) ?? 'java', [
-        '-Xmx4096M',
+        `-Xmx${JVM_MEMORIA}`,
         '-jar',
         `"${jar}"`,
         'cli',
@@ -625,7 +748,7 @@ const handleRandomize = async (req: IncomingMessage, res: ServerResponse): Promi
     const randomized = await readFile(output);
     // Se devuelve comprimida por el mismo motivo: la vuelta gasta la subida de
     // esta maquina, que suele ser lo mas escaso de las dos.
-    const payload = gzipSync(randomized, { level: 6 });
+    const payload = await gzip(randomized, { level: 6 });
     res.writeHead(200, {
       'content-type': 'application/octet-stream',
       'content-length': payload.length,
@@ -654,6 +777,7 @@ const handleRandomize = async (req: IncomingMessage, res: ServerResponse): Promi
       message: error instanceof Error ? error.message : String(error),
     });
   } finally {
+    soltarTurno?.();
     // Pase lo que pase, no queda ni rastro de la ROM en el disco.
     await rm(workdir, { recursive: true, force: true }).catch(() => {});
   }
@@ -681,6 +805,21 @@ const server = createServer((req, res) => {
     return;
   }
 
+  // Por donde va quien espera. Existe porque la respuesta de /randomize no
+  // llega hasta el final: sin esto, esperar veintiocho minutos es
+  // indistinguible de estar roto.
+  if (req.method === 'GET' && req.url?.startsWith('/cola')) {
+    const ticket = new URL(req.url, 'http://localhost').searchParams.get('ticket');
+    const puesto = ticket ? cola.puestoDe(ticket) : null;
+    sendJson(res, 200, {
+      // null cuando ese ticket ya no espera: o le toco, o nunca estuvo.
+      puesto,
+      ...cola.estado(),
+      limite: cola.limite,
+    });
+    return;
+  }
+
   sendJson(res, 404, { error: 'no-encontrado' });
 });
 
@@ -688,6 +827,9 @@ const server = createServer((req, res) => {
 // ser alcanzable desde la red.
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`servicio de aleatorizacion escuchando en 127.0.0.1:${PORT}`);
+  console.log(
+    `hasta ${CONCURRENCIA} a la vez, ${MAX_EN_COLA} en cola, ${JVM_MEMORIA} por JVM`,
+  );
   void probeJava().then((java) => {
     if (!java.available) console.log('AVISO: no encuentro Java. El randomizer lo necesita.');
     else if (!java.bits64) console.log('AVISO: tu Java es de 32 bits y el randomizer no arrancara.');

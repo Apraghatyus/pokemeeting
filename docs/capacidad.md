@@ -19,9 +19,15 @@ Dos conclusiones, y la segunda es la que importa:
    no pasa por aqui. Eso cabe en la maquina mas pequena que vendan.
 
 2. **Lo que cuesta no es el estado estable, son dos picos.** Aleatorizar, que es
-   lo unico que quema CPU de verdad y hoy va a **0,59 por segundo** como techo; y
-   el ancho de banda del TURN, que es la unica factura que escala con el numero
-   de jugadores y puede irse a **8,9 TB al mes**.
+   lo unico que quema CPU de verdad y va a **0,78 por segundo** como techo en doce
+   nucleos -o sea unos 21 minutos para mil partidas nuevas-; y el ancho de banda
+   del TURN, que es la unica factura que escala con el numero de jugadores y puede
+   irse a **8,9 TB al mes**.
+
+Sobre el primero ya se actuo: hay cola con limite, y medido A/B en la misma
+maquina el servicio pasó de 0,48 a 0,78 por segundo. **x1,6, no el x2 que
+predije**, y la seccion del aleatorizador explica en que me equivoque al
+calcularlo.
 
 Y una observacion que cambia el calculo entero, en la seccion siguiente.
 
@@ -125,7 +131,8 @@ Y lo importante, como escala en paralelo en 12 nucleos:
 espera de cada uno: de 3,5 s a 13,5 s. Durante esas pruebas la CPU estuvo al
 **96% de media** y el disco al **6%**, asi que es CPU pura: ni disco ni red.
 
-A 0,59/s, **1000 aleatorizaciones son 28 minutos de cola.**
+A 0,59/s, **1000 aleatorizaciones son 28 minutos de cola.** (Ese era el punto
+de partida; mas abajo esta lo que quedo despues de arreglarlo.)
 
 #### Y la mitad de ese coste no es del randomizer
 
@@ -142,25 +149,64 @@ Desglosando los 3,5 s de una peticion:
 | **`gzipSync` + `gunzipSync` de 16 MB** | **0,46 s** | Si: hoy bloquean el bucle de eventos, o sea que serializan todo el servicio |
 | Arrancar una JVM (suelo, medido) | 0,3 s | No |
 
-Arreglar esas dos filas **aproximadamente dobla la capacidad sin comprar nada**.
-Es el mejor cambio por esfuerzo de todo el proyecto ahora mismo.
+Esas dos filas ya estan arregladas, y **lo medido no fue lo que predije**: ver la
+seccion siguiente.
 
-#### Dos riesgos de disponibilidad en el codigo actual
+#### Lo que se arreglo, y en que me equivoque al predecirlo
 
-- **No hay ningun limite de concurrencia.** Cada peticion hace `spawn` de una
-  JVM, y nada impide que haya 200 a la vez. Con 1000 jugadores entrando no es una
-  hipotesis: la maquina se queda sin memoria y caen todas, no solo las que
-  sobraban. **Es el riesgo numero uno** y se arregla con una cola y un semaforo.
-- **Cada JVM arranca con `-Xmx4096M`.** El pico real medido son 143 MB, y en las
-  pruebas funciono perfectamente con `-Xmx512M`. Ese techo de 4 GB no se usa,
-  pero autoriza a cada proceso a llegar ahi: 8 procesos son 32 GB autorizados en
-  una maquina que no los tiene.
+Las tres cosas estan hechas. Y conviene contar bien el resultado, porque **la
+prediccion de que doblaria la capacidad era optimista**:
 
-Nota menor: limitar los nucleos por copia
+| | Medido, A/B en la misma maquina |
+|---|---|
+| Antes (sin cola, gzip sincrono, `-Xmx4096M`) | 0,46 y 0,50 por segundo |
+| Despues (cola de 4, gzip asincrono, ajustes en cache, `-Xmx1024M`) | **0,80 y 0,76 por segundo** |
+
+**x1,6, no x2.** Las dos tandas de cada uno se midieron seguidas, misma maquina y
+mismo estado, porque entre sesiones las cifras absolutas se mueven facil un 30%.
+
+**Por que me pase al predecir el x2.** Lo saque de que el jar por fuera daba 1,38
+y el servicio 0,59, y asumi que la diferencia era toda desperdicio evitable. No
+lo era: la llamada directa tampoco descomprimia 5 MB de subida, ni escribia 16 MB
+al disco, ni los leia de vuelta, ni comprimia 16 MB de respuesta. Eso es trabajo
+real que sigue ahi.
+
+Y de ahi sale la leccion que mas vale guardarse: **en una maquina con la CPU
+saturada, pasar trabajo a asincrono no crea capacidad.** Los 389 ms de comprimir
+se siguen pagando; lo unico que cambia es que los paga una peticion en vez de
+congelar a todas.
+
+Lo que compro cada cambio, separado:
+
+- **Cachear los ajustes** quita trabajo de verdad: de 4,4 s en frio a 2,8 s en
+  caliente, medido tres veces seguidas en un proceso recien arrancado. Es la
+  unica de las tres que sube el rendimiento.
+- **Comprimir fuera del bucle** no da capacidad; da que el servicio siga
+  respondiendo. Medido con cuatro copias en marcha, preguntar por la cola tarda
+  **2 ms de mediana y 68 ms en el peor caso**. Con `gzipSync` cada respuesta
+  congelaba el proceso 389 ms, asi que justo la consulta que dice "faltan X
+  minutos" llegaba tarde cuando mas falta hacia. Sin esto, la cola no se podria
+  consultar.
+- **La cola no cuesta rendimiento: lo protege.** Medido, 8 a la vez dan 0,46 por
+  segundo y 4 a la vez dan 0,55: pasado el limite, mas concurrencia va *a peor*.
+  Y acota la memoria, que era el riesgo gordo.
+
+Tambien se probo subir `UV_THREADPOOL_SIZE` de 4 a 16, por si los `gzip`
+asincronos se estorbaban en el grupo de hilos. **No cambia nada** (0,77 frente a
+0,74, o sea ruido). Queda descartado.
+
+Nota menor que no se adopto: limitar los nucleos por copia
 (`-XX:ActiveProcessorCount=1`, porque cada JVM dimensiona su recolector para
-todos los nucleos de la maquina) dio entre un 12% y un 26% de mejora en dos
-pasadas. La diferencia entre esas dos cifras es ruido de carga, asi que es una
-ganancia modesta y no la palanca principal.
+todos los nucleos de la maquina) dio entre un 12% y un 26% en dos pasadas. La
+distancia entre esas dos cifras es ruido de carga, asi que es una ganancia
+modesta y no la palanca principal.
+
+#### Lo que esto cambia para el dimensionado
+
+A 0,78 por segundo, **1000 aleatorizaciones son unos 21 minutos** en doce
+nucleos, en vez de los 35 de antes. Sigue siendo un pico que hay que gestionar
+con la cola, no una cifra que lo haga desaparecer: para bajar de ahi hace falta
+mas maquina, no mas codigo.
 
 ### 4. El video: lo unico que escala con el numero de jugadores
 
@@ -232,12 +278,22 @@ Aqui vive el HTTPS y las dos cabeceras de aislamiento, como explica
 Separado porque es la unica pieza que puede comerse la maquina entera, y no
 quieres que al hacerlo se lleve por delante las salas de 500 partidas en curso.
 
-Con el codigo de hoy, 8 vCPU dan del orden de 0,4–0,6 aleatorizaciones por
-segundo: **1000 nuevas partidas son unos 30 minutos de cola**. Con los dos
-arreglos de arriba, la mitad.
+Con el codigo de hoy, 8 vCPU dan del orden de 0,5–0,8 aleatorizaciones por
+segundo: **1000 nuevas partidas son unos 20–30 minutos de cola**, que la cola
+gestiona y le cuenta al jugador. Bajar de ahi es cuestion de mas nucleos, no de
+mas codigo: los arreglos faciles ya estan hechos.
 
-Memoria: con un limite de 4 a 6 simultaneas y `-Xmx` bajado a 512 MB, son menos
-de 3 GB. Los 8 GB son para no pensar.
+Memoria: con el limite por defecto de 4 simultaneas y `-Xmx1024M`, el peor caso
+autorizado son 4 GB y el real medido ronda los 600 MB. Los 8 GB son para no
+pensar.
+
+Las tres variables que la ajustan:
+
+| Variable | Por defecto | Para que |
+|---|---|---|
+| `RANDOMIZER_CONCURRENCIA` | `min(4, nucleos)` | Cuantas a la vez. Mas de 4 empeora. |
+| `RANDOMIZER_MAX_COLA` | `100` | A partir de ahi se responde "ahora no" en vez de aceptar y mentir. |
+| `RANDOMIZER_XMX` | `1024M` | Techo de memoria de cada JVM. |
 
 Esta maquina **se puede apagar** sin tumbar nada mas: sin ella la aplicacion
 funciona entera menos el menu de aleatorizar. Es la candidata obvia a escalar
@@ -261,28 +317,36 @@ mando, y no se queda.
 
 ---
 
-## Antes de comprar hardware, cinco cambios
+## Cambios: los hechos y los que quedan
 
-Ordenados por lo que dan frente a lo que cuestan. Los dos primeros valen mas que
-duplicar la maquina B.
+### Hechos
 
-1. **Poner un limite de aleatorizaciones simultaneas, con cola.** Hoy no hay
-   ninguno. Es lo que separa "los que sobran esperan" de "se cae para todos".
-   Y la cola necesita decirle al jugador en que puesto va, porque con 1000
-   personas esperar 28 minutos sin saberlo es indistinguible de estar roto.
-2. **Cachear el fichero de ajustes.** Es 1 s de los 3,5, el resultado es
-   determinista y las combinaciones del menu son pocas.
-3. **Comprimir fuera del bucle de eventos.** `gzipSync` de 16 MB son 389 ms en
-   los que el servicio entero esta congelado, no solo esa peticion.
-4. **Bajar `-Xmx4096M` a 512 MB.** Medido: el pico real son 143 MB y con 512
-   funciona. Quita el riesgo de que N procesos autoricen N × 4 GB.
-5. **No subir `mgba.wasm.map`** a produccion.
+1. **Limite de aleatorizaciones simultaneas, con cola.** Es lo que separa "los
+   que sobran esperan" de "se cae para todos". Y la cola le dice al jugador por
+   donde va: `GET /cola?ticket=`, con el ticket que se inventa el propio cliente,
+   porque la respuesta de `/randomize` no llega hasta el final y sin ticket no
+   habria con que preguntar justo mientras hace falta. En pantalla sale "hay 3
+   esperando antes que ti: unos 2 minutos".
+2. **Ajustes en cache.** De 4,4 s a 2,8 s por peticion. Que el orden en que se
+   marcan las opciones no cambia el resultado no se supuso: se comprobo, porque
+   la cadena de ajustes es media receta.
+3. **Compresion fuera del bucle de eventos.** No da capacidad, da que el servicio
+   responda mientras trabaja. Sin esto la cola no se podria consultar.
+4. **`-Xmx` de 4096M a 1024M.** El pico real medido son 143 MB. El techo de 4 GB
+   no se usaba, pero autorizaba a cada proceso a pedirlo.
 
-Y una que no es de capacidad pero que a esta escala cambia de categoria: **las
-salas viven en memoria**. Hoy reiniciar el servidor de salas es una molestia; con
-500 partidas en curso son 500 partidas cortadas sin posibilidad de reconexion.
-Ya esta apuntado como deuda en [ideas-pendientes.md](ideas-pendientes.md), pero
-con 1000 jugadores sube de prioridad.
+Lo vigilan `npm run test:cola` (la clase), `test:cola:servicio` (por HTTP) y
+`test:cola:ui` (que el jugador lo vea).
+
+### Lo que queda
+
+- **No subir `mgba.wasm.map`** a produccion: 448 KB de mapa de depuracion.
+- **Las salas viven en memoria.** No es de capacidad, pero a esta escala cambia de
+  categoria: hoy reiniciar el servidor de salas es una molestia, con 500 partidas
+  en curso son 500 partidas cortadas sin reconexion posible. Ya esta apuntado en
+  [ideas-pendientes.md](ideas-pendientes.md); con 1000 jugadores sube de
+  prioridad.
+- **Un TURN**, sin el cual una parte de las parejas no conecta nunca.
 
 ---
 
@@ -296,9 +360,13 @@ Para poder repetirlo cuando cambie el codigo:
 - **Aleatorizador**: peticiones `POST /randomize` reales con la ROM comprimida,
   en tandas de 1, 2, 4 y 8; CPU y disco con los contadores del sistema; y el jar
   llamado tambien por fuera del servicio para separar su coste del de la JVM.
+- **El antes y el despues**: con `git stash` del fichero del servicio, para medir
+  las dos versiones seguidas en la misma maquina y con la misma carga. Es la unica
+  forma de que la comparacion signifique algo: entre sesiones las cifras
+  absolutas se mueven un 30% sin tocar nada.
 - **Video**: `RTCPeerConnection.getStats()` de una pareja jugando, envolviendo el
   constructor desde fuera para no tocar el codigo de la aplicacion.
 
 Las cifras salen de una maquina de 12 nucleos. Lo que se traslada a otra maquina
-son las **proporciones** (que el servicio se come la mitad de su capacidad, que
-escalar se estanca), no los segundos exactos.
+son las **proporciones** (que escalar se estanca pasadas cuatro copias, que
+asincrono no crea capacidad en una maquina saturada), no los segundos exactos.

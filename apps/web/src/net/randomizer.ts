@@ -133,6 +133,8 @@ export type RandomizeRequest = {
   settingsString?: string;
   /** Semilla concreta: con ella sale la misma copia de siempre. */
   seed?: string;
+  /** Con que preguntar por el puesto en la cola. Lo pone `randomizeRom`. */
+  ticket?: string;
 };
 
 export class RandomizerError extends Error {}
@@ -167,17 +169,82 @@ const gunzip = async (data: ArrayBuffer): Promise<Uint8Array> => {
   return new Uint8Array(await new Response(stream).arrayBuffer());
 };
 
+/** Por donde va la peticion mientras espera su turno. */
+export type PuestoEnCola = {
+  /** Cuantos tiene por delante. */
+  delante: number;
+  /** Cuantas se estan haciendo ahora mismo. */
+  atendiendo: number;
+  /** Lo que se tarda por copia ultimamente, o null si no se sabe aun. */
+  segundosPorCopia: number | null;
+};
+
+/**
+ * Pregunta por el puesto de un ticket.
+ *
+ * Devuelve null cuando ese ticket ya no espera, que es lo que pasa en cuanto le
+ * toca: a partir de ahi lo que queda es trabajo, no cola.
+ */
+export const consultarCola = async (ticket: string): Promise<PuestoEnCola | null> => {
+  try {
+    const r = await fetch(`${BASE}/cola?ticket=${encodeURIComponent(ticket)}`);
+    if (!r.ok) return null;
+    const datos = (await r.json()) as { puesto: PuestoEnCola | null };
+    return datos.puesto;
+  } catch {
+    // Que falle preguntar no es motivo para romper nada: solo dejamos de contar.
+    return null;
+  }
+};
+
 export const randomizeRom = async (
   request: RandomizeRequest,
   rom: Uint8Array,
+  /**
+   * Se llama mientras se espera turno, para poder decir cuanta cola hay.
+   *
+   * Hace falta porque con varios jugadores aleatorizando a la vez la espera deja
+   * de ser "un rato" y pasa a ser minutos, y minutos sin noticias son
+   * indistinguibles de estar roto: el jugador recarga, vuelve al final de la
+   * cola y encima deja trabajo huerfano.
+   */
+  alEsperar?: (puesto: PuestoEnCola | null) => void,
 ): Promise<RandomizeResult> => {
-  const response = await fetch(`${BASE}/randomize`, {
+  // El ticket lo pone el cliente porque la respuesta no llega hasta el final:
+  // si lo repartiera el servidor, no habria con que preguntar justo mientras
+  // hace falta.
+  const ticket = crypto.randomUUID();
+
+  const peticion = fetch(`${BASE}/randomize`, {
     method: 'POST',
     headers: {
       'content-type': 'application/octet-stream',
       [ENCODING_HEADER]: 'gzip',
     },
-    body: (await gzip(pack(request, rom))) as BodyInit,
+    body: (await gzip(pack({ ...request, ticket }, rom))) as BodyInit,
+  });
+
+  let esperando = true;
+  if (alEsperar) {
+    void (async () => {
+      while (esperando) {
+        await new Promise((sigue) => setTimeout(sigue, 1500));
+        if (!esperando) break;
+        const puesto = await consultarCola(ticket);
+        if (!esperando) break;
+        // Se pregunta hasta el final y no se para en el primer hueco: un ticket
+        // desconocido no significa "ya te toca", tambien significa "todavia no
+        // has entrado en la cola". El servidor no te apunta hasta haber recibido
+        // los cinco megas de la ROM, asi que las primeras consultas no te
+        // encuentran y rendirse ahi deja al jugador sin noticias justo cuando
+        // empieza a esperar de verdad.
+        alEsperar(puesto);
+      }
+    })();
+  }
+
+  const response = await peticion.finally(() => {
+    esperando = false;
   });
 
   if (!response.ok) {

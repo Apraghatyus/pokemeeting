@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type RefObject } from 'react';
 import {
   checkRandomizer,
   randomizeRom,
+  type PuestoEnCola,
   randomizerIsRemote,
   type RandomizerStatus,
   type RandomizeSummary,
@@ -54,7 +55,7 @@ type Props = {
 
 type Progress =
   | { fase: 'eligiendo' }
-  | { fase: 'trabajando' }
+  | { fase: 'trabajando'; cola?: PuestoEnCola | null }
   | {
       fase: 'hecho';
       seed: string | null;
@@ -96,6 +97,32 @@ const DEFAULT_SELECTION = ['salvajes', 'iniciales', 'entrenadores', 'movimientos
  * antes de empezar: aleatorizar despues de jugar un rato significa perder la
  * partida.
  */
+/**
+ * Lo que se le dice a quien espera.
+ *
+ * Se da una estimacion y no solo el puesto porque "eres el cuarto" no responde
+ * la pregunta de verdad, que es si da tiempo a ir por un cafe. Y se redondea
+ * hacia arriba a proposito: quedarse corto es lo unico que hace que la gente
+ * recargue la pagina.
+ */
+const textoDeEspera = (cola: PuestoEnCola): string => {
+  if (cola.delante === 0) return 'Eres el siguiente. Empieza en cuanto quede un hueco.';
+
+  const segundos = cola.segundosPorCopia;
+  if (segundos === null || cola.atendiendo === 0) {
+    return `Hay ${cola.delante} esperando antes que tu.`;
+  }
+
+  // Las que se hacen a la vez dividen la espera: con cuatro en marcha, el que
+  // tiene ocho delante espera dos turnos, no ocho.
+  const minutos = Math.ceil((cola.delante / cola.atendiendo) * segundos / 60);
+  return (
+    `Hay ${cola.delante} esperando antes que tu: ` +
+    `unos ${minutos} ${minutos === 1 ? 'minuto' : 'minutos'}. ` +
+    'Puedes dejar la pestana abierta.'
+  );
+};
+
 export const RandomizerModal = ({
   open,
   onClose,
@@ -111,6 +138,15 @@ export const RandomizerModal = ({
 }: Props) => {
   const [status, setStatus] = useState<RandomizerStatus>({ estado: 'comprobando' });
   const [progress, setProgress] = useState<Progress>({ fase: 'eligiendo' });
+
+  /**
+   * Apunta el puesto en la cola sin pisar el resto del estado.
+   *
+   * Solo se refresca si seguimos en la fase de trabajo: una respuesta de la cola
+   * que llegue tarde no debe devolver el modal a "esperando" cuando ya acabo.
+   */
+  const avisarDeLaCola = (cola: PuestoEnCola | null) =>
+    setProgress((actual) => (actual.fase === 'trabajando' ? { fase: 'trabajando', cola } : actual));
   const [selected, setSelected] = useState<Set<string>>(new Set(DEFAULT_SELECTION));
   const [partidas, setPartidas] = useState<PartidaGuardada[]>([]);
   const [otras, setOtras] = useState<PartidaGuardada[]>([]);
@@ -180,7 +216,7 @@ export const RandomizerModal = ({
     setProgress({ fase: 'trabajando' });
     try {
       // Siempre desde la original: asi el nombre tampoco se encadena.
-      const result = await randomizeRom({ options: [...selected] }, base.bytes);
+      const result = await randomizeRom({ options: [...selected] }, base.bytes, avisarDeLaCola);
 
       // Nombre propio para cada copia: asi conviven varias partidas de la
       // misma ROM sin pisarse el fichero de guardado.
@@ -297,6 +333,7 @@ export const RandomizerModal = ({
       const result = await randomizeRom(
         { settingsString: traida.receta.ajustes, seed: traida.receta.semilla },
         base.bytes,
+        avisarDeLaCola,
       );
       if (crc32(result.rom) !== traida.receta.crc32) {
         setProgress({
@@ -357,6 +394,7 @@ export const RandomizerModal = ({
       const result = await randomizeRom(
         { settingsString: receta.ajustes, seed: receta.semilla },
         base.bytes,
+        avisarDeLaCola,
       );
       const generada = crc32(result.rom);
       if (generada !== receta.crc32) {
@@ -411,6 +449,7 @@ export const RandomizerModal = ({
       const result = await randomizeRom(
         { settingsString: partida.ajustes, seed: partida.semilla },
         base.bytes,
+        avisarDeLaCola,
       );
       const generada = crc32(result.rom);
       if (partida.crc32 && generada !== partida.crc32) {
@@ -680,6 +719,14 @@ export const RandomizerModal = ({
           )}
 
           {progress.fase === 'error' && <p className="alert">{progress.message}</p>}
+
+          {/* Solo sale si de verdad hay cola. Jugando solo no hay nada que
+              contar y un mensaje de espera sobraria. */}
+          {progress.fase === 'trabajando' && progress.cola && (
+            <p className="hint" role="status">
+              {textoDeEspera(progress.cola)}
+            </p>
+          )}
 
           <div className="modal__acciones">
             <button type="button" className="button--wide" onClick={onClose}>
