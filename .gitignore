@@ -44,3 +44,6 @@ tools/cloudflared.exe
 
 # Capturas que dejan las pruebas al correrlas sin indicar carpeta.
 *.png
+
+# El nucleo de DS lo baja tools/nds/preparar.mjs: es de otra gente y pesa 7 MB.
+tools/nds/nucleo/

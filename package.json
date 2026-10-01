@@ -34,6 +34,8 @@
     "memoria:analizar": "npx tsx tools/memoria/analizar-savestate.mjs",
     "memoria:nombres": "npx tsx tools/memoria/buscar-nombres.mjs",
     "test:receta": "node tools/tests/test-receta.mjs",
+    "nds:preparar": "node tools/nds/preparar.mjs",
+    "nds:probar": "node tools/nds/probar-nds.mjs",
     "test:resumen": "npx tsx tools/tests/test-resumen.mjs",
     "test:gbc": "node tools/tests/test-gbc.mjs",
     "test:cabeceras": "npx tsx tools/tests/test-cabeceras.mjs",

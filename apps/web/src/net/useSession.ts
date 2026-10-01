@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import type { RomFingerprint } from '@emupoke/protocol';
+import { parsePeerMessage, type EquipoResumen, type RomFingerprint } from '@emupoke/protocol';
 import { compareRoms, type RomCompatibility } from '@emupoke/pokemon';
 import { PeerLink, type PeerState } from './peerLink';
 import { SignalingClient } from './signalingClient';
@@ -51,6 +51,14 @@ export type SessionState = {
   password: string | null;
   voice: VoiceState;
   reconnect: ReconnectState;
+  /**
+   * El equipo del companero, tal y como lo tiene en su partida.
+   *
+   * Llega por el canal de datos cada vez que le cambia algo. Son numeros y
+   * motes: el nombre de cada especie y su sprite los pone este lado con su
+   * propia ROM, asi que por el cable no viaja nada del juego.
+   */
+  equipoCompanero: EquipoResumen | null;
 };
 
 const initialState: SessionState = {
@@ -70,6 +78,7 @@ const initialState: SessionState = {
     partnerVolume: 80,
     partnerMuted: false,
   },
+  equipoCompanero: null,
 };
 
 /** Fotogramas por segundo del video que enviamos. El GBA corre a 60, pero para
@@ -83,6 +92,8 @@ export const useSession = (
   const [state, setState] = useState<SessionState>(initialState);
   const signalingRef = useRef<SignalingClient | null>(null);
   const peerRef = useRef<PeerLink | null>(null);
+  /** Momento del ultimo equipo que llego, para descartar los que lleguen tarde. */
+  const ultimoEquipoRef = useRef<number | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   // La pista del microfono sobrevive a la conexion: si el companero se va y
   // vuelve, se reengancha al nuevo enlace sin volver a pedir permiso.
@@ -158,8 +169,19 @@ export const useSession = (
               reconnectRef.current();
             }
           },
-          onData: () => {
-            // Aqui entraran los eventos de Soul Link y los intercambios.
+          onData: (crudo) => {
+            // Al otro lado hay un navegador que no controlamos: lo que no
+            // cuadre se descarta y la partida sigue.
+            const mensaje = parsePeerMessage(crudo);
+            if (!mensaje) return;
+
+            // El canal de datos no garantiza el orden. Sin esta comprobacion,
+            // un mensaje que llega tarde pisaria a uno mas nuevo y el equipo
+            // del companero daria saltos atras.
+            const anterior = ultimoEquipoRef.current;
+            if (anterior !== null && mensaje.equipo.momento < anterior) return;
+            ultimoEquipoRef.current = mensaje.equipo.momento;
+            patch({ equipoCompanero: mensaje.equipo });
           },
           sendSignal: (data) => signaling.signal(data),
         },
