@@ -185,17 +185,22 @@ body {
 /* ---------- vista de juego ---------- */
 
 .app__main {
-  max-width: 1280px;
+  /* Antes se quedaba en 1280 y en una pantalla ancha sobraban palmos a los
+     lados mientras la partida se veia pequeña. Ahora ocupa lo que haya, con un
+     tope para que en un monitor muy ancho no quede ridiculamente estirada. */
+  max-width: 2200px;
   margin: 0 auto;
-  padding: 16px;
+  padding: 16px 20px;
 }
 
 .stage {
   position: relative;
-  width: 100%;
-  /* Proporcion nativa de GBA: 240x160 = 3:2. */
-  aspect-ratio: 3 / 2;
-  max-height: calc(100vh - 120px);
+  /* Lo mas ancha que quepa sin pasarse de alto. Antes era el 100% del hueco
+     con un tope de alto, y eso rompia la proporcion: la caja salia mas ancha
+     de la cuenta y el juego quedaba con franjas negras arriba y abajo dentro
+     de su propio marco. */
+  width: min(100%, calc((100vh - var(--cromo)) * var(--proporcion, 1.5)));
+  aspect-ratio: var(--proporcion, 1.5);
   margin: 0 auto;
   background: #000;
   border: 1px solid var(--border);
@@ -1379,6 +1384,9 @@ details.partidas[open] > summary::before {
 
 :root {
   --columna-equipo: 210px;
+  /* Lo que ocupa todo lo que no es la partida: barra de arriba, margenes y la
+     barra de voz. De aqui sale cuanto alto le queda al escenario. */
+  --cromo: 150px;
 }
 
 .mesa__centro {
@@ -1607,4 +1615,23 @@ details.partidas[open] > summary::before {
   clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
+}
+
+/* El sprite viene como imagen cuando hay; si no, se queda el circulo con las
+   dos letras, que comparte clase y medidas para que la ficha no de un salto
+   mientras carga. */
+.ficha__sprite--imagen {
+  background: none;
+  border: none;
+  /* Son dibujos de pocos pixeles: al agrandarlos hay que dejar los bordes
+     duros, o el navegador los difumina y parecen manchas. */
+  image-rendering: pixelated;
+  object-fit: contain;
+  width: 44px;
+  height: 44px;
+}
+
+/* Un debilitado se ve apagado tambien en el sprite. */
+.ficha--debilitado .ficha__sprite--imagen {
+  filter: grayscale(1);
 }

@@ -5,8 +5,9 @@ import { useEmulator } from './core/useEmulator';
 import { useKeyboardOwnership } from './core/useKeyboardOwnership';
 import { useSession } from './net/useSession';
 import { useEquipo } from './core/useEquipo';
-import { useNombresEspecie } from './core/useNombresEspecie';
+import { useEspecies } from './core/useEspecies';
 import { EquipoPanel } from './ui/EquipoPanel';
+import { Modal } from './ui/Modal';
 import { RandomizerModal } from './ui/RandomizerModal';
 import { RomDropZone, RoomDropZoneHint } from './ui/RomDropZone';
 import { RomInfoCard } from './ui/RomInfoCard';
@@ -24,7 +25,7 @@ export const App = () => {
 
   // Los nombres de especie salen de TU ROM, y sirven tanto para tu equipo como
   // para el de tu companero: por la red viaja el numero, no el nombre.
-  const nombreEspecie = useNombresEspecie(emulator.romBytesRef, state.romName);
+  const especies = useEspecies(emulator.romBytesRef, state.romName);
 
   const [roomOpen, setRoomOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -98,7 +99,7 @@ export const App = () => {
             titulo="Tu equipo"
             lado="propio"
             equipo={miEquipo.equipo}
-            nombreEspecie={nombreEspecie}
+            especies={especies}
             motivo={
               !hasRom
                 ? 'Carga una ROM para ver tu equipo.'
@@ -114,6 +115,11 @@ export const App = () => {
           remoteStream={session.state.remoteStream}
           partnerLabel={session.state.peerRom?.fileName ?? 'Tu companero'}
           hasRom={hasRom}
+          proporcion={
+            state.platform
+              ? state.platform.screens[0]!.width / state.platform.screens[0]!.height
+              : 240 / 160
+          }
           dropzone={
             <RomDropZone
               onRom={emulator.openRom}
@@ -132,7 +138,7 @@ export const App = () => {
             }
             lado="companero"
             equipo={session.state.equipoCompanero}
-            nombreEspecie={nombreEspecie}
+            especies={especies}
             motivo={
               session.state.phase === 'conectada'
                 ? 'Todavia no ha mandado su equipo.'
@@ -157,108 +163,115 @@ export const App = () => {
           </p>
         )}
 
-        {menuOpen && (
-          <div className="drawer">
-            <section className="panel panel--wide">
-              <h2>Emulador</h2>
-              <Toolbar
-                state={state}
-                onTogglePause={emulator.togglePause}
-                onReset={emulator.reset}
-                onSaveState={emulator.saveState}
-                onLoadState={emulator.loadState}
-                onDownloadSave={emulator.downloadSave}
-                onExportState={emulator.exportState}
-                onImportSave={emulator.importSave}
-                onFastForward={emulator.setFastForward}
-              />
-              {state.lastSaveAt && (
-                <p className="note">
-                  Guardado a las {new Date(state.lastSaveAt).toLocaleTimeString('es')}. La partida
-                  queda en este navegador.
-                </p>
-              )}
-            </section>
-
-            {hasRom && (
-              <>
-                <RomInfoCard
-                  header={state.header!}
-                  platform={state.platform!}
-                  romName={state.romName!}
-                />
-                <section className="panel">
-                  <h2>Cambiar de juego</h2>
-                  <p className="hint">
-                    Cierra esta ROM y vuelve a la pantalla de carga para elegir otra.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      emulator.closeRom();
-                    }}
-                  >
-                    Cargar otra ROM
-                  </button>
-                </section>
-              </>
+        {/* Todos los ajustes viven en un modal y no en un cajon lateral: el
+            cajon empujaba la partida a un lado cada vez que se abria, y aqui
+            lo que no puede moverse es justo la pantalla del juego. */}
+        <Modal
+          open={menuOpen}
+          onClose={() => setMenuOpen(false)}
+          icon="⚙"
+          title="Ajustes"
+          subtitle="Emulador, mando y partida"
+        >
+          <section className="panel panel--wide">
+            <h2>Emulador</h2>
+            <Toolbar
+              state={state}
+              onTogglePause={emulator.togglePause}
+              onReset={emulator.reset}
+              onSaveState={emulator.saveState}
+              onLoadState={emulator.loadState}
+              onDownloadSave={emulator.downloadSave}
+              onExportState={emulator.exportState}
+              onImportSave={emulator.importSave}
+              onFastForward={emulator.setFastForward}
+            />
+            {state.lastSaveAt && (
+              <p className="note">
+                Guardado a las {new Date(state.lastSaveAt).toLocaleTimeString('es')}. La partida
+                queda en este navegador.
+              </p>
             )}
+          </section>
 
-            {hasRom && (
+          {hasRom && (
+            <>
+              <RomInfoCard
+                header={state.header!}
+                platform={state.platform!}
+                romName={state.romName!}
+              />
               <section className="panel">
-                <h2>Aleatorizar</h2>
+                <h2>Cambiar de juego</h2>
                 <p className="hint">
-                  Cambia que Pokemon, objetos y entrenadores aparecen en tu partida.
+                  Cierra esta ROM y vuelve a la pantalla de carga para elegir otra.
                 </p>
                 <button
                   type="button"
                   onClick={() => {
                     setMenuOpen(false);
-                    setRandomizerOpen(true);
+                    emulator.closeRom();
                   }}
                 >
-                  Abrir opciones
+                  Cargar otra ROM
                 </button>
-                {state.romSource === 'generada' && (
-                  <p className="hint">
-                    Estas jugando una copia aleatorizada. Aleatorizar otra vez parte siempre de tu
-                    ROM original, no de esta.
-                  </p>
-                )}
               </section>
-            )}
+            </>
+          )}
 
+          {hasRom && (
             <section className="panel">
-              <h2>Controles</h2>
-              <dl className="kv">
-                {DEFAULT_KEY_BINDINGS.map(([key, input]) => (
-                  <div className="kv__row" key={input}>
-                    <dt>{input}</dt>
-                    <dd className="mono">{key}</dd>
-                  </div>
-                ))}
-              </dl>
+              <h2>Aleatorizar</h2>
               <p className="hint">
-                Mientras escribes en un campo, el juego suelta el teclado y lo recupera al salir.
+                Cambia que Pokemon, objetos y entrenadores aparecen en tu partida.
               </p>
               <button
                 type="button"
-                className={touchPad ? 'is-active' : undefined}
-                onClick={() => setTouchPad((v) => !v)}
+                onClick={() => {
+                  setMenuOpen(false);
+                  setRandomizerOpen(true);
+                }}
               >
-                {touchPad ? 'Ocultar mando tactil' : 'Mostrar mando tactil'}
+                Abrir opciones
               </button>
+              {state.romSource === 'generada' && (
+                <p className="hint">
+                  Estas jugando una copia aleatorizada. Aleatorizar otra vez parte siempre de tu
+                  ROM original, no de esta.
+                </p>
+              )}
             </section>
+          )}
 
-            {state.log.length > 0 && (
-              <section className="panel">
-                <h2>Registro del nucleo</h2>
-                <pre className="log">{state.log.join('\n')}</pre>
-              </section>
-            )}
-          </div>
-        )}
+          <section className="panel">
+            <h2>Controles</h2>
+            <dl className="kv">
+              {DEFAULT_KEY_BINDINGS.map(([key, input]) => (
+                <div className="kv__row" key={input}>
+                  <dt>{input}</dt>
+                  <dd className="mono">{key}</dd>
+                </div>
+              ))}
+            </dl>
+            <p className="hint">
+              Mientras escribes en un campo, el juego suelta el teclado y lo recupera al salir.
+            </p>
+            <button
+              type="button"
+              className={touchPad ? 'is-active' : undefined}
+              onClick={() => setTouchPad((v) => !v)}
+            >
+              {touchPad ? 'Ocultar mando tactil' : 'Mostrar mando tactil'}
+            </button>
+          </section>
+
+          {state.log.length > 0 && (
+            <section className="panel">
+              <h2>Registro del nucleo</h2>
+              <pre className="log">{state.log.join('\n')}</pre>
+            </section>
+          )}
+        </Modal>
       </main>
 
       <RandomizerModal

@@ -204,3 +204,54 @@ export const describirTipos = (tipos: readonly [number, number]): string => {
   const nombre = (t: number) => TIPOS_GEN3[t] ?? `#${t}`;
   return tipos[0] === tipos[1] ? nombre(tipos[0]) : `${nombre(tipos[0])}/${nombre(tipos[1])}`;
 };
+
+/**
+ * Traduce el numero interno de especie al de la Pokedex nacional.
+ *
+ * Hacen falta los dos. El interno es el que usa el juego en memoria, y es el
+ * que leemos de una partida. El nacional es el que usa todo el mundo fuera del
+ * juego, empezando por cualquier coleccion de sprites.
+ *
+ * La conversion NO es una resta, aunque lo parezca: las 251 primeras coinciden
+ * y a partir de ahi los de Hoenn van en su orden regional. Comprobado, que es
+ * como se descubrio: la especie interna 411 es CHIMECHO, que es la 358
+ * nacional, no la 386 que daria restar un desplazamiento fijo.
+ *
+ * La tabla esta en la ROM, asi que no hay que mantener aqui una lista de
+ * ciento treinta y cinco numeros que ademas habria que revisar por idioma.
+ */
+export type TablaDex = {
+  offset: number;
+  /** El numero nacional, o 0 si esa especie no existe. */
+  nacional: (especie: number) => number;
+};
+
+/** Cuantas especies seguidas tienen que cuadrar para dar la tabla por buena. */
+const IDENTIDAD = 251;
+
+export const encontrarTablaDex = (rom: Uint8Array): TablaDex | null => {
+  const u16 = (i: number): number => rom[i]! | (rom[i + 1]! << 8);
+
+  // La firma es inmejorable: para las especies de las dos primeras
+  // generaciones, el numero interno y el nacional son el mismo, asi que la
+  // tabla empieza con 1, 2, 3, 4... en enteros de dos bytes.
+  for (let offset = 0; offset + 2 * (IDENTIDAD + 160) < rom.length; offset += 2) {
+    if (u16(offset) !== 1 || u16(offset + 2) !== 2) continue;
+
+    let seguidas = 0;
+    while (seguidas < IDENTIDAD && u16(offset + seguidas * 2) === seguidas + 1) seguidas += 1;
+    if (seguidas < IDENTIDAD) continue;
+
+    // La tabla esta indexada desde la especie 1, no desde la 0.
+    const nacional = (especie: number): number =>
+      especie < 1 ? 0 : u16(offset + (especie - 1) * 2);
+
+    // Confirmacion con el primero de Hoenn, que es donde las dos numeraciones
+    // dejan de coincidir y donde fallaria cualquier atajo.
+    if (nacional(277) !== 252) continue;
+
+    return { offset, nacional };
+  }
+
+  return null;
+};

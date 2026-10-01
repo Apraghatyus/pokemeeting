@@ -7,6 +7,13 @@ type Props = {
   /** Nombre con el que etiquetar su pantalla. */
   partnerLabel: string;
   hasRom: boolean;
+  /**
+   * Ancho dividido por alto de la consola que corre.
+   *
+   * GBA es 3:2 y Game Boy Color 10:9, asi que fijarlo en el estilo dejaba
+   * franjas negras en una de las dos. Viene de la plataforma, que ya lo sabe.
+   */
+  proporcion: number;
   /** Selector de ROM, mostrado encima mientras no haya juego cargado. */
   dropzone: ReactNode;
 };
@@ -116,7 +123,14 @@ const useArrastre = (
   return { esquina, arrastrando, desplazamiento, alPulsar };
 };
 
-export const Stage = ({ canvasRef, remoteStream, partnerLabel, hasRom, dropzone }: Props) => {
+export const Stage = ({
+  canvasRef,
+  remoteStream,
+  partnerLabel,
+  hasRom,
+  proporcion,
+  dropzone,
+}: Props) => {
   const stageRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [swapped, setSwapped] = useState(false);
@@ -149,13 +163,13 @@ export const Stage = ({ canvasRef, remoteStream, partnerLabel, hasRom, dropzone 
   };
 
   return (
-    <div className={`stage${fullscreen ? ' stage--fullscreen' : ''}`} ref={stageRef}>
+    <div
+      className={`stage${fullscreen ? ' stage--fullscreen' : ''}`}
+      ref={stageRef}
+      style={{ '--proporcion': proporcion } as React.CSSProperties}
+    >
       <div className={slotClass(true)}>
         <canvas ref={canvasRef} className="slot__media" width={240} height={160} />
-        <div className="slot__label">
-          <span className="dot dot--on" />
-          Tu partida
-        </div>
         {/* El boton va en los dos huecos y el CSS lo muestra solo en el pequeno.
             Si estuviera solo en el del companero, al intercambiar desapareceria
             y no habria forma de volver. */}

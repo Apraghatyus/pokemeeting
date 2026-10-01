@@ -22,7 +22,7 @@ import { spawn } from 'node:child_process';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
@@ -158,30 +158,93 @@ const unpack = (body: Buffer): { request: RandomizeRequest; rom: Buffer } => {
 const gameCodeOf = (rom: Buffer): string =>
   rom.length > 0xb0 ? rom.subarray(0xac, 0xb0).toString('ascii') : '';
 
+/**
+ * Donde esta el ejecutable de Java.
+ *
+ * Normalmente basta con "java", porque esta en el PATH. Pero el PATH depende de
+ * desde donde se arranque el servicio: una terminal distinta, un servicio del
+ * sistema o un editor pueden traer otro, y entonces el randomizer decia que no
+ * habia Java estando instalado.
+ *
+ * Asi que si no esta en el PATH se busca donde suele estar. Se resuelve una
+ * vez y se reutiliza, porque de aqui sale tambien jjs.
+ */
+let javaCache: string | undefined;
+
+const candidatosDeJava = (): string[] => {
+  const rutas: string[] = [];
+  const home = process.env['JAVA_HOME'];
+  if (home) rutas.push(join(home, 'bin', 'java'));
+
+  // Windows: cada version se instala en su carpeta y no siempre toca el PATH.
+  for (const base of ['C:/Program Files/Java', 'C:/Program Files (x86)/Java']) {
+    try {
+      for (const version of readdirSync(base)) {
+        rutas.push(join(base, version, 'bin', 'java.exe'));
+      }
+    } catch {
+      // Esa carpeta no existe en este sistema; se prueba la siguiente.
+    }
+  }
+
+  // Linux y Mac, por si algun dia corre ahi.
+  for (const base of ['/usr/lib/jvm', '/Library/Java/JavaVirtualMachines']) {
+    try {
+      for (const version of readdirSync(base)) {
+        rutas.push(join(base, version, 'bin', 'java'));
+        rutas.push(join(base, version, 'Contents', 'Home', 'bin', 'java'));
+      }
+    } catch {
+      // Igual que arriba.
+    }
+  }
+
+  return rutas;
+};
+
+/** Prueba un ejecutable concreto preguntandole su version. */
+const responde = (ejecutable: string): Promise<string | null> =>
+  new Promise((listo) => {
+    const comando = ejecutable.includes(' ') ? `"${ejecutable}"` : ejecutable;
+    const child = spawn(comando, ['-version'], { shell: true });
+    let salida = '';
+    child.stderr.on('data', (chunk: Buffer) => (salida += chunk.toString()));
+    child.on('error', () => listo(null));
+    child.on('close', () => listo(/version "([^"]+)"/.test(salida) ? salida : null));
+  });
+
+const buscarJava = async (): Promise<string | null> => {
+  if (javaCache !== undefined) return javaCache === '' ? null : javaCache;
+
+  for (const candidato of ['java', ...candidatosDeJava()]) {
+    if (candidato !== 'java' && !existsSync(candidato)) continue;
+    if (await responde(candidato)) {
+      javaCache = candidato;
+      if (candidato !== 'java') {
+        console.log(`java no estaba en el PATH; se usara ${candidato}`);
+      }
+      return candidato;
+    }
+  }
+
+  javaCache = '';
+  return null;
+};
+
 type JavaInfo = { available: boolean; version: string | null; bits64: boolean };
 
 /** Pregunta a Java su version. Lo usa /health para poder avisar antes de fallar. */
-const probeJava = (): Promise<JavaInfo> =>
-  new Promise((resolveProbe) => {
-    const child = spawn('java', ['-version'], { shell: true });
-    let output = '';
-    // java -version escribe en stderr, no en stdout.
-    child.stderr.on('data', (chunk: Buffer) => (output += chunk.toString()));
-    child.on('error', () => resolveProbe({ available: false, version: null, bits64: false }));
-    child.on('close', (code) => {
-      if (code !== 0 && !output) {
-        resolveProbe({ available: false, version: null, bits64: false });
-        return;
-      }
-      const version = /version "([^"]+)"/.exec(output)?.[1] ?? null;
-      resolveProbe({
-        available: true,
-        version,
-        // El randomizer no arranca con Java de 32 bits, asi que conviene mirarlo.
-        bits64: /64-Bit/i.test(output),
-      });
-    });
-  });
+const probeJava = async (): Promise<JavaInfo> => {
+  const ejecutable = await buscarJava();
+  if (!ejecutable) return { available: false, version: null, bits64: false };
+
+  const salida = (await responde(ejecutable)) ?? '';
+  return {
+    available: true,
+    version: /version "([^"]+)"/.exec(salida)?.[1] ?? null,
+    bits64: /64-Bit/i.test(salida),
+  };
+};
 
 /**
  * Ruta de jjs, el motor de scripts que trae la JRE de Java 8.
@@ -196,13 +259,20 @@ const probeJava = (): Promise<JavaInfo> =>
  */
 let jjsCache: string | null | undefined;
 
-const findJjs = (): Promise<string | null> =>
-  new Promise((resolveJjs) => {
-    if (jjsCache !== undefined) {
-      resolveJjs(jjsCache);
-      return;
-    }
-    const child = spawn('java', ['-XshowSettings:properties', '-version'], { shell: true });
+const findJjs = async (): Promise<string | null> => {
+  if (jjsCache !== undefined) return jjsCache;
+
+  // jjs vive junto al Java que se este usando, que no tiene por que ser el del
+  // PATH: puede haberlo encontrado buscarJava en otro sitio.
+  const java = await buscarJava();
+  if (!java) {
+    jjsCache = null;
+    return null;
+  }
+
+  return new Promise((resolveJjs) => {
+    const comando = java.includes(' ') ? `"${java}"` : java;
+    const child = spawn(comando, ['-XshowSettings:properties', '-version'], { shell: true });
     let output = '';
     child.stderr.on('data', (chunk: Buffer) => (output += chunk.toString()));
     child.on('error', () => {
@@ -218,6 +288,7 @@ const findJjs = (): Promise<string | null> =>
       resolveJjs(jjsCache);
     });
   });
+};
 
 type JavaRun = { code: number | null; stdout: string; stderr: string; timedOut: boolean };
 
@@ -506,7 +577,8 @@ const handleRandomize = async (req: IncomingMessage, res: ServerResponse): Promi
       ]);
       ajustesUsados = /^AJUSTES:(.+)$/m.exec(execution.stdout)?.[1]?.trim() ?? null;
     } else {
-      execution = await run('java', [
+      // Sin jjs tampoco hay busqueda previa que valga: se usa lo que haya.
+      execution = await run((await buscarJava()) ?? 'java', [
         '-Xmx4096M',
         '-jar',
         `"${jar}"`,

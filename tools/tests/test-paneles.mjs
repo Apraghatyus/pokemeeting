@@ -76,6 +76,26 @@ if (aparecio) {
   check('su nivel', /Nv\.6/.test(texto), texto);
   check('y el nombre de la especie, sacado de la ROM', /BULBASAUR/i.test(texto), texto);
 
+  // El sprite se pide a PokeAPI por su numero de Pokedex nacional, que sale de
+  // una tabla de la propia ROM: la conversion no es una resta.
+  const sprite = await page.locator('.equipo--propio .ficha__sprite--imagen').first();
+  const src = (await sprite.getAttribute('src').catch(() => null)) ?? '';
+  check('la ficha pide el sprite de la especie', /\/1\.png$/.test(src), src.slice(-60));
+  // Hay que esperarla: la imagen va con carga diferida y mirarla nada mas
+  // aparecer la ficha dice que no ha cargado cuando solo es que no ha llegado.
+  const cargo = await sprite
+    .evaluate(
+      (img) =>
+        new Promise((listo) => {
+          if (img.complete) return listo(img.naturalWidth > 0);
+          img.addEventListener('load', () => listo(img.naturalWidth > 0));
+          img.addEventListener('error', () => listo(false));
+          setTimeout(() => listo(img.naturalWidth > 0), 10_000);
+        }),
+    )
+    .catch(() => false);
+  check('y la imagen llega, que con aislamiento cross-origin no es obvio', cargo === true);
+
   // Fuera de combate y sano: ni iluminado ni con estado alterado.
   check('un Pokemon sano no lleva etiqueta de estado',
     (await page.locator('.equipo--propio .estado').count()) === 0);
