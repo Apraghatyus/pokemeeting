@@ -44,8 +44,11 @@ check('trae al menos un Pokemon', primero !== undefined);
 check('con su mote', typeof primero.mote === 'string' && primero.mote.length > 0, `"${primero.mote}"`);
 check('su especie como numero, no como nombre', Number.isInteger(primero.especie), String(primero.especie));
 check('su nivel', primero.nivel > 0 && primero.nivel <= 100, String(primero.nivel));
-check('y sus PS', primero.psMaximos > 0 && primero.ps <= primero.psMaximos,
-  `${primero.ps}/${primero.psMaximos}`);
+// La vida exacta no viaja: cambiaria en cada turno de combate. Solo si cayo.
+check('no manda la vida, que cambia a cada turno',
+  primero.ps === undefined && primero.psMaximos === undefined);
+check('pero si dice como esta: debilitado, envenenado, dormido...',
+  primero.estado === null || typeof primero.estado === 'string', String(primero.estado));
 check('no es un huevo', primero.huevo === false);
 check('y lleva su personalidad, que es lo que no cambia nunca',
   primero.personalidad > 0, `0x${primero.personalidad.toString(16).toUpperCase()}`);
@@ -59,11 +62,11 @@ check('y en una direccion donde no hay equipo, nada',
 
 // --- comparar dos lecturas ---
 check('dos lecturas iguales se reconocen como iguales', pk.mismoEquipo(resumen, { ...resumen }));
-const herido = {
+const caido = {
   ...resumen,
-  ranuras: resumen.ranuras.map((r, i) => (i === 0 ? { ...r, ps: r.ps - 1 } : r)),
+  ranuras: resumen.ranuras.map((r, i) => (i === 0 ? { ...r, estado: 'debilitado' } : r)),
 };
-check('y un Pokemon con un PS menos ya no', !pk.mismoEquipo(resumen, herido));
+check('y uno que acaba de caer ya no', !pk.mismoEquipo(resumen, caido));
 
 // --- lo que viaja por el cable ---
 const paquete = JSON.stringify({ type: 'equipo', equipo: resumen });

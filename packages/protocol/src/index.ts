@@ -59,6 +59,20 @@ export const isValidRoomCode = (code: string): boolean =>
  * edicion conservan la misma tabla de nombres, asi que la especie 25 se llama
  * PIKACHU en las dos aunque sus estadisticas sean otras.
  */
+/**
+ * Lo que le pasa a un Pokemon, si le pasa algo.
+ *
+ * Son los estados de siempre del juego. Van en este orden de gravedad porque
+ * solo se enseña uno: estar debilitado tapa todo lo demas.
+ */
+export type EstadoPokemon =
+  | 'debilitado'
+  | 'dormido'
+  | 'congelado'
+  | 'paralizado'
+  | 'quemado'
+  | 'envenenado';
+
 export type PokemonResumen = {
   /** Posicion en el equipo, de 0 a 5. */
   ranura: number;
@@ -67,8 +81,15 @@ export type PokemonResumen = {
   /** El mote, que lo escribio el jugador y no es de nadie mas. */
   mote: string;
   nivel: number;
-  ps: number;
-  psMaximos: number;
+  /**
+   * Como esta: debilitado, envenenado, dormido... o null si esta bien.
+   *
+   * La vida exacta no viaja a proposito: cambia en cada turno de combate y
+   * llenaria el canal de mensajes para enseñar una barra que se mueve sola.
+   * El estado alterado cambia pocas veces y dice mas de un vistazo, sobre todo
+   * en un Soul Link, donde un debilitado suele ser el final de una pareja.
+   */
+  estado: EstadoPokemon | null;
   /** Un huevo no enseña especie ni nivel, y conviene saberlo antes de pintarlo. */
   huevo: boolean;
   /**

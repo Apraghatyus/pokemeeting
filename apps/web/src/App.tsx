@@ -4,6 +4,9 @@ import { DEFAULT_KEY_BINDINGS } from './core/mgbaCore';
 import { useEmulator } from './core/useEmulator';
 import { useKeyboardOwnership } from './core/useKeyboardOwnership';
 import { useSession } from './net/useSession';
+import { useEquipo } from './core/useEquipo';
+import { useNombresEspecie } from './core/useNombresEspecie';
+import { EquipoPanel } from './ui/EquipoPanel';
 import { RandomizerModal } from './ui/RandomizerModal';
 import { RomDropZone, RoomDropZoneHint } from './ui/RomDropZone';
 import { RomInfoCard } from './ui/RomInfoCard';
@@ -18,6 +21,10 @@ export const App = () => {
   const emulator = useEmulator();
   const { state } = emulator;
   const hasRom = state.header !== null && state.platform !== null;
+
+  // Los nombres de especie salen de TU ROM, y sirven tanto para tu equipo como
+  // para el de tu companero: por la red viaja el numero, no el nombre.
+  const nombreEspecie = useNombresEspecie(emulator.romBytesRef, state.romName);
 
   const [roomOpen, setRoomOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -62,6 +69,15 @@ export const App = () => {
 
   const session = useSession(emulator.canvasRef, romRef);
 
+  // Tu equipo se lee de la partida cada pocos segundos y, cuando cambia, se le
+  // manda al companero. Si no hay sala, enviarEquipo no hace nada.
+  const miEquipo = useEquipo(
+    emulator.coreRef,
+    state.status === 'running',
+    state.romName,
+    session.enviarEquipo,
+  );
+
   return (
     <div className="app">
       <TopBar
@@ -77,6 +93,22 @@ export const App = () => {
       />
 
       <main className="app__main">
+        <div className="mesa">
+          <EquipoPanel
+            titulo="Tu equipo"
+            lado="propio"
+            equipo={miEquipo.equipo}
+            nombreEspecie={nombreEspecie}
+            motivo={
+              !hasRom
+                ? 'Carga una ROM para ver tu equipo.'
+                : miEquipo.disponible
+                  ? 'Todavia sin Pokemon.'
+                  : 'De este juego aun no se sabe leer el equipo.'
+            }
+          />
+
+          <div className="mesa__centro">
         <Stage
           canvasRef={emulator.canvasRef}
           remoteStream={session.state.remoteStream}
@@ -90,6 +122,24 @@ export const App = () => {
             />
           }
         />
+          </div>
+
+          <EquipoPanel
+            titulo={
+              session.state.phase === 'conectada'
+                ? 'Equipo de tu companero'
+                : 'Equipo del companero'
+            }
+            lado="companero"
+            equipo={session.state.equipoCompanero}
+            nombreEspecie={nombreEspecie}
+            motivo={
+              session.state.phase === 'conectada'
+                ? 'Todavia no ha mandado su equipo.'
+                : 'Cuando alguien entre en tu sala, su equipo aparece aqui.'
+            }
+          />
+        </div>
 
         <VoiceBar
           voice={session.state.voice}

@@ -10,10 +10,12 @@
 // aleatorizadas de la misma edicion conservan la misma tabla de nombres: la
 // especie 25 se llama PIKACHU en las dos, aunque una la haya hecho de Fuego.
 
-import type { EquipoResumen, PokemonResumen } from '@emupoke/protocol';
+import type { EquipoResumen, EstadoPokemon, PokemonResumen } from '@emupoke/protocol';
 import { leerPokemon, pareceValido, TAMANO_EN_EQUIPO, TAMANO_EQUIPO } from './gen3';
 import { localizarEquipo, type Equipo } from './equipo';
 import { desplazamientoDe, leerCabecera } from './savestate';
+import { parseGameCode } from './games';
+import { lectorPara, registrarLector } from './lectores';
 import { leerTexto } from './texto';
 
 const u16 = (b: Uint8Array, i: number): number => b[i]! | (b[i + 1]! << 8);
@@ -22,6 +24,28 @@ const u16 = (b: Uint8Array, i: number): number => b[i]! | (b[i + 1]! << 8);
 const PS_ACTUALES = 0x56;
 const PS_MAXIMOS = 0x58;
 
+/**
+ * El estado alterado, en una palabra de cuatro bytes.
+ *
+ * Los bits de abajo cuentan los turnos que le quedan de sueño, asi que
+ * cualquiera de ellos encendido significa dormido. Los de arriba son una
+ * bandera cada uno. Se mira en orden de gravedad porque solo se enseña uno.
+ */
+const leerEstado = (bloque: Uint8Array): EstadoPokemon | null => {
+  const psMaximos = u16(bloque, PS_MAXIMOS);
+  if (psMaximos > 0 && u16(bloque, PS_ACTUALES) === 0) return 'debilitado';
+
+  const banderas = bloque[0x50] ?? 0;
+  if ((banderas & 0x07) !== 0) return 'dormido';
+  if ((banderas & 0x20) !== 0) return 'congelado';
+  if ((banderas & 0x40) !== 0) return 'paralizado';
+  if ((banderas & 0x10) !== 0) return 'quemado';
+  // El veneno normal y el grave se enseñan igual: lo que importa es que esta
+  // envenenado, y el detalle ya lo ve en su juego.
+  if ((banderas & 0x88) !== 0) return 'envenenado';
+  return null;
+};
+
 const resumirBloque = (bloque: Uint8Array, ranura: number): PokemonResumen => {
   const p = leerPokemon(bloque);
   return {
@@ -29,8 +53,7 @@ const resumirBloque = (bloque: Uint8Array, ranura: number): PokemonResumen => {
     especie: p.especie,
     mote: leerTexto(p.moteBruto),
     nivel: p.nivel,
-    ps: u16(bloque, PS_ACTUALES),
-    psMaximos: u16(bloque, PS_MAXIMOS),
+    estado: leerEstado(bloque),
     huevo: p.esHuevo,
     personalidad: p.personalidad,
   };
@@ -43,7 +66,7 @@ const resumirBloque = (bloque: Uint8Array, ranura: number): PokemonResumen => {
  * entera comprobando checksums, y esto se llama cada pocos segundos mientras
  * se juega. Con la direccion en la mano, las siguientes lecturas van directas.
  */
-export const resumirEquipo = (
+const resumirGen3 = (
   estado: Uint8Array,
 ): { resumen: EquipoResumen; equipo: Equipo } | null => {
   const equipo = localizarEquipo(estado);
@@ -69,7 +92,7 @@ export const resumirEquipo = (
  * error: entre dos lecturas el jugador puede haber reiniciado o cargado otra
  * partida, y entonces toca volver a buscarlo.
  */
-export const releerEquipo = (
+const releerGen3 = (
   estado: Uint8Array,
   direccion: number,
   codigoJuego: string,
@@ -88,8 +111,58 @@ export const releerEquipo = (
   }
 
   if (ranuras.length === 0) return null;
+
   return { juego: codigoJuego, momento: Date.now(), ranuras };
 };
+
+/**
+ * El lector de tercera generacion, registrado para que lo encuentren los de
+ * arriba sin saber que generacion es.
+ *
+ * Reconoce una partida por su forma: un estado de mGBA del tamano que sabemos
+ * interpretar, de un juego que el catalogo dice que es de tercera. Un estado de
+ * Game Boy Color no pasa por aqui, y cuando exista su lector no habra que
+ * tocar nada de esto.
+ */
+registrarLector({
+  nombre: 'tercera generacion',
+  generacion: 3,
+  sirve: (estado) => {
+    try {
+      return parseGameCode(leerCabecera(estado).codigoJuego).game?.generacion === 3;
+    } catch {
+      // leerCabecera se queja si el estado no tiene el tamano esperado, que es
+      // justo lo que pasa con el de otra consola.
+      return false;
+    }
+  },
+  resumir: resumirGen3,
+  releer: releerGen3,
+});
+
+/**
+ * Lee el equipo de una partida, sea del juego que sea.
+ *
+ * Devuelve tambien donde lo encontro: localizarlo cuesta recorrer la memoria
+ * entera comprobando checksums, y esto se llama cada pocos segundos mientras
+ * se juega. Con la direccion en la mano, las siguientes lecturas van directas.
+ */
+export const resumirEquipo = (
+  estado: Uint8Array,
+): { resumen: EquipoResumen; equipo: Equipo } | null => lectorPara(estado)?.resumir(estado) ?? null;
+
+/**
+ * Relee el equipo en una direccion que ya conocemos.
+ *
+ * Es la version barata, para repetirla mientras se juega: en vez de barrer
+ * trescientos kilobytes de memoria, mira seis bloques.
+ */
+export const releerEquipo = (
+  estado: Uint8Array,
+  direccion: number,
+  codigoJuego: string,
+): EquipoResumen | null =>
+  lectorPara(estado)?.releer(estado, direccion, codigoJuego) ?? null;
 
 /**
  * Si dos lecturas del equipo dicen lo mismo.
@@ -107,8 +180,7 @@ export const mismoEquipo = (a: EquipoResumen | null, b: EquipoResumen | null): b
       uno.personalidad === otro.personalidad &&
       uno.especie === otro.especie &&
       uno.nivel === otro.nivel &&
-      uno.ps === otro.ps &&
-      uno.psMaximos === otro.psMaximos &&
+      uno.estado === otro.estado &&
       uno.mote === otro.mote &&
       uno.huevo === otro.huevo
     );

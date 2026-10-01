@@ -5,12 +5,17 @@
   --border: #26313d;
   --text: #e8eef5;
   --muted: #8b9aab;
-  --accent: #19c9d4;
-  --accent-ink: #052326;
-  --accent-dim: #10606a;
+  /* Paleta tomada del juego: el rojo y el blanco de una Poke Ball, y el azul
+     y el amarillo del logotipo de siempre. El amarillo manda porque sobre
+     fondo oscuro es lo que mejor se lee, y el rojo queda para lo que avisa. */
+  --accent: #ffcb05;
+  --accent-ink: #2a2a2a;
+  --accent-dim: #8a6f05;
+  --rojo: #ee1515;
+  --azul: #3b4cca;
   --ok: #4ecb8b;
   --wait: #d6a84a;
-  --danger: #e4574a;
+  --danger: #ee1515;
   color-scheme: dark;
 }
 
@@ -224,8 +229,13 @@ body {
 
 .slot--pip {
   z-index: 2;
+  /* La esquina la elige quien juega arrastrandola; estas son las de partida,
+     y las sobrescriben las reglas .slot--arriba-izq y companía. */
   right: 18px;
   bottom: 18px;
+  /* Que se vea que se puede coger. */
+  cursor: grab;
+  touch-action: none;
   width: 32%;
   min-width: 190px;
   max-width: 360px;
@@ -1356,4 +1366,245 @@ details.partidas[open] > summary::before {
 .partida__abrir:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* --- La mesa: tu equipo, la pantalla y el equipo del companero --- */
+
+.mesa {
+  display: grid;
+  grid-template-columns: var(--columna-equipo) minmax(0, 1fr) var(--columna-equipo);
+  gap: 14px;
+  align-items: stretch;
+}
+
+:root {
+  --columna-equipo: 210px;
+}
+
+.mesa__centro {
+  min-width: 0;
+}
+
+.equipo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+/* Las dos columnas se anclan a esquinas opuestas. Con el equipo a medias, los
+   huecos quedan hacia el centro y cada lista se lee hacia su borde. */
+.equipo--companero {
+  justify-content: flex-end;
+}
+
+.equipo__titulo {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.equipo--companero .equipo__titulo {
+  text-align: right;
+}
+
+/* La columna del companero crece de abajo hacia arriba: su primer Pokemon va
+   pegado a la esquina de abajo y los siguientes suben. Con el equipo a medias,
+   los huecos quedan arriba, hacia el centro de la pantalla. */
+.equipo--companero .equipo__lista {
+  flex-direction: column-reverse;
+  justify-content: flex-end;
+}
+
+.equipo__lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.equipo__vacio {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* --- Cada Pokemon --- */
+
+.ficha {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  /* El borde izquierdo es el que se enciende al estar en combate, asi que se
+     reserva el hueco desde el principio y la ficha no da un salto al activarse. */
+  border-left-width: 3px;
+  border-radius: 12px;
+}
+
+.ficha__sprite {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff;
+  background: hsl(var(--tono) 55% 32%);
+  border: 2px solid hsl(var(--tono) 60% 55%);
+}
+
+.ficha__datos {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ficha__nombre {
+  font-size: 13px;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ficha__linea {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ficha__nivel {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* El Pokemon que esta combatiendo. El estilo ya esta; falta saber cual es. */
+.ficha--activo {
+  border-color: var(--accent);
+  border-left-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset, 0 0 14px -4px var(--accent);
+}
+
+/* Un debilitado se apaga entero: en un Soul Link suele ser el final de una
+   pareja, y eso tiene que verse sin leer. */
+.ficha--debilitado {
+  opacity: 0.55;
+  border-left-color: var(--rojo);
+}
+
+.ficha--dormido { border-left-color: #8a7fd4; }
+.ficha--congelado { border-left-color: #76c7e0; }
+.ficha--paralizado { border-left-color: #d9b32a; }
+.ficha--quemado { border-left-color: #e07a3c; }
+.ficha--envenenado { border-left-color: #a861c4; }
+
+.estado {
+  flex: none;
+  padding: 1px 5px;
+  border-radius: 5px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #1a1a1a;
+  background: var(--muted);
+}
+
+.estado--debilitado { background: var(--rojo); color: #fff; }
+.estado--dormido { background: #8a7fd4; }
+.estado--congelado { background: #76c7e0; }
+.estado--paralizado { background: #d9b32a; }
+.estado--quemado { background: #e07a3c; }
+.estado--envenenado { background: #a861c4; color: #fff; }
+
+/* En pantallas estrechas las columnas no caben a los lados: pasan debajo, la
+   tuya primero. */
+@media (max-width: 1100px) {
+  .mesa {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mesa__centro {
+    order: -1;
+  }
+
+  .equipo__lista {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .equipo__lista .ficha {
+    flex: 1 1 150px;
+  }
+
+  .equipo--companero .equipo__titulo {
+    text-align: left;
+  }
+}
+
+/* --- La ventana del companero se lleva a la esquina que uno quiera --- */
+
+/* Cada esquina fija dos lados y suelta los otros dos. Hace falta el "auto"
+   explicito: sin el, los 18px de la regla general seguirian aplicando y la
+   ventana se quedaria estirada entre dos esquinas. */
+.slot--pip.slot--arriba-izq { top: 18px; left: 18px; right: auto; bottom: auto; }
+.slot--pip.slot--arriba-der { top: 18px; right: 18px; left: auto; bottom: auto; }
+.slot--pip.slot--abajo-izq { bottom: 18px; left: 18px; right: auto; top: auto; }
+.slot--pip.slot--abajo-der { bottom: 18px; right: 18px; left: auto; top: auto; }
+
+.slot--pip.slot--arrastrando {
+  cursor: grabbing;
+  /* Mientras se arrastra va pegada al puntero, sin la transicion de sitio:
+     animar la posicion y seguir al raton a la vez se ve a tirones. */
+  transition: none;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.75);
+  opacity: 0.92;
+}
+
+/* Al soltarla, viaja a su esquina en vez de aparecer ahi de golpe. */
+.slot--pip:not(.slot--arrastrando) {
+  transition:
+    top 160ms ease,
+    right 160ms ease,
+    bottom 160ms ease,
+    left 160ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slot--pip:not(.slot--arrastrando) {
+    transition: none;
+  }
+}
+
+/* La etiqueta no se selecciona al arrastrar: en movil, mantener pulsado sobre
+   texto abre el menu de seleccion y se come el gesto. */
+.slot--pip .slot__label {
+  user-select: none;
+}
+
+/* Texto solo para quien usa un lector de pantalla: la especie de cada
+   Pokemon, que en la ficha se distingue por el color y las dos letras.
+   Faltaba esta clase y el nombre se veia en pantalla, pegado al nivel. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }

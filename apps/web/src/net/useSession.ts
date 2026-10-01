@@ -458,8 +458,20 @@ export const useSession = (
     setState(initialState);
   }, []);
 
+  /**
+   * Le manda al companero como va tu equipo.
+   *
+   * Si el canal no esta abierto no pasa nada: se pierde ese aviso y el
+   * siguiente cambio mandara el estado completo otra vez, que es lo que hay en
+   * ese momento. No hace falta cola ni reintentos para esto.
+   */
+  const enviarEquipo = useCallback((equipo: EquipoResumen) => {
+    peerRef.current?.send(JSON.stringify({ type: 'equipo', equipo }));
+  }, []);
+
   return {
     state,
+    enviarEquipo,
     createRoom,
     joinRoom,
     leave,
