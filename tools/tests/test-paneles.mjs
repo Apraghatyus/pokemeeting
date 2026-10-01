@@ -34,13 +34,18 @@ await page.waitForFunction(() => !document.querySelector('.dropzone button')?.di
   timeout: 30_000,
 });
 
-// --- antes de cargar nada, los dos paneles explican por que estan vacios ---
-const vacioPropio = ((await page.locator('.equipo--propio').textContent()) ?? '').replace(/\s+/g, ' ');
-check('sin ROM, tu panel dice que falta cargarla', /Carga una ROM/.test(vacioPropio), vacioPropio.slice(0, 70));
+// --- antes de cargar nada ---
+check('tu columna esta ahi desde el principio',
+  (await page.locator('.equipo--propio').count()) === 1);
+check('y vacia, sin fichas ni frases de relleno',
+  (await page.locator('.equipo--propio .ficha').count()) === 0 &&
+    (await page.locator('.equipo--propio .equipo__vacio').count()) === 0);
 
-const vacioCompanero = ((await page.locator('.equipo--companero').textContent()) ?? '').replace(/\s+/g, ' ');
-check('y el del companero, que no hay nadie en la sala',
-  /sala/.test(vacioCompanero), vacioCompanero.slice(0, 70));
+// Jugando solo esa columna no existe: su sitio se lo queda la partida.
+check('jugando solo no hay columna del companero',
+  (await page.locator('.equipo--companero').count()) === 0);
+check('y la mesa esta en modo de uno solo',
+  (await page.locator('.mesa--solo').count()) === 1);
 
 // --- se carga la ROM y la partida ---
 await page.setInputFiles('input[type=file][accept*=".gba"]', ROM);

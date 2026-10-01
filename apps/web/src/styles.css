@@ -38,6 +38,12 @@ body {
 }
 
 .app {
+  /* Columna de alto fijo para que el hueco de la partida sea medible: asi el
+     escenario puede ocupar todo lo que sobra en vez de restar un numero a ojo
+     al alto de la ventana, que era lo que lo dejaba pequeño. */
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
   min-height: 100vh;
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -189,17 +195,23 @@ body {
      lados mientras la partida se veia pequeña. Ahora ocupa lo que haya, con un
      tope para que en un monitor muy ancho no quede ridiculamente estirada. */
   max-width: 2200px;
+  width: 100%;
   margin: 0 auto;
   padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  /* Sin esto, un hijo que no cabe estira el contenedor en vez de encogerse. */
+  min-height: 0;
 }
 
 .stage {
   position: relative;
-  /* Lo mas ancha que quepa sin pasarse de alto. Antes era el 100% del hueco
-     con un tope de alto, y eso rompia la proporcion: la caja salia mas ancha
-     de la cuenta y el juego quedaba con franjas negras arriba y abajo dentro
-     de su propio marco. */
-  width: min(100%, calc((100vh - var(--cromo)) * var(--proporcion, 1.5)));
+  /* Lo mas ancha que quepa sin pasarse del alto disponible, medido de verdad.
+     Antes se restaba un numero fijo al alto de la ventana, y ese numero no
+     sabia de la barra de voz ni del mando tactil: sobraba hueco abajo y la
+     partida se veia mas pequeña de lo que podia. */
+  width: min(100%, calc(100cqh * var(--proporcion, 1.5)));
   aspect-ratio: var(--proporcion, 1.5);
   margin: 0 auto;
   background: #000;
@@ -312,6 +324,9 @@ body {
   right: 14px;
   width: 38px;
   height: 38px;
+  /* Por encima de las dos pantallas. Sin esto quedaba debajo del canvas, que
+     lleva z-index 1, y el boton estaba ahi sin que se viera. */
+  z-index: 3;
 }
 
 .slot--pip .stage__fullscreen {
@@ -1376,6 +1391,8 @@ details.partidas[open] > summary::before {
 /* --- La mesa: tu equipo, la pantalla y el equipo del companero --- */
 
 .mesa {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: var(--columna-equipo) minmax(0, 1fr) var(--columna-equipo);
   gap: 14px;
@@ -1383,7 +1400,7 @@ details.partidas[open] > summary::before {
 }
 
 :root {
-  --columna-equipo: 210px;
+  --columna-equipo: 230px;
   /* Lo que ocupa todo lo que no es la partida: barra de arriba, margenes y la
      barra de voz. De aqui sale cuanto alto le queda al escenario. */
   --cromo: 150px;
@@ -1391,6 +1408,12 @@ details.partidas[open] > summary::before {
 
 .mesa__centro {
   min-width: 0;
+  min-height: 0;
+  /* Convierte este hueco en una unidad de medida: desde dentro, 100cqh es
+     exactamente el alto que le queda a la partida. */
+  container-type: size;
+  display: grid;
+  place-items: center;
 }
 
 .equipo {
@@ -1434,6 +1457,12 @@ details.partidas[open] > summary::before {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  /* La columna mide lo que mide la partida, y los seis se reparten ese alto.
+     Con menos de seis se quedan juntos al principio, que para el equipo propio
+     es arriba y para el del companero abajo, cada uno hacia su esquina. */
+  flex: 1;
+  min-height: 0;
+  justify-content: space-between;
 }
 
 .equipo__vacio {
@@ -1449,21 +1478,28 @@ details.partidas[open] > summary::before {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 10px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  /* El borde izquierdo es el que se enciende al estar en combate, asi que se
-     reserva el hueco desde el principio y la ficha no da un salto al activarse. */
-  border-left-width: 3px;
-  border-radius: 12px;
+  padding: 6px 10px;
+  border-radius: 14px;
+  /* Sin bordes: con seis fichas en columna, seis recuadros marcados compiten
+     con la partida. Queda un fondo muy tenue que las separa sin dibujarlas. */
+  background: rgba(255, 255, 255, 0.035);
+  border: none;
+  /* La linea de color del estado se hace con una sombra interior en vez de un
+     borde, para que no cuente como caja ni mueva nada al aparecer. */
+  box-shadow: none;
+  transition: background 140ms ease;
+}
+
+.ficha:hover {
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .ficha__sprite {
   flex: none;
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   font-size: 12px;
   font-weight: 700;
@@ -1501,23 +1537,33 @@ details.partidas[open] > summary::before {
 
 /* El Pokemon que esta combatiendo. El estilo ya esta; falta saber cual es. */
 .ficha--activo {
-  border-color: var(--accent);
-  border-left-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent) inset, 0 0 14px -4px var(--accent);
+  background: rgba(255, 203, 5, 0.1);
+  box-shadow:
+    inset 0 0 0 1px var(--accent),
+    0 0 16px -4px var(--accent);
 }
 
 /* Un debilitado se apaga entero: en un Soul Link suele ser el final de una
    pareja, y eso tiene que verse sin leer. */
 .ficha--debilitado {
-  opacity: 0.55;
-  border-left-color: var(--rojo);
+  opacity: 0.5;
 }
 
-.ficha--dormido { border-left-color: #8a7fd4; }
-.ficha--congelado { border-left-color: #76c7e0; }
-.ficha--paralizado { border-left-color: #d9b32a; }
-.ficha--quemado { border-left-color: #e07a3c; }
-.ficha--envenenado { border-left-color: #a861c4; }
+.ficha--debilitado,
+.ficha--dormido,
+.ficha--congelado,
+.ficha--paralizado,
+.ficha--quemado,
+.ficha--envenenado {
+  box-shadow: inset 3px 0 0 0 var(--color-estado);
+}
+
+.ficha--debilitado { --color-estado: var(--rojo); }
+.ficha--dormido { --color-estado: #8a7fd4; }
+.ficha--congelado { --color-estado: #76c7e0; }
+.ficha--paralizado { --color-estado: #d9b32a; }
+.ficha--quemado { --color-estado: #e07a3c; }
+.ficha--envenenado { --color-estado: #a861c4; }
 
 .estado {
   flex: none;
@@ -1624,14 +1670,23 @@ details.partidas[open] > summary::before {
   background: none;
   border: none;
   /* Son dibujos de pocos pixeles: al agrandarlos hay que dejar los bordes
-     duros, o el navegador los difumina y parecen manchas. */
+     duros, o el navegador los difumina y parecen manchas. Los de tercera
+     generacion vienen a 64, asi que a este tamaño se ven exactos. */
   image-rendering: pixelated;
   object-fit: contain;
-  width: 44px;
-  height: 44px;
+  width: 64px;
+  height: 64px;
+  /* Una sombra bajo el sprite lo despega del fondo ahora que no hay borde. */
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
 }
 
 /* Un debilitado se ve apagado tambien en el sprite. */
 .ficha--debilitado .ficha__sprite--imagen {
   filter: grayscale(1);
+}
+
+/* Jugando solo no hay equipo del companero que enseñar, asi que esa columna no
+   ocupa: la partida se queda su sitio y se ve mas grande. */
+.mesa--solo {
+  grid-template-columns: var(--columna-equipo) minmax(0, 1fr);
 }

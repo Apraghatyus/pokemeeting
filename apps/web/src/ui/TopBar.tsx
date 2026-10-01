@@ -16,12 +16,19 @@ type Props = {
   volumeDisabled: boolean;
 };
 
-const STATUS: Record<SessionState['phase'], { text: string; dot: string }> = {
-  'sin-sala': { text: 'Sin conexion', dot: '' },
-  'esperando-companero': { text: 'Esperando', dot: 'wait' },
-  conectando: { text: 'Conectando', dot: 'busy' },
-  conectada: { text: 'Conectados', dot: 'on' },
-  perdida: { text: 'Conexion perdida', dot: 'off' },
+/**
+ * El estado de la conexion, reducido a un punto de color.
+ *
+ * El texto se quito de la barra para dejarla limpia, pero un punto de color no
+ * dice nada a quien no lo ve ni a quien no sabe que significa cada color: la
+ * frase sigue existiendo como titulo y como etiqueta accesible.
+ */
+const STATUS: Record<SessionState['phase'], { dot: string; texto: string }> = {
+  'sin-sala': { dot: '', texto: 'Sin conexion' },
+  'esperando-companero': { dot: 'wait', texto: 'Esperando a tu companero' },
+  conectando: { dot: 'busy', texto: 'Conectando' },
+  conectada: { dot: 'on', texto: 'Conectados' },
+  perdida: { dot: 'off', texto: 'Conexion perdida' },
 };
 
 export const TopBar = ({
@@ -38,7 +45,7 @@ export const TopBar = ({
   // Reconectando es un estado distinto de "caido": el jugador necesita saber
   // que se esta intentando solo, para no dar la partida por perdida.
   const status = session.reconnect.trying
-    ? { text: 'Reconectando', dot: 'busy' }
+    ? { texto: 'Reconectando', dot: 'busy' }
     : STATUS[session.phase];
 
   return (
@@ -78,9 +85,8 @@ export const TopBar = ({
         {/* Solo se menciona el teclado cuando deja de ser del juego: si no,
             es ruido permanente en la barra. */}
         {keyboardOwner === 'interfaz' && <span className="chip chip--interfaz">Escribiendo</span>}
-        <span className="status">
+        <span className="status" title={status.texto} aria-label={status.texto} role="status">
           <span className={`dot${status.dot ? ` dot--${status.dot}` : ''}`} />
-          {status.text}
         </span>
         <button
           type="button"

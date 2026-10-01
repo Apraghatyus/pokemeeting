@@ -70,6 +70,11 @@ export const App = () => {
 
   const session = useSession(emulator.canvasRef, romRef);
 
+  // Con companero la pantalla comparte sitio con su equipo; sin el, se lo
+  // queda. Se mira la conexion y no si ha mandado equipo, para que la columna
+  // aparezca en cuanto entra y no de un salto cuando llegue su primer aviso.
+  const conCompanero = session.state.phase === 'conectada';
+
   // Tu equipo se lee de la partida cada pocos segundos y, cuando cambia, se le
   // manda al companero. Si no hay sala, enviarEquipo no hace nada.
   const miEquipo = useEquipo(
@@ -94,19 +99,12 @@ export const App = () => {
       />
 
       <main className="app__main">
-        <div className="mesa">
+        <div className={`mesa${conCompanero ? '' : ' mesa--solo'}`}>
           <EquipoPanel
             titulo="Tu equipo"
             lado="propio"
             equipo={miEquipo.equipo}
             especies={especies}
-            motivo={
-              !hasRom
-                ? 'Carga una ROM para ver tu equipo.'
-                : miEquipo.disponible
-                  ? 'Todavia sin Pokemon.'
-                  : 'De este juego aun no se sabe leer el equipo.'
-            }
           />
 
           <div className="mesa__centro">
@@ -130,21 +128,18 @@ export const App = () => {
         />
           </div>
 
-          <EquipoPanel
-            titulo={
-              session.state.phase === 'conectada'
-                ? 'Equipo de tu companero'
-                : 'Equipo del companero'
-            }
-            lado="companero"
-            equipo={session.state.equipoCompanero}
-            especies={especies}
-            motivo={
-              session.state.phase === 'conectada'
-                ? 'Todavia no ha mandado su equipo.'
-                : 'Cuando alguien entre en tu sala, su equipo aparece aqui.'
-            }
-          />
+          {/* Jugando solo, esta columna no existe y la partida se lleva su
+              sitio. Vuelve en cuanto alguien entra en la sala, aunque todavia
+              no haya mandado su equipo. */}
+          {conCompanero && (
+            <EquipoPanel
+              titulo="Equipo de tu companero"
+              lado="companero"
+              equipo={session.state.equipoCompanero}
+              especies={especies}
+              motivo="Todavia no ha mandado su equipo."
+            />
+          )}
         </div>
 
         <VoiceBar

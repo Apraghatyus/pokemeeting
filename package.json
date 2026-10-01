@@ -45,6 +45,7 @@
     "test:estadisticas": "npx tsx tools/tests/test-estadisticas.mjs",
     "test:inyeccion": "node tools/tests/probar-inyeccion.mjs",
     "test:intercambio": "node tools/tests/probar-intercambio.mjs",
+    "memoria:llenar": "npx tsx tools/memoria/llenar-equipo.mjs",
     "memoria:intercambiar": "npx tsx tools/memoria/intercambiar.mjs"
   },
   "engines": {

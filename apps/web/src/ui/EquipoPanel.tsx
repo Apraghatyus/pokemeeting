@@ -38,7 +38,12 @@ type Props = {
    * para que el dia que llegue sea pasar este numero.
    */
   activo?: number | null;
-  /** Por que no hay nada que enseñar, si es el caso. */
+  /**
+   * Por que no hay nada que enseñar.
+   *
+   * Sin esto la columna vacia no dice nada, que es lo que se quiere mientras
+   * no hay partida: una frase de relleno en cada hueco ensucia la pantalla.
+   */
   motivo?: string;
 };
 
@@ -222,7 +227,7 @@ export const EquipoPanel = ({
       <h2 className="equipo__titulo">{titulo}</h2>
 
       {ranuras.length === 0 ? (
-        <p className="equipo__vacio">{motivo ?? 'Todavia sin Pokemon.'}</p>
+        motivo ? <p className="equipo__vacio">{motivo}</p> : null
       ) : (
         <ul className="equipo__lista">
           {ranuras.map((pokemon) => (
