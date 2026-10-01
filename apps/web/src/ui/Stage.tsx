@@ -21,6 +21,123 @@ type Props = {
 };
 
 /**
+ * Si la pantalla es de las estrechas, las de movil.
+ *
+ * Se mira el mismo ancho con el que el estilo reordena la pagina, para que las
+ * dos cosas no puedan discrepar. Ahi la ventana del companero no se arrastra:
+ * el gesto compite con el desplazamiento de la pagina, y ademas en una pantalla
+ * de ese tamano las cuatro esquinas quedan casi en el mismo sitio.
+ */
+const ESTRECHA = '(max-width: 1100px)';
+
+const useEsEstrecha = (): boolean => {
+  const [estrecha, setEstrecha] = useState(
+    () => globalThis.matchMedia?.(ESTRECHA).matches ?? false,
+  );
+
+  useEffect(() => {
+    const consulta = globalThis.matchMedia?.(ESTRECHA);
+    if (!consulta) return;
+    const alCambiar = () => setEstrecha(consulta.matches);
+    consulta.addEventListener('change', alCambiar);
+    return () => consulta.removeEventListener('change', alCambiar);
+  }, []);
+
+  return estrecha;
+};
+
+/**
+ * Permite llevar la ventana del companero a la esquina que uno quiera.
+ *
+ * Mientras se arrastra sigue al dedo o al raton; al soltar se queda en la
+ * esquina mas cercana a donde estaba. Se eligio asi, y no dejarla donde se
+ * suelte, porque pegada a una esquina nunca tapa el centro de la partida, que
+ * es donde se juega.
+ *
+ * La esquina se recuerda en este navegador: quien la quiere arriba a la
+ * izquierda la quiere siempre.
+ */
+type Esquina = 'arriba-izq' | 'arriba-der' | 'abajo-izq' | 'abajo-der';
+
+const CLAVE_ESQUINA = 'emupoke.esquina-companero';
+
+const esEsquina = (valor: unknown): valor is Esquina =>
+  valor === 'arriba-izq' || valor === 'arriba-der' || valor === 'abajo-izq' || valor === 'abajo-der';
+
+const esquinaGuardada = (): Esquina => {
+  try {
+    const guardada = globalThis.localStorage?.getItem(CLAVE_ESQUINA);
+    return esEsquina(guardada) ? guardada : 'abajo-der';
+  } catch {
+    // Sin almacenamiento se empieza siempre en la de abajo a la derecha.
+    return 'abajo-der';
+  }
+};
+
+/** Cuanto hay que mover el dedo para que cuente como arrastrar y no como clic. */
+const UMBRAL = 6;
+
+const useArrastre = (marcoRef: { current: HTMLDivElement | null }) => {
+  const [esquina, setEsquina] = useState<Esquina>(esquinaGuardada);
+  const [desplazamiento, setDesplazamiento] = useState({ x: 0, y: 0 });
+  const [arrastrando, setArrastrando] = useState(false);
+
+  const alPulsar = (evento: React.PointerEvent<HTMLElement>) => {
+    // Los botones de dentro -intercambiar pantallas- tienen que seguir
+    // funcionando: si el gesto empieza encima de uno, no se arrastra.
+    if ((evento.target as HTMLElement).closest('button')) return;
+
+    const ventana = evento.currentTarget;
+    const inicio = { x: evento.clientX, y: evento.clientY };
+    let movido = false;
+    ventana.setPointerCapture(evento.pointerId);
+
+    const alMover = (e: PointerEvent) => {
+      const dx = e.clientX - inicio.x;
+      const dy = e.clientY - inicio.y;
+      if (!movido && Math.hypot(dx, dy) < UMBRAL) return;
+      movido = true;
+      setArrastrando(true);
+      setDesplazamiento({ x: dx, y: dy });
+    };
+
+    const alSoltar = () => {
+      ventana.removeEventListener('pointermove', alMover);
+      ventana.removeEventListener('pointerup', alSoltar);
+      ventana.removeEventListener('pointercancel', alSoltar);
+      setArrastrando(false);
+      setDesplazamiento({ x: 0, y: 0 });
+      if (!movido) return;
+
+      // La esquina mas cercana al centro de la ventana al soltarla. Se mide
+      // contra la PARTIDA, no contra el hueco, porque es a ella a la que se
+      // agarra.
+      const marco = marcoRef.current?.getBoundingClientRect();
+      const caja = ventana.getBoundingClientRect();
+      if (!marco) return;
+
+      const centro = { x: caja.left + caja.width / 2, y: caja.top + caja.height / 2 };
+      const arriba = centro.y < marco.top + marco.height / 2;
+      const izquierda = centro.x < marco.left + marco.width / 2;
+      const elegida: Esquina = `${arriba ? 'arriba' : 'abajo'}-${izquierda ? 'izq' : 'der'}`;
+
+      setEsquina(elegida);
+      try {
+        globalThis.localStorage?.setItem(CLAVE_ESQUINA, elegida);
+      } catch {
+        // Sin almacenamiento se pierde al recargar, pero la sesion sigue.
+      }
+    };
+
+    ventana.addEventListener('pointermove', alMover);
+    ventana.addEventListener('pointerup', alSoltar);
+    ventana.addEventListener('pointercancel', alSoltar);
+  };
+
+  return { esquina, arrastrando, desplazamiento, alPulsar };
+};
+
+/**
  * La vista de juego: tu partida y, al lado, la de tu companero.
  *
  * Antes la suya iba encima de la tuya, como una ventana flotante. Ahora va
@@ -45,6 +162,9 @@ export const Stage = ({
   const marcoRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [swapped, setSwapped] = useState(false);
+  const { esquina, arrastrando, desplazamiento, alPulsar } = useArrastre(marcoRef);
+  // En movil la ventana se queda donde esta: ver useEsEstrecha.
+  const seArrastra = !useEsEstrecha();
   const [fullscreen, setFullscreen] = useState(false);
 
   useEffect(() => {
@@ -78,7 +198,17 @@ export const Stage = ({
       ref={marcoRef}
       style={{ '--proporcion': proporcion } as React.CSSProperties}
     >
-      <div className={`pantalla ${tamano(true)}`}>
+      <div
+        className={`pantalla ${tamano(true)}${
+          swapped ? ` pantalla--${esquina}${arrastrando ? ' pantalla--arrastrando' : ''}` : ''
+        }`}
+        onPointerDown={swapped && seArrastra ? alPulsar : undefined}
+        style={
+          swapped && arrastrando
+            ? { transform: `translate(${desplazamiento.x}px, ${desplazamiento.y}px)` }
+            : undefined
+        }
+      >
         <canvas ref={canvasRef} className="pantalla__media" width={240} height={160} />
         <span className="pantalla__etiqueta">
           <span className="dot dot--on" />
@@ -107,7 +237,17 @@ export const Stage = ({
       </div>
 
       {connected && (
-        <div className={`pantalla ${tamano(false)}`}>
+        <div
+          className={`pantalla ${tamano(false)} pantalla--${esquina}${
+            arrastrando ? ' pantalla--arrastrando' : ''
+          }`}
+          onPointerDown={seArrastra ? alPulsar : undefined}
+          style={
+            arrastrando
+              ? { transform: `translate(${desplazamiento.x}px, ${desplazamiento.y}px)` }
+              : undefined
+          }
+        >
           <video ref={videoRef} className="pantalla__media" playsInline muted />
           <span className="pantalla__etiqueta">
             <span className="dot dot--on" />

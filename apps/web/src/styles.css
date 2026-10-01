@@ -258,11 +258,16 @@ body {
   z-index: 20;
   /* Los porcentajes se miden sobre la partida, asi que asoma siempre lo mismo
      se vea grande o pequeña. Mas o menos la mitad de la ventana queda fuera por
-     el lado, que es como se ve en una videollamada. */
+     el lado, que es como se ve en una videollamada.
+     La esquina concreta la elige quien juega arrastrandola; estas reglas valen
+     para la de partida y las sobrescriben las de abajo. */
   right: -11%;
-  bottom: -9%;
+  bottom: -2%;
   width: 26%;
-  min-width: 150px;
+  min-width: 120px;
+  cursor: grab;
+  /* Sin esto, en una pantalla tactil el gesto lo captura el desplazamiento dela pagina y la ventana no se mueve. */
+  touch-action: none;
   border-color: rgba(255, 255, 255, 0.28);
   box-shadow: 0 12px 34px rgba(0, 0, 0, 0.65);
 }
@@ -364,6 +369,40 @@ body {
 .pantallas--completa .pantalla {
   border: none;
   border-radius: 0;
+}
+
+/* Cada esquina fija dos lados y suelta los otros dos. Hace falta el "auto"
+   explicito: sin el, los valores de la regla general seguirian aplicando y la
+   ventana se quedaria estirada entre dos esquinas. */
+.pantalla--pequena.pantalla--abajo-der { right: -11%; bottom: -9%; left: auto; top: auto; }
+.pantalla--pequena.pantalla--abajo-izq { left: -11%; bottom: -9%; right: auto; top: auto; }
+.pantalla--pequena.pantalla--arriba-der { right: -11%; top: -9%; left: auto; bottom: auto; }
+.pantalla--pequena.pantalla--arriba-izq { left: -11%; top: -9%; right: auto; bottom: auto; }
+
+/* Mientras se arrastra va pegada al puntero, sin transicion de sitio: animar
+   la posicion y seguir al raton a la vez se ve a tirones. */
+.pantalla--arrastrando {
+  cursor: grabbing;
+  transition: none;
+  z-index: 30;
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.75);
+  opacity: 0.94;
+}
+
+/* Al soltarla, viaja a su esquina en vez de aparecer ahi de golpe. */
+.pantalla--pequena:not(.pantalla--arrastrando) {
+  transition:
+    top 160ms ease,
+    right 160ms ease,
+    bottom 160ms ease,
+    left 160ms ease,
+    width 180ms ease;
+}
+
+/* La etiqueta no se selecciona al arrastrar: en movil, mantener pulsado sobre
+   texto abre el menu de seleccion y se come el gesto. */
+.pantalla--pequena .pantalla__etiqueta {
+  user-select: none;
 }
 
 /* ---------- los controles que flotan sobre la partida ---------- */
@@ -1496,9 +1535,24 @@ details.partidas[open] > summary::before {
  * Reservando lo que asoma entero, la partida perdia mas de cien pixeles de
  * ancho, que es peor negocio.
  */
-.mesa__centro:has(.pantalla--pequena) {
+.mesa__centro:has(.pantalla--abajo-der) {
   padding-right: 48px;
   padding-bottom: 26px;
+}
+
+.mesa__centro:has(.pantalla--abajo-izq) {
+  padding-left: 48px;
+  padding-bottom: 26px;
+}
+
+.mesa__centro:has(.pantalla--arriba-der) {
+  padding-right: 48px;
+  padding-top: 26px;
+}
+
+.mesa__centro:has(.pantalla--arriba-izq) {
+  padding-left: 48px;
+  padding-top: 26px;
 }
 
 .equipo {
@@ -1689,6 +1743,31 @@ details.partidas[open] > summary::before {
 /* En pantalla estrecha las columnas no caben a los lados: la partida se pone
    arriba, a todo el ancho, y los equipos debajo como una lista. */
 @media (max-width: 1100px) {
+  /* En movil la ventana del companero no se arrastra -lo decide Stage.tsx- asi
+     que no hay esquina que elegir: se queda abajo a la derecha y el dedo vuelve
+     a servir para desplazar la pagina. */
+  .pantalla--pequena,
+  .pantalla--pequena.pantalla--abajo-der,
+  .pantalla--pequena.pantalla--abajo-izq,
+  .pantalla--pequena.pantalla--arriba-der,
+  .pantalla--pequena.pantalla--arriba-izq {
+    width: 38%;
+    right: -8px;
+    bottom: -8px;
+    left: auto;
+    top: auto;
+    cursor: default;
+    touch-action: auto;
+  }
+
+  /* Y sin esquina elegida tampoco hay que reservarle sitio a los lados. */
+  .mesa__centro:has(.pantalla--abajo-der),
+  .mesa__centro:has(.pantalla--abajo-izq),
+  .mesa__centro:has(.pantalla--arriba-der),
+  .mesa__centro:has(.pantalla--arriba-izq) {
+    padding: 0;
+  }
+
   .app {
     /* Deja de ser una columna de alto fijo: aqui se hace scroll. */
     height: auto;

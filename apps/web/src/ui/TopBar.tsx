@@ -69,9 +69,6 @@ export const TopBar = ({
         ) : (
           <span className="roomchip__label">Jugar con un amigo</span>
         )}
-        <span className="roomchip__caret" aria-hidden="true">
-          ⌄
-        </span>
       </button>
 
       <div className="topbar__right">
