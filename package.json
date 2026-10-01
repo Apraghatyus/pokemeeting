@@ -18,6 +18,7 @@
     "test:session": "node tools/tests/test-session.mjs",
     "dev:https": "npm run dev:https --workspace=@emupoke/web",
     "test:mobile": "node tools/tests/test-mobile.mjs",
+    "test:mando": "node tools/tests/test-mando.mjs",
     "test:roms": "npx tsx tools/tests/test-roms.mjs",
     "dev:randomizer": "npm run dev --workspace=@emupoke/randomizer",
     "test:randomizer": "node tools/tests/test-randomizer.mjs",

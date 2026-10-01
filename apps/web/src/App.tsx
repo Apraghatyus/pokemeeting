@@ -7,6 +7,7 @@ import { useSession } from './net/useSession';
 import { useEquipo } from './core/useEquipo';
 import { useEsEstrecha } from './core/useEsEstrecha';
 import { useEspecies } from './core/useEspecies';
+import { useMandoTactil } from './core/useMandoTactil';
 import { motesDebilitados } from '@emupoke/pokemon';
 import { EquipoPanel } from './ui/EquipoPanel';
 import { Modal } from './ui/Modal';
@@ -33,11 +34,9 @@ export const App = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [randomizerOpen, setRandomizerOpen] = useState(false);
 
-  // En movil los controles tactiles salen solos; en escritorio se pueden
-  // encender desde el menu, que tambien sirve para probarlos.
-  const [touchPad, setTouchPad] = useState(
-    () => globalThis.matchMedia?.('(pointer: coarse)').matches ?? false,
-  );
+  // El mando en pantalla aparece solo cuando hace falta: lo decide con que se
+  // esta jugando, no que aparato es. Desde el menu se fuerza a mano.
+  const mando = useMandoTactil();
 
   // Con el modal o el menu abiertos el teclado es de la interfaz aunque el foco
   // este en un boton: si no, las flechas moverian al personaje por detras.
@@ -182,7 +181,7 @@ export const App = () => {
         </div>
 
 
-        {touchPad && hasRom && <TouchControls coreRef={emulator.coreRef} />}
+        {mando.visible && hasRom && <TouchControls coreRef={emulator.coreRef} />}
 
         {state.error && (
           <p className="alert" role="alert">
@@ -285,11 +284,15 @@ export const App = () => {
             </p>
             <button
               type="button"
-              className={touchPad ? 'is-active' : undefined}
-              onClick={() => setTouchPad((v) => !v)}
+              className={mando.visible ? 'is-active' : undefined}
+              onClick={() => mando.fijar(!mando.visible)}
             >
-              {touchPad ? 'Ocultar mando tactil' : 'Mostrar mando tactil'}
+              {mando.visible ? 'Ocultar mando tactil' : 'Mostrar mando tactil'}
             </button>
+            <p className="hint">
+              El mando sale solo si juegas tocando la pantalla y se va si usas el teclado. Si lo
+              cambias aqui, se queda como lo dejes.
+            </p>
           </section>
 
           {state.log.length > 0 && (
