@@ -36,6 +36,8 @@
     "test:receta": "node tools/tests/test-receta.mjs",
     "nds:preparar": "node tools/nds/preparar.mjs",
     "nds:probar": "node tools/nds/probar-nds.mjs",
+    "test:paquete": "npx tsx tools/tests/test-paquete.mjs",
+    "test:llevarse": "node tools/tests/test-llevarse-partida.mjs",
     "test:fluidez": "node tools/tests/test-fluidez.mjs",
     "test:arrastre": "node tools/tests/test-arrastre.mjs",
     "test:equipo": "node tools/tests/test-equipo-companero.mjs",

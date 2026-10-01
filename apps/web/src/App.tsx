@@ -301,6 +301,8 @@ export const App = () => {
         onContinuar={emulator.openSavedGame}
         onBorrar={emulator.deleteSavedGame}
         existeGuardada={emulator.existeGuardada}
+        leerGuardado={emulator.leerGuardado}
+        escribirGuardado={emulator.escribirGuardado}
       />
 
       <RoomModal

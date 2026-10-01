@@ -22,6 +22,7 @@ import {
 import { parseGameCode } from '@emupoke/pokemon';
 import { crc32 } from '../core/romHeader';
 import { codificarReceta, descodificarReceta } from '../core/receta';
+import { empaquetar, leerPaquete, nombreDeFichero } from '../core/paquete';
 import { Modal } from './Modal';
 
 type Props = {
@@ -45,6 +46,10 @@ type Props = {
   onBorrar: (fileName: string) => void;
   /** Si la copia de una partida sigue en el navegador o hay que rehacerla. */
   existeGuardada: (fileName: string) => boolean;
+  /** El guardado de una partida, para poder llevarsela a otro aparato. */
+  leerGuardado: (fileName: string) => Uint8Array | null;
+  /** Mete un guardado traido de fuera. */
+  escribirGuardado: (fileName: string, bytes: Uint8Array) => Promise<void>;
 };
 
 type Progress =
@@ -101,6 +106,8 @@ export const RandomizerModal = ({
   onContinuar,
   onBorrar,
   existeGuardada,
+  leerGuardado,
+  escribirGuardado,
 }: Props) => {
   const [status, setStatus] = useState<RandomizerStatus>({ estado: 'comprobando' });
   const [progress, setProgress] = useState<Progress>({ fase: 'eligiendo' });
@@ -205,6 +212,114 @@ export const RandomizerModal = ({
               })
             : null,
       });
+    } catch (error) {
+      setProgress({
+        fase: 'error',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  /**
+   * Descarga una partida entera: el guardado y la receta, en un fichero.
+   *
+   * Es lo que se lleva uno al movil o a otro ordenador. No lleva la ROM dentro
+   * -de ahi que pese lo que pesa el guardado- asi que al cargarlo hace falta la
+   * ROM original, que es la tuya y ya la tienes.
+   */
+  const exportarPartida = (partida: PartidaGuardada) => {
+    const sav = leerGuardado(partida.fichero);
+    if (!sav) {
+      setProgress({
+        fase: 'error',
+        message:
+          'Esa partida todavia no tiene guardado. Guarda dentro del juego, desde su propio menu, y vuelve a intentarlo.',
+      });
+      return;
+    }
+    if (!partida.semilla || !partida.ajustes || !partida.crc32) {
+      setProgress({
+        fase: 'error',
+        message: 'De esa partida no se guardo la receta, asi que no se puede rehacer en otro sitio.',
+      });
+      return;
+    }
+
+    const bytes = empaquetar({
+      receta: {
+        baseCrc32: partida.baseCrc32,
+        crc32: partida.crc32,
+        semilla: partida.semilla,
+        ajustes: partida.ajustes,
+      },
+      sav,
+      nombre: partida.baseNombre,
+    });
+
+    const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/octet-stream' }));
+    const enlace = document.createElement('a');
+    enlace.href = url;
+    enlace.download = nombreDeFichero(partida.baseNombre);
+    enlace.click();
+    URL.revokeObjectURL(url);
+  };
+
+  /**
+   * Continua una partida traida de otro aparato.
+   *
+   * Se rehace la copia desde su receta, se comprueba que salio identica y solo
+   * entonces se mete el guardado. El guardado se escribe ANTES de cargar la
+   * ROM: asi el juego lo encuentra al arrancar y no hay que reiniciarlo.
+   */
+  const abrirPartidaDeFichero = async (fichero: File) => {
+    const base = baseRom.current;
+    if (!base) return;
+
+    const traida = leerPaquete(new Uint8Array(await fichero.arrayBuffer()));
+    if (!traida) {
+      setProgress({
+        fase: 'error',
+        message: 'Ese fichero no es una partida de Emupoke. Tiene que ser el .emupoke que descargaste.',
+      });
+      return;
+    }
+    if (traida.receta.baseCrc32 !== base.crc32) {
+      setProgress({
+        fase: 'error',
+        message:
+          'Esa partida se jugo con otra copia de la ROM original. Carga la misma con la que se creo.',
+      });
+      return;
+    }
+
+    setProgress({ fase: 'trabajando' });
+    try {
+      const result = await randomizeRom(
+        { settingsString: traida.receta.ajustes, seed: traida.receta.semilla },
+        base.bytes,
+      );
+      if (crc32(result.rom) !== traida.receta.crc32) {
+        setProgress({
+          fase: 'error',
+          message:
+            'La copia rehecha no coincide con la de esa partida, seguramente por una version distinta del randomizer. No la cargo: tu guardado no encajaria.',
+        });
+        return;
+      }
+
+      const nombre = nombreParaNueva(base.fileName);
+      await escribirGuardado(nombre, traida.sav);
+      await onRandomized(result.rom, nombre);
+      registrar({
+        fichero: nombre,
+        baseNombre: base.fileName,
+        baseCrc32: base.crc32,
+        semilla: traida.receta.semilla,
+        ajustes: traida.receta.ajustes,
+        crc32: traida.receta.crc32,
+        cambiado: result.summary.changed,
+      });
+      onClose();
     } catch (error) {
       setProgress({
         fase: 'error',
@@ -414,6 +529,18 @@ export const RandomizerModal = ({
                             {aqui ? '' : rehacible ? ' · hay que rehacerla' : ' · ya no esta'}
                           </em>
                         </button>
+                        <button
+                          type="button"
+                          className="partida__receta"
+                          onClick={() => exportarPartida(partida)}
+                          title={
+                            'Descargar esta partida entera: el guardado y la receta.\n' +
+                            'Es lo que te llevas a otro aparato para seguir ahi.'
+                          }
+                          aria-label="Descargar esta partida para otro aparato"
+                        >
+                          ⤓
+                        </button>
                         <BotonReceta partida={partida} />
                         <button
                           type="button"
@@ -494,6 +621,24 @@ export const RandomizerModal = ({
                   Hace falta la misma ROM original con la que se creo. La receta sola no sirve de
                   nada: no lleva el juego dentro.
                 </p>
+
+                {/* Lo mismo pero con el fichero entero, que ademas trae el
+                    guardado: es lo que se lleva uno al movil para seguir ahi. */}
+                <label className="partida__traer">
+                  <span>O trae tu partida de otro aparato</span>
+                  <input
+                    type="file"
+                    accept=".emupoke"
+                    disabled={lleno || progress.fase === 'trabajando'}
+                    onChange={(event) => {
+                      const fichero = event.target.files?.[0];
+                      // Se limpia para que elegir el mismo fichero dos veces
+                      // seguidas vuelva a disparar el cambio.
+                      event.target.value = '';
+                      if (fichero) void abrirPartidaDeFichero(fichero);
+                    }}
+                  />
+                </label>
               </details>
 
               {lleno && (

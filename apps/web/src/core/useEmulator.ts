@@ -70,7 +70,8 @@ const discardGeneratedRom = (core: MgbaModule, romPath: string | null): void => 
 
 /** Ruta del fichero de partida que mGBA asocia a una ROM. */
 const savePathFor = (core: MgbaModule, romPath: string): string | null => {
-  const name = romPath.split('/').pop()?.replace(/\.gba$/i, '.sav');
+  // Cualquier extension, no solo .gba: ahora tambien se juega a Game Boy Color.
+  const name = romPath.split('/').pop()?.replace(/\.[^.]+$/, '.sav');
   return name ? `${core.filePaths().savePath}/${name}` : null;
 };
 
@@ -328,6 +329,38 @@ export const useEmulator = () => {
     return core.FS.analyzePath(`${core.filePaths().gamePath}/${fileName}`).exists;
   }, []);
 
+  /**
+   * El fichero de guardado de una partida, para poder llevarselo.
+   *
+   * Devuelve null si esa partida todavia no ha guardado nunca: el juego solo
+   * escribe su guardado cuando el jugador guarda desde su menu.
+   */
+  const leerGuardado = useCallback((fichero: string): Uint8Array | null => {
+    const core = coreRef.current;
+    if (!core) return null;
+    const ruta = savePathFor(core, fichero);
+    try {
+      if (!ruta || !core.FS.analyzePath(ruta).exists) return null;
+      const bytes = core.FS.readFile(ruta) as Uint8Array;
+      // Un guardado recien creado puede estar entero a ceros; eso no es una
+      // partida, es un hueco, y llevarselo a otro aparato no sirve de nada.
+      return bytes.some((b) => b !== 0) ? bytes : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  /** Mete un guardado traido de fuera en la partida que le corresponde. */
+  const escribirGuardado = useCallback(async (fichero: string, bytes: Uint8Array) => {
+    const core = coreRef.current;
+    if (!core) return;
+    const ruta = savePathFor(core, fichero);
+    if (!ruta) return;
+    core.FS.writeFile(ruta, bytes);
+    // Este si se persiste: es la partida de alguien.
+    await core.FSSync();
+  }, []);
+
   /** Borra una partida guardada: su ROM y su fichero de guardado. */
   const deleteSavedGame = useCallback((fileName: string) => {
     const core = coreRef.current;
@@ -533,6 +566,8 @@ export const useEmulator = () => {
     closeRom,
     openSavedGame,
     existeGuardada,
+    leerGuardado,
+    escribirGuardado,
     deleteSavedGame,
     state,
     openRom,

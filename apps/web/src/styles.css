@@ -1958,3 +1958,28 @@ details.partidas[open] > summary::before {
   background: var(--accent);
   border-color: var(--accent);
 }
+
+/* Traer una partida de otro aparato: un fichero, no un texto que pegar. */
+.partida__traer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.partida__traer input[type='file'] {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.partida__traer input[type='file']::file-selector-button {
+  margin-right: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: var(--text);
+  cursor: pointer;
+}
