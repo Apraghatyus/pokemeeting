@@ -1779,6 +1779,51 @@ details.partidas[open] > summary::before {
     right: 56px;
   }
 
+  /* El gesto horizontal es nuestro; el vertical sigue desplazando la pagina,
+     que debajo estan el mando y los equipos. */
+  .pantallas--deslizable {
+    touch-action: pan-y;
+  }
+
+  /* El desplazamiento solo existe MIENTRAS el dedo se mueve.
+   *
+   * Dejarlo puesto siempre, aunque fuera de cero pixeles, mantenia el canvas en
+   * una capa compuesta aparte y se notaba donde mas duele: al companero le
+   * llegaban 40 fotogramas por segundo en vez de 55. Medido con el escritorio
+   * al lado, que seguia a 53. */
+  .pantallas--deslizando .pantalla--grande {
+    transform: translateX(var(--deslizado, 0px));
+    transition: none;
+  }
+
+  /* Dos puntos: sin ellos nadie adivina que hay otra pantalla detras. */
+  .pantallas__puntos {
+    position: absolute;
+    left: 50%;
+    bottom: -14px;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 6px;
+    z-index: 4;
+  }
+
+  .pantallas__puntos span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: background 160ms ease;
+  }
+
+  .pantallas__puntos span.is-aqui {
+    background: var(--accent);
+  }
+
+  /* Deslizando se cambia, asi que el boton sobra. */
+  .pantallas--deslizable .pantalla__boton--intercambiar {
+    display: none;
+  }
+
   .pantalla--pequena > .pantalla__boton--intercambiar,
   .pantalla--pequena > .pantalla__etiqueta,
   .pantalla--pequena > .pantalla__controles {
@@ -1803,6 +1848,10 @@ details.partidas[open] > summary::before {
   .mesa--solo {
     grid-template-columns: minmax(0, 1fr);
     gap: 10px;
+    /* Apilado, cada cosa ocupa lo suyo y todo se va arriba. Heredado del
+       escritorio, la mesa se estiraba a todo el alto y dejaba medio movil en
+       blanco entre la partida y el equipo. */
+    flex: 0 0 auto;
   }
 
   .mesa__centro {
@@ -1830,18 +1879,70 @@ details.partidas[open] > summary::before {
     width: min(100%, calc((100svh - 190px) * var(--proporcion, 1.5)));
   }
 
-  /* Las seis filas fijas tenian sentido en una columna alta; en una lista
-     ocupan toda la pantalla de vacio. Aqui se encogen a su contenido y los
-     huecos desaparecen. */
+  /* El equipo pasa a ser una tira horizontal que se desplaza con el dedo.
+   *
+   * En vertical, seis fichas a lo ancho de la pantalla se comen el movil
+   * entero y hay que hacer scroll para ver el equipo mientras juegas, que es
+   * justo cuando no puedes. En tira se ven tres de un vistazo y el resto esta
+   * a un gesto. */
   .equipo__lista {
     display: flex;
     flex-direction: row;
-    flex-wrap: wrap;
-    gap: 6px;
+    flex-wrap: nowrap;
+    gap: 8px;
+    overflow-x: auto;
+    /* Que la tira mida lo que miden las fichas. Heredado de la columna, se
+       estiraba a todo el alto que hubiera y cada ficha salia de 314 pixeles
+       de alto para un sprite de 56. */
+    flex: 0 0 auto;
+    align-items: flex-start;
+    /* El gesto horizontal es de la tira; el vertical sigue siendo de la pagina. */
+    touch-action: pan-x;
+    /* Cada ficha se queda centrada al soltar, como un carrusel. */
+    scroll-snap-type: x proximity;
+    padding-bottom: 4px;
+  }
+
+  /* Sin barra de desplazamiento a la vista: estorba mas que ayuda en un movil,
+     y los puntos de arriba ya dicen que hay mas. */
+  .equipo__lista::-webkit-scrollbar {
+    display: none;
   }
 
   .equipo__lista .ficha {
-    flex: 1 1 150px;
+    flex: 0 0 auto;
+    width: 92px;
+    /* En columna: en una tira, el sprite manda y el texto acompaña debajo. */
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 4px;
+    scroll-snap-align: center;
+  }
+
+  .ficha__datos {
+    align-items: center;
+    width: 100%;
+  }
+
+  .ficha__nombre {
+    max-width: 100%;
+    font-size: 11px;
+    text-align: center;
+  }
+
+  .ficha__linea {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .ficha__nivel {
+    font-size: 10px;
+  }
+
+  /* Un solo tipo en la tira: dos no caben en 92 pixeles sin apretarse. */
+  .ficha__linea + .ficha__linea .tipo:nth-child(2) {
+    display: none;
   }
 
   .ficha--hueco {
@@ -2018,4 +2119,28 @@ details.partidas[open] > summary::before {
   background: var(--bg-raised);
   color: var(--text);
   cursor: pointer;
+}
+
+/* Cabecera del equipo: el titulo y, en pantalla estrecha, el boton para ver el
+   del companero. */
+.equipo__cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.equipo__cambiar {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: var(--text);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.equipo__cambiar:hover {
+  border-color: var(--accent-dim);
 }

@@ -47,6 +47,13 @@ type Props = {
    */
   caidosDelOtro?: ReadonlySet<string>;
   /**
+   * Cambia a ver el equipo del otro.
+   *
+   * Solo se pasa en pantallas estrechas, donde no caben las dos columnas: ahi
+   * se ve un equipo y se cambia, igual que con las dos partidas.
+   */
+  onCambiar?: () => void;
+  /**
    * Por que no hay nada que enseñar.
    *
    * Sin esto la columna vacia no dice nada, que es lo que se quiere mientras
@@ -264,6 +271,7 @@ export const EquipoPanel = ({
   especies,
   activo = null,
   caidosDelOtro,
+  onCambiar,
   motivo,
 }: Props) => {
   const ranuras = equipo?.ranuras ?? [];
@@ -280,7 +288,14 @@ export const EquipoPanel = ({
 
   return (
     <aside className={`equipo equipo--${lado}`} aria-label={titulo}>
-      <h2 className="equipo__titulo">{titulo}</h2>
+      <div className="equipo__cabecera">
+        <h2 className="equipo__titulo">{titulo}</h2>
+        {onCambiar && (
+          <button type="button" className="equipo__cambiar" onClick={onCambiar}>
+            {lado === 'propio' ? 'Ver el suyo' : 'Ver el tuyo'}
+          </button>
+        )}
+      </div>
 
       {ranuras.length === 0 && motivo ? (
         <p className="equipo__vacio">{motivo}</p>

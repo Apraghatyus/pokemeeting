@@ -5,6 +5,7 @@ import { useEmulator } from './core/useEmulator';
 import { useKeyboardOwnership } from './core/useKeyboardOwnership';
 import { useSession } from './net/useSession';
 import { useEquipo } from './core/useEquipo';
+import { useEsEstrecha } from './core/useEsEstrecha';
 import { useEspecies } from './core/useEspecies';
 import { motesDebilitados } from '@emupoke/pokemon';
 import { EquipoPanel } from './ui/EquipoPanel';
@@ -100,6 +101,12 @@ export const App = () => {
   const caidosMios = motesDebilitados(miEquipo.equipo);
   const caidosSuyos = motesDebilitados(session.state.equipoCompanero);
 
+  // En pantalla estrecha no caben las dos columnas, asi que se ve un equipo y
+  // se cambia con un boton, igual que con las dos partidas.
+  const estrecha = useEsEstrecha();
+  const [verSuEquipo, setVerSuEquipo] = useState(false);
+  const unoSolo = estrecha && conCompanero;
+
   return (
     <div className="app">
       <TopBar
@@ -116,12 +123,16 @@ export const App = () => {
 
       <main className="app__main">
         <div className={`mesa${conCompanero ? '' : ' mesa--solo'}`}>
+          {/* Con sitio, los dos equipos a los lados. En pantalla estrecha solo
+              cabe uno, asi que se enseña ese y se cambia con el boton. */}
           <EquipoPanel
-            titulo="Tu equipo"
-            lado="propio"
-            equipo={miEquipo.equipo}
+            titulo={unoSolo && verSuEquipo ? 'Equipo de tu companero' : 'Tu equipo'}
+            lado={unoSolo && verSuEquipo ? 'companero' : 'propio'}
+            equipo={unoSolo && verSuEquipo ? session.state.equipoCompanero : miEquipo.equipo}
             especies={especies}
-            caidosDelOtro={caidosSuyos}
+            caidosDelOtro={unoSolo && verSuEquipo ? caidosMios : caidosSuyos}
+            onCambiar={unoSolo ? () => setVerSuEquipo((v) => !v) : undefined}
+            motivo={unoSolo && verSuEquipo ? 'Todavia no ha mandado su equipo.' : undefined}
           />
 
           <div className="mesa__centro">
@@ -156,10 +167,9 @@ export const App = () => {
         />
           </div>
 
-          {/* Jugando solo, esta columna no existe y la partida se lleva su
-              sitio. Vuelve en cuanto alguien entra en la sala, aunque todavia
-              no haya mandado su equipo. */}
-          {conCompanero && (
+          {/* La columna de la derecha solo existe con sitio y con companero.
+              Jugando solo, la partida se lleva ese hueco. */}
+          {conCompanero && !unoSolo && (
             <EquipoPanel
               titulo="Equipo de tu companero"
               lado="companero"

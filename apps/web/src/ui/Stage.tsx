@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useEsEstrecha } from '../core/useEsEstrecha';
 
 type Props = {
   canvasRef: RefObject<HTMLCanvasElement | null>;
@@ -18,32 +19,6 @@ type Props = {
   dropzone: ReactNode;
   /** Botones que flotan sobre la partida: voz y demas. */
   controles?: ReactNode;
-};
-
-/**
- * Si la pantalla es de las estrechas, las de movil.
- *
- * Se mira el mismo ancho con el que el estilo reordena la pagina, para que las
- * dos cosas no puedan discrepar. Ahi la ventana del companero no se arrastra:
- * el gesto compite con el desplazamiento de la pagina, y ademas en una pantalla
- * de ese tamano las cuatro esquinas quedan casi en el mismo sitio.
- */
-const ESTRECHA = '(max-width: 1100px)';
-
-const useEsEstrecha = (): boolean => {
-  const [estrecha, setEstrecha] = useState(
-    () => globalThis.matchMedia?.(ESTRECHA).matches ?? false,
-  );
-
-  useEffect(() => {
-    const consulta = globalThis.matchMedia?.(ESTRECHA);
-    if (!consulta) return;
-    const alCambiar = () => setEstrecha(consulta.matches);
-    consulta.addEventListener('change', alCambiar);
-    return () => consulta.removeEventListener('change', alCambiar);
-  }, []);
-
-  return estrecha;
 };
 
 /**
@@ -138,6 +113,86 @@ const useArrastre = (marcoRef: { current: HTMLDivElement | null }) => {
 };
 
 /**
+ * Cambiar de pantalla deslizando el dedo.
+ *
+ * En movil solo se ve una partida a la vez, asi que hace falta una forma de
+ * pasar a la del companero. Deslizar es mas natural que un boton y no ocupa
+ * sitio en pantalla, que es justo lo que escasea ahi.
+ *
+ * Solo cuenta el gesto horizontal: el vertical tiene que seguir desplazando la
+ * pagina, porque debajo estan el mando y los equipos. Por eso se decide en el
+ * primer movimiento y, si va hacia abajo, se suelta el gesto y no se vuelve a
+ * mirar hasta el siguiente.
+ */
+const ARRASTRE_MINIMO = 10;
+/** Cuanto hay que recorrer para que el cambio se dé por hecho. */
+const PARA_CAMBIAR = 60;
+
+const useDeslizar = (
+  activo: boolean,
+  alCambiar: () => void,
+): {
+  desplazado: number;
+  deslizando: boolean;
+  alPulsar: (evento: React.PointerEvent<HTMLElement>) => void;
+} => {
+  const [desplazado, setDesplazado] = useState(0);
+  const [deslizando, setDeslizando] = useState(false);
+
+  const alPulsar = (evento: React.PointerEvent<HTMLElement>) => {
+    if (!activo) return;
+    // Los botones de encima siguen siendo botones.
+    if ((evento.target as HTMLElement).closest('button')) return;
+
+    const zona = evento.currentTarget;
+    const inicio = { x: evento.clientX, y: evento.clientY };
+    let decidido: 'horizontal' | 'vertical' | null = null;
+
+    const alMover = (e: PointerEvent) => {
+      const dx = e.clientX - inicio.x;
+      const dy = e.clientY - inicio.y;
+
+      if (decidido === null) {
+        if (Math.hypot(dx, dy) < ARRASTRE_MINIMO) return;
+        // El primer movimiento decide de quien es el gesto.
+        decidido = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical';
+        if (decidido === 'vertical') {
+          soltar();
+          return;
+        }
+        zona.setPointerCapture(e.pointerId);
+        setDeslizando(true);
+      }
+
+      // Se acompaña al dedo con resistencia: pasado el umbral cuesta mas, que
+      // es lo que hace notar que ya vale con eso.
+      const resistido = Math.sign(dx) * Math.min(Math.abs(dx), PARA_CAMBIAR + Math.abs(dx) / 4);
+      setDesplazado(resistido);
+    };
+
+    const alSoltar = (e: PointerEvent) => {
+      const dx = e.clientX - inicio.x;
+      soltar();
+      if (decidido === 'horizontal' && Math.abs(dx) >= PARA_CAMBIAR) alCambiar();
+    };
+
+    function soltar() {
+      zona.removeEventListener('pointermove', alMover);
+      zona.removeEventListener('pointerup', alSoltar);
+      zona.removeEventListener('pointercancel', soltar as unknown as EventListener);
+      setDeslizando(false);
+      setDesplazado(0);
+    }
+
+    zona.addEventListener('pointermove', alMover);
+    zona.addEventListener('pointerup', alSoltar);
+    zona.addEventListener('pointercancel', soltar as unknown as EventListener);
+  };
+
+  return { desplazado, deslizando, alPulsar };
+};
+
+/**
  * La vista de juego: tu partida y, al lado, la de tu companero.
  *
  * Antes la suya iba encima de la tuya, como una ventana flotante. Ahora va
@@ -162,9 +217,18 @@ export const Stage = ({
   const marcoRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [swapped, setSwapped] = useState(false);
+  const connected = remoteStream !== null;
   const { esquina, arrastrando, desplazamiento, alPulsar } = useArrastre(marcoRef);
   // En movil la ventana se queda donde esta: ver useEsEstrecha.
-  const seArrastra = !useEsEstrecha();
+  const estrecha = useEsEstrecha();
+  const seArrastra = !estrecha;
+
+  // Y ahi se cambia de pantalla deslizando, no con un boton: en una pantalla
+  // pequeña un boton mas es sitio que se le quita a la partida.
+  const puedeDeslizar = estrecha && connected;
+  const { desplazado, deslizando, alPulsar: alDeslizar } = useDeslizar(puedeDeslizar, () =>
+    setSwapped((v) => !v),
+  );
   const [fullscreen, setFullscreen] = useState(false);
 
   useEffect(() => {
@@ -185,7 +249,6 @@ export const Stage = ({
     else void marcoRef.current?.requestFullscreen().catch(() => {});
   };
 
-  const connected = remoteStream !== null;
   // Sin companero no hay segunda pantalla: la tuya se queda todo el alto.
   const tamano = (mia: boolean) =>
     !connected || mia !== swapped ? 'pantalla--grande' : 'pantalla--pequena';
@@ -194,9 +257,15 @@ export const Stage = ({
     <div
       className={`pantallas${connected ? '' : ' pantallas--solo'}${
         fullscreen ? ' pantallas--completa' : ''
-      }`}
+      }${puedeDeslizar ? ' pantallas--deslizable' : ''}${deslizando ? ' pantallas--deslizando' : ''}`}
       ref={marcoRef}
-      style={{ '--proporcion': proporcion } as React.CSSProperties}
+      onPointerDown={puedeDeslizar ? alDeslizar : undefined}
+      style={
+        {
+          '--proporcion': proporcion,
+          ...(desplazado !== 0 ? { '--deslizado': `${desplazado}px` } : {}),
+        } as React.CSSProperties
+      }
     >
       <div
         className={`pantalla ${tamano(true)}${
@@ -235,6 +304,15 @@ export const Stage = ({
         {connected && <BotonIntercambiar onSwap={() => setSwapped((v) => !v)} />}
         {!hasRom && <div className="pantalla__encima">{dropzone}</div>}
       </div>
+
+      {puedeDeslizar && (
+        // Dos puntos para que se vea que hay otra pantalla detras. Sin esto,
+        // nadie adivina que se puede deslizar.
+        <div className="pantallas__puntos" aria-hidden="true">
+          <span className={swapped ? '' : 'is-aqui'} />
+          <span className={swapped ? 'is-aqui' : ''} />
+        </div>
+      )}
 
       {connected && (
         <div

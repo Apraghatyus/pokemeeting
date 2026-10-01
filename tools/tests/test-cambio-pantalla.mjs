@@ -19,6 +19,11 @@ if (!ROM) {
   process.exit(2);
 }
 
+// Suelo para distinguir "se mueve" de "se quedo congelado", que es lo peor que
+// podria pasar al esconder la pantalla. Lo fino se mide comparando, no con un
+// numero absoluto: ver mas abajo.
+const MINIMO = 25;
+
 let fallos = 0;
 const check = (nombre, ok, detalle = '') => {
   console.log(`${ok ? 'OK   ' : 'FALLO'} ${nombre}${detalle ? '  -> ' + detalle : ''}`);
@@ -86,8 +91,34 @@ check('en movil solo se ve una pantalla', antes.pequenaOculta);
 check('y la que no se ve sigue viva, no quitada', antes.pequenaSigueEnPie);
 check('al principio se ve la tuya', antes.mia);
 
-const hayBoton = await movil.locator('.pantalla--grande .pantalla__boton--intercambiar').isVisible();
-check('hay boton para cambiar de pantalla', hayBoton);
+// En movil se cambia deslizando, no con un boton: un boton mas es sitio que
+// se le quita a la partida.
+check('no hay boton de cambiar, que aqui sobra',
+  (await movil.locator('.pantalla--grande .pantalla__boton--intercambiar').isVisible()) === false);
+check('y hay dos puntos que avisan de que hay otra pantalla',
+  (await movil.locator('.pantallas__puntos span').count()) === 2);
+
+/** Desliza el dedo por la pantalla. */
+const deslizar = async (dx, dy) => {
+  const caja = await movil.locator('.pantalla--grande').boundingBox();
+  const centro = { x: caja.x + caja.width / 2, y: caja.y + caja.height / 2 };
+  await movil.mouse.move(centro.x, centro.y);
+  await movil.mouse.down();
+  for (let paso = 1; paso <= 8; paso += 1) {
+    await movil.mouse.move(centro.x + (dx * paso) / 8, centro.y + (dy * paso) / 8);
+    await movil.waitForTimeout(25);
+  }
+  await movil.mouse.up();
+  await movil.waitForTimeout(700);
+};
+
+// Un gesto corto no cuenta: si no, cambiaria de pantalla al rozarla.
+await deslizar(25, 0);
+check('un roce corto no cambia de pantalla', (await visible()).mia);
+
+// Y el vertical es de la pagina, que debajo estan el mando y los equipos.
+await deslizar(0, 120);
+check('deslizar hacia abajo tampoco', (await visible()).mia);
 
 /** Cuantos fotogramas por segundo le llegan al otro de MI partida. */
 const fpsQueLlegan = async (segundos) =>
@@ -99,20 +130,50 @@ const fpsQueLlegan = async (segundos) =>
   }, segundos);
 
 const conMiPantallaVisible = await fpsQueLlegan(5);
-check('mientras se ve tu partida, al otro le llega fluida',
-  conMiPantallaVisible >= 50, `${conMiPantallaVisible.toFixed(1)} fps`);
+check('mientras se ve tu partida, al otro le llega en movimiento',
+  conMiPantallaVisible >= MINIMO, `${conMiPantallaVisible.toFixed(1)} fps`);
 
-// --- se cambia de pantalla: ahora la tuya es la que no se ve ---
-await movil.locator('.pantalla--grande .pantalla__boton--intercambiar').click();
-await movil.waitForTimeout(2500);
-
+// --- se cambia de pantalla deslizando ---
+await deslizar(-140, 0);
 const despues = await visible();
-check('al pulsar el boton se ve la del companero', !despues.mia);
+check('deslizando se pasa a la pantalla del companero', !despues.mia);
+
+await deslizar(140, 0);
+check('y deslizando al otro lado se vuelve a la tuya', (await visible()).mia);
+await deslizar(-140, 0);
 
 const conMiPantallaOculta = await fpsQueLlegan(6);
-check('y aun asi al otro le sigue llegando la tuya en movimiento',
-  conMiPantallaOculta >= 50,
-  `${conMiPantallaOculta.toFixed(1)} fps con tu pantalla escondida`);
+// Lo que de verdad se pregunta aqui no es a cuantos fps llega, sino si
+// esconder la pantalla lo empeora. Se compara contra lo que llegaba antes, en
+// la misma maquina y en los mismos segundos: un numero absoluto convierte esto
+// en un medidor de lo ocupado que este el ordenador, y en una misma sesion se
+// han visto 57 y 40 sin tocar nada.
+const perdida = 1 - conMiPantallaOculta / conMiPantallaVisible;
+check('y esconderla no empeora lo que le llega', perdida < 0.2,
+  `${conMiPantallaVisible.toFixed(1)} -> ${conMiPantallaOculta.toFixed(1)} fps`);
+check('que sigue siendo movimiento y no una imagen quieta',
+  conMiPantallaOculta >= MINIMO, `${conMiPantallaOculta.toFixed(1)} fps`);
+
+// --- y lo mismo con los equipos: uno a la vez y un boton para cambiar ---
+const equipoVisible = () =>
+  movil.evaluate(() => ({
+    cuantos: document.querySelectorAll('.equipo').length,
+    titulo: document.querySelector('.equipo__titulo')?.textContent?.trim() ?? '',
+  }));
+
+const equipoAntes = await equipoVisible();
+check('en movil se enseña un equipo, no dos', equipoAntes.cuantos === 1, `${equipoAntes.cuantos}`);
+check('y empieza por el tuyo', /Tu equipo/i.test(equipoAntes.titulo), equipoAntes.titulo);
+
+await movil.locator('.equipo__cambiar').click();
+await movil.waitForTimeout(500);
+const equipoDespues = await equipoVisible();
+check('el boton cambia al equipo de tu companero', /companero/i.test(equipoDespues.titulo),
+  equipoDespues.titulo);
+
+await movil.locator('.equipo__cambiar').click();
+await movil.waitForTimeout(500);
+check('y vuelve al tuyo', /Tu equipo/i.test((await equipoVisible()).titulo));
 
 await navegador.close();
 console.log(fallos === 0 ? '\nEL CAMBIO DE PANTALLA NO CORTA LA TRANSMISION' : `\n${fallos} COMPROBACIONES FALLIDAS`);
