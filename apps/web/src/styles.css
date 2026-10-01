@@ -1454,15 +1454,15 @@ details.partidas[open] > summary::before {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  /* La columna mide lo que mide la partida, y los seis se reparten ese alto.
-     Con menos de seis se quedan juntos al principio, que para el equipo propio
-     es arriba y para el del companero abajo, cada uno hacia su esquina. */
+  /* Seis filas iguales, siempre. El sitio de cada Pokemon esta reservado desde
+     el principio: al capturar el tercero aparece en su fila y los dos que ya
+     estaban no se mueven. Repartirlos hacia que el equipo entero bailara cada
+     vez que entraba uno nuevo. */
+  display: grid;
+  grid-template-rows: repeat(6, 1fr);
+  gap: 4px;
   flex: 1;
   min-height: 0;
-  justify-content: space-between;
 }
 
 .equipo__vacio {
@@ -1477,21 +1477,25 @@ details.partidas[open] > summary::before {
 .ficha {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 10px;
+  /* Casi sin margen: lo que tiene que verse es el Pokemon, no su recuadro. */
+  padding: 2px 4px;
+  min-width: 0;
   border-radius: 14px;
-  /* Sin bordes: con seis fichas en columna, seis recuadros marcados compiten
-     con la partida. Queda un fondo muy tenue que las separa sin dibujarlas. */
-  background: rgba(255, 255, 255, 0.035);
+  /* Sin fondo. La tarjeta solo se dibuja cuando tiene algo que decir: que ese
+     Pokemon esta peleando, o que le pasa algo. El resto del tiempo son seis
+     sprites en una columna, que es lo que se quiere mirar. */
+  background: none;
   border: none;
-  /* La linea de color del estado se hace con una sombra interior en vez de un
-     borde, para que no cuente como caja ni mueva nada al aparecer. */
   box-shadow: none;
-  transition: background 140ms ease;
+  transition:
+    background 140ms ease,
+    box-shadow 140ms ease;
 }
 
-.ficha:hover {
-  background: rgba(255, 255, 255, 0.06);
+/* Un hueco vacio no se ve, pero ocupa su fila: por eso el equipo no baila
+   cuando entra uno nuevo. */
+.ficha--hueco {
+  visibility: hidden;
 }
 
 .ficha__sprite {
@@ -1553,6 +1557,7 @@ details.partidas[open] > summary::before {
 .ficha--paralizado,
 .ficha--quemado,
 .ficha--envenenado {
+  background: rgba(255, 255, 255, 0.04);
   box-shadow: inset 3px 0 0 0 var(--color-estado);
 }
 
@@ -1672,8 +1677,10 @@ details.partidas[open] > summary::before {
      generacion vienen a 64, asi que a este tamaño se ven exactos. */
   image-rendering: pixelated;
   object-fit: contain;
-  width: 64px;
-  height: 64px;
+  /* Los de tercera generacion vienen a 64; a 80 se ven grandes y siguen
+     exactos, porque se agrandan por un numero redondo y sin difuminar. */
+  width: 80px;
+  height: 80px;
   /* Una sombra bajo el sprite lo despega del fondo ahora que no hay borde. */
   filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
 }
@@ -1729,4 +1736,20 @@ details.partidas[open] > summary::before {
 /* La segunda linea de la ficha, la de los tipos, un poco mas suelta. */
 .ficha__linea + .ficha__linea {
   margin-top: 2px;
+}
+
+/* La pareja de este Pokemon cayo en la otra partida. Se marca y ya: la partida
+   es de quien juega y el programa no decide por el. */
+.estado--enlace {
+  background: var(--rojo);
+  color: #fff;
+}
+
+.ficha--pareja-caida {
+  background: rgba(238, 21, 21, 0.08);
+  box-shadow: inset 3px 0 0 0 var(--rojo);
+}
+
+.ficha--pareja-caida .ficha__sprite--imagen {
+  filter: grayscale(0.7) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
 }

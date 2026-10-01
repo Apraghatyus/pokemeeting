@@ -6,6 +6,7 @@ import { useKeyboardOwnership } from './core/useKeyboardOwnership';
 import { useSession } from './net/useSession';
 import { useEquipo } from './core/useEquipo';
 import { useEspecies } from './core/useEspecies';
+import { motesDebilitados } from '@emupoke/pokemon';
 import { EquipoPanel } from './ui/EquipoPanel';
 import { Modal } from './ui/Modal';
 import { RandomizerModal } from './ui/RandomizerModal';
@@ -85,6 +86,11 @@ export const App = () => {
     session.enviarEquipo,
   );
 
+  // Soul Link: las parejas se reconocen por el mote, que es el mismo en las dos
+  // partidas. Si a uno se le cae el suyo, al otro se le marca el emparejado.
+  const caidosMios = motesDebilitados(miEquipo.equipo);
+  const caidosSuyos = motesDebilitados(session.state.equipoCompanero);
+
   return (
     <div className="app">
       <TopBar
@@ -106,6 +112,7 @@ export const App = () => {
             lado="propio"
             equipo={miEquipo.equipo}
             especies={especies}
+            caidosDelOtro={caidosSuyos}
           />
 
           <div className="mesa__centro">
@@ -138,6 +145,7 @@ export const App = () => {
               lado="companero"
               equipo={session.state.equipoCompanero}
               especies={especies}
+              caidosDelOtro={caidosMios}
               motivo="Todavia no ha mandado su equipo."
             />
           )}

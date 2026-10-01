@@ -118,6 +118,7 @@ comprueban cosas que solo se pueden comprobar así.
 | `npm run test:juegos` | Que los juegos que decimos aceptar los acepta el jar |
 | `npm run test:gbc` | Que el emulador corre Game Boy Color, no solo GBA |
 | `npm run test:paneles -- <rom> <estado>` | Que el panel enseña el equipo de la partida |
+| `npm run test:soullink` | Que las parejas de un Soul Link se emparejan bien |
 | `npm run test:resumen -- <estado> [rom]` | El resumen del equipo y lo que viaja al compañero |
 | `npm run test:cabeceras` | Que reconocemos de qué consola es una ROM |
 | `npm run test:semilla -- <rom>` | Que la misma semilla da la misma ROM |

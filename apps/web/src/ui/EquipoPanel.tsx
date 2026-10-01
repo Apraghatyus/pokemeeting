@@ -13,7 +13,7 @@
 // Fuego que, el dia que exista su lector, una de Oro.
 
 import { useState } from 'react';
-import { parseGameCode, TIPOS_GEN3 } from '@emupoke/pokemon';
+import { parejaCaida, parseGameCode, TAMANO_EQUIPO, TIPOS_GEN3 } from '@emupoke/pokemon';
 import type { Especies } from '../core/useEspecies';
 import type { EquipoResumen, EstadoPokemon, PokemonResumen } from '@emupoke/protocol';
 
@@ -38,6 +38,14 @@ type Props = {
    * para que el dia que llegue sea pasar este numero.
    */
   activo?: number | null;
+  /**
+   * Motes que han caido en el OTRO equipo.
+   *
+   * En un Soul Link los Pokemon van emparejados por el nombre que les ponen los
+   * dos jugadores, asi que si cae uno, al otro se le acabo tambien. Se marca,
+   * no se impone: el Pokemon sigue vivo en la partida y su dueño decide.
+   */
+  caidosDelOtro?: ReadonlySet<string>;
   /**
    * Por que no hay nada que enseñar.
    *
@@ -176,17 +184,20 @@ const Ficha = ({
   especies,
   generacion,
   activo,
+  parejaRota,
 }: {
   pokemon: PokemonResumen;
   especies: Especies;
   generacion: number;
   activo: boolean;
+  parejaRota: boolean;
 }) => {
   const nombre = pokemon.huevo ? 'Huevo' : especies.nombre(pokemon.especie);
   const clases = [
     'ficha',
     activo ? 'ficha--activo' : '',
     pokemon.estado ? `ficha--${pokemon.estado}` : '',
+    parejaRota ? 'ficha--pareja-caida' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -225,6 +236,12 @@ const Ficha = ({
               {SIGLA[pokemon.estado]}
             </span>
           )}
+          {/* Su pareja cayo al otro lado. No se toca su partida: se avisa. */}
+          {parejaRota && !pokemon.estado && (
+            <span className="estado estado--enlace" title="Su pareja se debilito">
+              ENLACE
+            </span>
+          )}
         </span>
         <span className="ficha__linea">
           {!pokemon.huevo && <Tipos tipos={pokemon.tipos} />}
@@ -246,6 +263,7 @@ export const EquipoPanel = ({
   lado,
   especies,
   activo = null,
+  caidosDelOtro,
   motivo,
 }: Props) => {
   const ranuras = equipo?.ranuras ?? [];
@@ -253,25 +271,42 @@ export const EquipoPanel = ({
   // para el del companero es el suyo, no el nuestro.
   const generacion = equipo ? (parseGameCode(equipo.juego).game?.generacion ?? 3) : 3;
 
+  // Siempre seis huecos, tenga o no Pokemon. Asi el sitio de cada uno esta
+  // reservado desde el principio: al capturar el tercero aparece en su fila y
+  // los otros dos no se mueven, en vez de recolocarse los tres.
+  const huecos = Array.from({ length: TAMANO_EQUIPO }, (_, i) =>
+    ranuras.find((r) => r.ranura === i) ?? null,
+  );
+
+  // El companero crece desde abajo, asi que su primera ranura va la ultima.
+  const enOrden = lado === 'companero' ? [...huecos].reverse() : huecos;
+
   return (
     <aside className={`equipo equipo--${lado}`} aria-label={titulo}>
       <h2 className="equipo__titulo">{titulo}</h2>
 
-      {ranuras.length === 0 ? (
-        motivo ? <p className="equipo__vacio">{motivo}</p> : null
+      {ranuras.length === 0 && motivo ? (
+        <p className="equipo__vacio">{motivo}</p>
       ) : (
         <ul className="equipo__lista">
-          {ranuras.map((pokemon) => (
-            // La personalidad no cambia nunca, asi que cambiar dos Pokemon de
-            // sitio mueve la ficha en vez de rehacerla.
-            <Ficha
-              key={pokemon.personalidad}
-              pokemon={pokemon}
-              especies={especies}
-              generacion={generacion}
-              activo={activo === pokemon.ranura}
-            />
-          ))}
+          {enOrden.map((pokemon, i) =>
+            pokemon ? (
+              // La personalidad no cambia nunca, asi que cambiar dos Pokemon de
+              // sitio mueve la ficha en vez de rehacerla.
+              <Ficha
+                key={pokemon.personalidad}
+                pokemon={pokemon}
+                especies={especies}
+                generacion={generacion}
+                activo={activo === pokemon.ranura}
+                parejaRota={
+                  caidosDelOtro !== undefined && parejaCaida(pokemon.mote, caidosDelOtro)
+                }
+              />
+            ) : (
+              <li key={`hueco-${i}`} className="ficha ficha--hueco" aria-hidden="true" />
+            ),
+          )}
         </ul>
       )}
     </aside>

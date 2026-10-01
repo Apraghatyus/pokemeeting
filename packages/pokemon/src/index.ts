@@ -14,3 +14,4 @@ export * from './estadisticas';
 export * from './intercambio';
 export * from './lectores';
 export * from './resumen';
+export * from './soullink';
