@@ -12,3 +12,4 @@ export * from './rom';
 export * from './equipo';
 export * from './estadisticas';
 export * from './intercambio';
+export * from './resumen';

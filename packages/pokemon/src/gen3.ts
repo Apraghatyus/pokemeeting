@@ -69,6 +69,14 @@ export type PokemonGen3 = {
   experiencia: number;
   movimientos: number[];
   nivel: number;
+  /**
+   * Si es un huevo.
+   *
+   * Vive en el bit 30 de la palabra que guarda los IV, compartiendo sitio con
+   * ellos. Rellenar esa palabra a lo bruto enciende la bandera y el juego pinta
+   * un huevo sin nivel ni PS: paso al fabricar un Pokemon para probar.
+   */
+  esHuevo: boolean;
   /** true si el checksum cuadra: la senal de que el bloque esta intacto. */
   valido: boolean;
 };
@@ -130,6 +138,7 @@ export const leerPokemon = (bloque: Uint8Array): PokemonGen3 => {
 
   const g = posicionDe(personalidad, 'G');
   const a = posicionDe(personalidad, 'A');
+  const m = posicionDe(personalidad, 'M');
 
   return {
     personalidad,
@@ -142,6 +151,7 @@ export const leerPokemon = (bloque: Uint8Array): PokemonGen3 => {
     experiencia: u32(datos, g + 4),
     movimientos: [u16(datos, a), u16(datos, a + 2), u16(datos, a + 4), u16(datos, a + 6)],
     nivel: bloque[OFF.combate + 4] ?? 0,
+    esHuevo: ((u32(datos, m + 4) >>> 30) & 1) === 1,
     valido: calcularChecksum(datos) === u16(bloque, OFF.checksum),
   };
 };
