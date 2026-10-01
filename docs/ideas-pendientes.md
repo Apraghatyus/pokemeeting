@@ -5,48 +5,92 @@ dice también qué la bloquea, que suele ser lo que de verdad decide el orden.
 
 ---
 
-## Leer la memoria del juego
+## Lo que ya dejó de estar pendiente
 
-**Es el cimiento de casi todo lo demás.** Sin esto no hay intercambios ni nada
-que necesite saber qué Pokémon lleva cada uno.
+Se apunta aquí porque varias de estas estaban descritas como difíciles o
+imposibles, y resultaron no serlo. Vale la pena recordar por qué.
 
-El obstáculo está localizado: mGBA-wasm **no expone lectura ni escritura de
-memoria**, ni scripting Lua. Solo control de ejecución, savestates y sistema de
-ficheros.
-
-La salida es que un savestate de GBA contiene la EWRAM entera, y el equipo
-Pokémon de Rojo Fuego vive ahí. Así que se lee parseando savestates, y se
-escribe editando el savestate y recargándolo.
-
-El primer paso concreto es averiguar **en qué desplazamiento del savestate de
-mGBA empieza la EWRAM**. Se determina una vez, empíricamente, y a partir de ahí
-es aritmética.
-
-Como el Soul Link automático quedó descartado (las reglas las llevan los
-jugadores), no hace falta sondear la memoria continuamente: basta leerla en el
-momento del intercambio, con los dos juegos en pausa. Eso convierte la lectura
-por savestate de solución aceptable en solución cómoda.
+- **Leer la memoria del juego.** Hecho y comprobado contra una partida real: la
+  memoria empieza en `0x21000` del estado, el equipo en `0x02024284`, y el
+  descifrado devuelve los motes que esa persona escribió.
+  Ver [intercambios.md](intercambios.md).
+- **Intercambios.** Hecho por dentro, incluso entre dos copias aleatorizadas
+  distintas. Falta la parte de interfaz y el protocolo de dos fases.
+- **Semilla fija en el randomizer.** Aquí ponía que no se podía sin parchear su
+  código. Era falso: su clase `Randomizer` sí acepta una semilla, lo que no la
+  expone es su línea de órdenes. Se la llama desde `jjs` y ya.
+  Ver [randomizer.md](randomizer.md).
+- **Game Boy Color.** Se juega y se aleatoriza Oro, Plata y Cristal. El núcleo
+  ya los traía dentro.
+- **La transmisión a tirones.** Se capturaba a 30 fotogramas por segundo y el
+  juego corre a 60. Medido: llegaban 29,3 y se descartaba uno en ocho segundos,
+  o sea que la red iba bien y faltaba la mitad de los fotogramas. Ahora llegan
+  55,3. Lo vigila `npm run test:fluidez`.
+- **Llevarse la partida a otro aparato.** El `.sav` no bastaba porque no dice en
+  qué mundo estás; ahora se descarga un fichero con el guardado y la receta.
 
 ---
 
-## Intercambios de Pokémon
+## Diseño para pantallas pequeñas
 
-Depende de lo anterior. El diseño está razonado en
-[intercambios.md](intercambios.md): **nada de emular el cable link**, que exige
-sincronía ciclo a ciclo y se corrompe a la mínima, sino mover el bloque de 100
-bytes de una partida a otra con confirmación en dos fases.
+**Lo siguiente.** Los paneles de equipo están pensados para una pantalla ancha:
+en el móvil bajan como lista, pero los tamaños siguen siendo los de escritorio y
+no quedan cómodos.
 
-Queda pendiente de decidir sobre la marcha: validar los índices de especie,
-movimientos y objetos contra la ROM **que recibe**, porque un índice fuera de
-rango no da un Pokémon raro sino un "Bad Egg" o un cuelgue.
+Está pendiente un diseño propio para móvil, que vendrá de fuera. Lo que hay que
+tener claro al adaptarlo: las seis ranuras reservadas tienen sentido en una
+columna alta y ninguno en una lista, y el sprite a 80 píxeles se come la
+pantalla cuando el ancho son 390.
+
+---
+
+## Cuál está combatiendo
+
+Se intentó y se tumbó, que es más útil que no haberlo intentado: el juego copia
+al Pokémon que sale a su estructura de combate, así que su personalidad aparece
+dos veces en memoria y parecía bastar con buscarla.
+
+No basta. **Esa copia sigue ahí después del combate**, así que decía que el
+Bulbasaur seguía peleando mientras el jugador caminaba por el mapa.
+
+Lo que falta es saber si hay un combate en marcha. Se encuentra comparando dos
+partidas de la misma sesión, una en mitad de una pelea y otra caminando, y
+mirando qué cambia: es el método con el que se encontró todo lo demás. Hace
+falta que alguien exporte esos dos estados.
+
+El estilo para iluminar la ficha ya está puesto, esperando el dato.
+
+---
+
+## Intercambios en la interfaz
+
+El mecanismo está hecho y comprobado; falta la parte que ve el jugador: elegir
+el Pokémon, mandar los cien bytes por el canal de datos -que ya está abierto- y
+confirmar en dos fases para que nadie duplique ni pierda nada si se corta la
+conexión.
+
+Lo que se enseña antes de aceptar ya sabe decirlo `describirTrato`: que entregas
+un BULBASAUR y que en la copia del otro esa especie es de otro tipo.
+
+---
+
+## Segunda generación por dentro
+
+Oro, Plata y Cristal se juegan y se aleatorizan, pero no se les lee el equipo:
+en segunda generación los Pokémon ocupan 48 bytes, no van cifrados y los motes
+viven en listas aparte.
+
+La buena noticia es que el sitio donde encaja ya existe: hay un registro de
+lectores y añadir una generación es escribir un módulo al lado, sin tocar ni la
+interfaz ni la red.
 
 ---
 
 ## Apodo de jugador
 
-Pequeño y se nota mucho. Ahora la ventana del compañero muestra el nombre de su
-fichero de ROM; debería mostrar su nombre. Basta con pedirlo al entrar en la
-sala y mandarlo por el canal que ya existe.
+Pequeño y se nota. La ventana del compañero dice "Tu compañero" porque no
+sabemos cómo se llama. Basta con pedirlo al entrar en la sala y mandarlo por el
+canal que ya existe.
 
 ---
 
@@ -79,21 +123,6 @@ distintos:
 
 ---
 
-## Semilla fija en el randomizer
-
-Ahora dos jugadores con los mismos ajustes obtienen aleatorizaciones
-**distintas**, porque el randomizer no permite elegir la semilla ni desde su
-línea de órdenes ni desde el fichero de ajustes.
-
-Se puede arreglar parcheando su código Java para aceptar `--seed` y compilando
-el jar. Es un cambio pequeño, pero obliga a compilar Java y, al ser GPL-3, a
-publicar el parche si se distribuye.
-
-Mientras tanto, compartir los ajustes ya sirve para acordar **las mismas
-reglas**, aunque cada partida salga diferente.
-
----
-
 ## Servidor TURN
 
 WebRTC conecta directamente entre los dos navegadores usando un servidor STUN
@@ -103,21 +132,30 @@ Un TURN retransmite el tráfico cuando la conexión directa falla. Es la pieza q
 falta para que funcione "siempre" y no "casi siempre". Cuesta dinero o montar
 uno propio (coturn).
 
----
-
-## Game Boy Color
-
-Casi gratis: **mGBA ya emula GB y GBC de forma nativa**. El registro de
-plataformas ya los contempla. Lo que falta no es el emulador sino el
-conocimiento del dominio, porque la segunda generación guarda los Pokémon de
-otra manera que la tercera.
+El síntoma es reconocible: la sala se crea, los dos entráis y la pantalla del
+compañero no llega nunca.
 
 ---
 
 ## Nintendo DS
 
-Otro núcleo entero: melonDS compilado a WebAssembly. Existe, pero es un trabajo
-aparte, y además cambia la interfaz: dos pantallas y entrada táctil.
+Hay una prueba hecha que no toca la aplicación
+([tools/nds/LEEME.md](../tools/nds/LEEME.md)): el núcleo arranca en el
+navegador, va al 82% de la velocidad real y deja sacar estados, que es por donde
+se leería el equipo.
+
+Ese 82% hay que leerlo con cuidado: está medido con una ROM de relleno, donde el
+emulador casi no trabaja. Hace falta una ROM de verdad para saberlo.
+
+Lo que hay que querer antes de meterlo:
+
+- **La licencia.** Los núcleos de DS y el frontend que los empaqueta son GPL-3.
+  El de ahora es MPL-2.0. Meter uno GPL dentro de la aplicación y repartirla la
+  convierte entera en GPL-3.
+- **Dos pantallas y táctil**, que cambian la colocación, lo que se le envía al
+  compañero y el mando en móvil.
+- **Los intercambios habría que rehacerlos.** Cuarta generación usa otra
+  estructura y el estado sería de otro emulador.
 
 ---
 
@@ -137,16 +175,15 @@ caminando por tu juego, como en un MMO.
 cuestión de esfuerzo sino de que son dos problemas distintos:
 
 1. **Saber dónde está tu compañera** es alcanzable. Sus coordenadas y el mapa en
-   el que está viven en la memoria del juego, así que con la lectura de memoria
-   de más arriba se pueden leer y enviar por el canal que ya existe.
+   el que está viven en la memoria del juego, que ya se sabe leer.
 
 2. **Dibujarla dentro de tu juego** es otra cosa. El juego no tiene ningún
    concepto de "otro jugador": habría que inyectar código propio en la ROM
    (*hack* en ensamblador de GBA) que dibuje un personaje extra en unas
    coordenadas que le llegan de fuera, y escribir esas coordenadas en memoria
-   **en cada fotograma**. Eso último ni siquiera es posible con nuestro acceso
-   por savestates; haría falta recompilar mGBA exportando lectura y escritura de
-   memoria.
+   **en cada fotograma**. Eso último no se puede con el acceso por savestates,
+   que cuesta unos milisegundos cada vez; haría falta recompilar mGBA
+   exportando lectura y escritura de memoria.
 
 Y las dos personas tendrían que jugar exactamente la misma ROM parcheada.
 
@@ -157,8 +194,7 @@ equipos durante años.
 **Lo que sí está al alcance**, y da buena parte de la sensación, es un **mapa
 compartido fuera del juego**: leer las coordenadas de los dos, dibujar un mini
 mapa en la interfaz y ver el punto de cada uno moverse en tiempo real. "Estoy en
-Ciudad Celeste, ven" sin escribirlo. Eso sale casi gratis una vez esté la
-lectura de memoria, y no toca la ROM.
+Ciudad Celeste, ven" sin escribirlo. No toca la ROM.
 
 ---
 
@@ -166,12 +202,17 @@ lectura de memoria, y no toca la ROM.
 
 - **`jjs` desaparece en Java 15.** El fichero de ajustes del randomizer lo
   escribe la propia clase `Settings` a través de Nashorn, que ya no existe en
-  Java moderno. Con una JRE nueva habrá que volver a pedir un `.rnqs` o portar
-  el formato.
+  Java moderno. Y de ahí sale también la semilla fija, así que sin `jjs` las
+  partidas dejan de poderse rehacer. Con una JRE nueva habría que portar el
+  formato del fichero de ajustes.
 - **Las salas viven en memoria.** Si se reinicia el servidor de salas,
   desaparecen y no hay reconexión posible; hay que crear una nueva.
 - **Sin límite de espacio visible.** Se guardan hasta tres partidas de 16 MB,
   pero no se muestra cuánto ocupa ni se avisa si el navegador se queda sin
   sitio.
+- **La prueba de paneles falla de vez en cuando.** Una de cada bastantes, y pasa
+  al repetirla sin tocar nada: es una carrera, no una rotura. Se midieron las
+  búsquedas en la ROM por si eran ellas y no lo son (233 ms los nombres, 52 las
+  estadísticas, 16 la tabla de Pokédex).
 - **El ruido de `unwind`.** Al cambiar de ROM, emscripten lanza una excepción
   `unwind` que aparece en la consola. Es normal y no rompe nada, pero ensucia.
