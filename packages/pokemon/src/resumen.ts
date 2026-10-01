@@ -54,6 +54,9 @@ const resumirBloque = (bloque: Uint8Array, ranura: number): PokemonResumen => {
     mote: leerTexto(p.moteBruto),
     nivel: p.nivel,
     estado: leerEstado(bloque),
+    // El tipo no esta en la partida sino en la ROM, que este lector no tiene.
+    // Lo rellena quien si la tiene, antes de enseñarlo o de enviarlo.
+    tipos: null,
     huevo: p.esHuevo,
     personalidad: p.personalidad,
   };

@@ -11,7 +11,7 @@
 // ordenador, ni la nuestra de aqui.
 
 import { useEffect, useMemo, useRef } from 'react';
-import { encontrarTablaDex, encontrarTablaNombres } from '@emupoke/pokemon';
+import { encontrarTablaDex, encontrarTablaEstadisticas, encontrarTablaNombres } from '@emupoke/pokemon';
 
 export type Especies = {
   nombre: (especie: number) => string;
@@ -23,6 +23,13 @@ export type Especies = {
    * CHIMECHO, la 358 nacional, no la 386- y la tabla buena esta en la ROM.
    */
   nacional: (especie: number) => number;
+  /**
+   * Sus dos tipos, leidos de la ROM.
+   *
+   * De la ROM y no de una lista de internet porque el randomizer los cambia:
+   * una lista diria el tipo de siempre y seria falso en media partida.
+   */
+  tipos: (especie: number) => readonly [number, number] | null;
 };
 
 /**
@@ -35,12 +42,14 @@ export const useEspecies = (
 ): Especies => {
   const nombresRef = useRef<((especie: number) => string) | null>(null);
   const dexRef = useRef<((especie: number) => number) | null>(null);
+  const tiposRef = useRef<((especie: number) => readonly [number, number] | null) | null>(null);
   const buscadaRef = useRef(false);
 
   useEffect(() => {
     // Al cambiar de juego, las tablas anteriores ya no valen.
     nombresRef.current = null;
     dexRef.current = null;
+    tiposRef.current = null;
     buscadaRef.current = false;
   }, [romName]);
 
@@ -55,6 +64,8 @@ export const useEspecies = (
       if (!rom) return;
       nombresRef.current = encontrarTablaNombres(rom)?.nombre ?? null;
       dexRef.current = encontrarTablaDex(rom)?.nacional ?? null;
+      const stats = encontrarTablaEstadisticas(rom);
+      tiposRef.current = stats ? (especie) => stats.estadisticas(especie)?.tipos ?? null : null;
     };
 
     return {
@@ -68,6 +79,10 @@ export const useEspecies = (
       nacional: (especie: number) => {
         asegurar();
         return dexRef.current?.(especie) ?? 0;
+      },
+      tipos: (especie: number) => {
+        asegurar();
+        return tiposRef.current?.(especie) ?? null;
       },
     };
   }, [romBytesRef, romName]);

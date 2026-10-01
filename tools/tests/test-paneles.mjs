@@ -101,6 +101,13 @@ if (aparecio) {
     .catch(() => false);
   check('y la imagen llega, que con aislamiento cross-origin no es obvio', cargo === true);
 
+  // El tipo sale de la ROM que corre, no de una lista: con una copia
+  // aleatorizada, una lista diria el tipo de siempre y seria falso.
+  const tipos = await page.locator('.equipo--propio .ficha .tipo').allTextContents();
+  check('la ficha enseña el tipo de la especie', tipos.length >= 1, tipos.join(' / '));
+  check('y es el que tiene en ESTA ROM, que aqui no esta aleatorizada',
+    tipos.map((t) => t.toLowerCase()).join('/') === 'planta/veneno', tipos.join('/'));
+
   // Fuera de combate y sano: ni iluminado ni con estado alterado.
   check('un Pokemon sano no lleva etiqueta de estado',
     (await page.locator('.equipo--propio .estado').count()) === 0);

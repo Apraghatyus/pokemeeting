@@ -17,6 +17,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EquipoResumen } from '@emupoke/protocol';
 import { mismoEquipo, releerEquipo, resumirEquipo } from '@emupoke/pokemon';
 import type { MgbaModule } from './mgbaCore';
+import type { Especies } from './useEspecies';
 
 /**
  * Ranura de estado reservada para mirar, separada de las del jugador.
@@ -49,12 +50,14 @@ export type EstadoEquipo = {
  * @param coreRef   el nucleo, cuando ya este arrancado
  * @param jugando   si hay una partida en marcha
  * @param romName   para olvidar lo aprendido al cambiar de juego
+ * @param especies  para completar lo que esta en la ROM y no en la partida
  * @param onCambio  se llama solo cuando el equipo cambia de verdad
  */
 export const useEquipo = (
   coreRef: { current: MgbaModule | null },
   jugando: boolean,
   romName: string | null,
+  especies: Especies,
   onCambio?: (equipo: EquipoResumen) => void,
 ): EstadoEquipo => {
   const [equipo, setEquipo] = useState<EquipoResumen | null>(null);
@@ -68,6 +71,10 @@ export const useEquipo = (
   // bucle: viene de una funcion nueva en cada render del componente de arriba.
   const avisoRef = useRef(onCambio);
   avisoRef.current = onCambio;
+
+  // Igual que el aviso: cambia en cada render y no debe reiniciar el bucle.
+  const especiesRef = useRef(especies);
+  especiesRef.current = especies;
 
   const mirar = useCallback(() => {
     const core = coreRef.current;
@@ -99,6 +106,19 @@ export const useEquipo = (
         } else {
           direccionRef.current = null;
         }
+      }
+
+      // El tipo de cada especie vive en la ROM, no en la partida, asi que se
+      // añade aqui: lo manda cada lado con su copia, porque en dos
+      // aleatorizadas por separado la misma especie tiene tipos distintos.
+      if (leido) {
+        leido = {
+          ...leido,
+          ranuras: leido.ranuras.map((r) => ({
+            ...r,
+            tipos: especiesRef.current.tipos(r.especie),
+          })),
+        };
       }
 
       setDisponible(true);

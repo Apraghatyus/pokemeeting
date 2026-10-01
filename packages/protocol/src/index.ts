@@ -90,6 +90,15 @@ export type PokemonResumen = {
    * en un Soul Link, donde un debilitado suele ser el final de una pareja.
    */
   estado: EstadoPokemon | null;
+  /**
+   * Sus dos tipos, como numeros, o null si no se han podido leer.
+   *
+   * Viajan en el mensaje en vez de resolverlos quien recibe, y esa es la
+   * diferencia entre acertar y mentir: en dos copias aleatorizadas por separado
+   * la misma especie tiene tipos distintos. Comprobado generando dos, donde el
+   * mismo Bulbasaur salio de Tierra en una y de Dragon en la otra.
+   */
+  tipos: readonly [number, number] | null;
   /** Un huevo no enseña especie ni nivel, y conviene saberlo antes de pintarlo. */
   huevo: boolean;
   /**

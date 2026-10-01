@@ -81,6 +81,7 @@ export const App = () => {
     emulator.coreRef,
     state.status === 'running',
     state.romName,
+    especies,
     session.enviarEquipo,
   );
 

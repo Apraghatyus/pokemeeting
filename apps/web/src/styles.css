@@ -1498,15 +1498,13 @@ details.partidas[open] > summary::before {
   flex: none;
   display: grid;
   place-items: center;
-  width: 56px;
-  height: 56px;
+  width: 70px;
+  height: 70px;
   border-radius: 50%;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.02em;
   color: #fff;
-  background: hsl(var(--tono) 55% 32%);
-  border: 2px solid hsl(var(--tono) 60% 55%);
 }
 
 .ficha__datos {
@@ -1689,4 +1687,46 @@ details.partidas[open] > summary::before {
    ocupa: la partida se queda su sitio y se ve mas grande. */
 .mesa--solo {
   grid-template-columns: var(--columna-equipo) minmax(0, 1fr);
+}
+
+/* --- Tipos --- */
+
+/* Los colores de siempre, los que usa todo el mundo para los tipos. Se
+   reconocen sin leer la etiqueta, que es justo para lo que sirven. */
+.tipo {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--color-tipo, #777);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+}
+
+/* El numero es el que usa la propia consola, no el de ninguna lista nuestra. */
+.tipo--0 { --color-tipo: #9fa19f; }   /* normal */
+.tipo--1 { --color-tipo: #ff8000; }   /* lucha */
+.tipo--2 { --color-tipo: #81b9ef; }   /* volador */
+.tipo--3 { --color-tipo: #9141cb; }   /* veneno */
+.tipo--4 { --color-tipo: #915121; }   /* tierra */
+.tipo--5 { --color-tipo: #afa981; }   /* roca */
+.tipo--6 { --color-tipo: #91a119; }   /* bicho */
+.tipo--7 { --color-tipo: #704170; }   /* fantasma */
+.tipo--8 { --color-tipo: #60a1b8; }   /* acero */
+.tipo--9 { --color-tipo: #777; }      /* el hueco sin usar */
+.tipo--10 { --color-tipo: #e62829; }  /* fuego */
+.tipo--11 { --color-tipo: #2980ef; }  /* agua */
+.tipo--12 { --color-tipo: #3fa129; }  /* planta */
+.tipo--13 { --color-tipo: #d6a400; }  /* electrico */
+.tipo--14 { --color-tipo: #ef4179; }  /* psiquico */
+.tipo--15 { --color-tipo: #3dcef3; }  /* hielo */
+.tipo--16 { --color-tipo: #5060e1; }  /* dragon */
+.tipo--17 { --color-tipo: #5a5465; }  /* siniestro */
+
+/* La segunda linea de la ficha, la de los tipos, un poco mas suelta. */
+.ficha__linea + .ficha__linea {
+  margin-top: 2px;
 }

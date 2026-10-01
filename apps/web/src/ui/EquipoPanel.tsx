@@ -13,7 +13,7 @@
 // Fuego que, el dia que exista su lector, una de Oro.
 
 import { useState } from 'react';
-import { parseGameCode } from '@emupoke/pokemon';
+import { parseGameCode, TIPOS_GEN3 } from '@emupoke/pokemon';
 import type { Especies } from '../core/useEspecies';
 import type { EquipoResumen, EstadoPokemon, PokemonResumen } from '@emupoke/protocol';
 
@@ -143,6 +143,34 @@ const Sprite = ({
   );
 };
 
+/**
+ * Los tipos de un Pokemon, uno o dos.
+ *
+ * Los nombres salen del catalogo de tercera generacion y el color de la
+ * convencion de siempre, la misma que usan PokeAPI y todo lo demas, para que
+ * se reconozcan sin leerlos.
+ *
+ * El numero del tipo viene en el mensaje, puesto por quien lo manda con SU
+ * copia del juego. Resolverlo aqui seria mas comodo y estaria mal: en dos
+ * copias aleatorizadas por separado la misma especie tiene tipos distintos.
+ */
+const Tipos = ({ tipos }: { tipos: readonly [number, number] | null }) => {
+  if (!tipos) return null;
+
+  // Un tipo repetido no es doble: es uno solo, y el juego lo guarda asi.
+  const unicos = tipos[0] === tipos[1] ? [tipos[0]] : [tipos[0], tipos[1]];
+
+  return (
+    <>
+      {unicos.map((tipo) => (
+        <span key={tipo} className={`tipo tipo--${tipo}`}>
+          {TIPOS_GEN3[tipo] ?? '?'}
+        </span>
+      ))}
+    </>
+  );
+};
+
 const Ficha = ({
   pokemon,
   especies,
@@ -197,6 +225,9 @@ const Ficha = ({
               {SIGLA[pokemon.estado]}
             </span>
           )}
+        </span>
+        <span className="ficha__linea">
+          {!pokemon.huevo && <Tipos tipos={pokemon.tipos} />}
         </span>
       </span>
 
