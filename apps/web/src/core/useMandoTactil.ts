@@ -13,7 +13,7 @@
 // decidir: mandar sobre algo que el jugador acaba de elegir es de las cosas que
 // mas molestan de una interfaz.
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
  * Un aparato en el que el mando tiene sentido de entrada.
@@ -25,18 +25,41 @@ import { useEffect, useRef, useState } from 'react';
  */
 const TACTIL = '(pointer: coarse) and (hover: none)';
 
+/**
+ * Los tres modos, que son las tres respuestas posibles a "¿saco el mando?".
+ *
+ * `auto` es la de serie y la buena casi siempre. Las otras dos existen porque
+ * ninguna deteccion acierta el 100% de las veces, y cuando falla el jugador
+ * necesita poder zanjarlo en vez de pelearse con ella.
+ */
+export type ModoMando = 'auto' | 'siempre' | 'nunca';
+
 export type MandoTactil = {
   visible: boolean;
+  modo: ModoMando;
   /** Lo enciende o lo apaga a mano, y deja de decidirse solo. */
   fijar: (visible: boolean) => void;
+  cambiarModo: (modo: ModoMando) => void;
+};
+
+const CLAVE_MODO = 'emupoke.mando';
+
+const leerModo = (): ModoMando => {
+  try {
+    const guardado = localStorage.getItem(CLAVE_MODO);
+    return guardado === 'siempre' || guardado === 'nunca' ? guardado : 'auto';
+  } catch {
+    return 'auto';
+  }
 };
 
 export const useMandoTactil = (): MandoTactil => {
+  const [modo, setModo] = useState<ModoMando>(leerModo);
   const [visible, setVisible] = useState(
     () => globalThis.matchMedia?.(TACTIL).matches ?? false,
   );
   /** Mientras nadie lo toque a mano, se sigue decidiendo solo. */
-  const automatico = useRef(true);
+  const automatico = useRef(leerModo() === 'auto');
 
   useEffect(() => {
     const consulta = globalThis.matchMedia?.(TACTIL);
@@ -93,11 +116,24 @@ export const useMandoTactil = (): MandoTactil => {
     };
   }, []);
 
+  const cambiarModo = useCallback((siguiente: ModoMando) => {
+    setModo(siguiente);
+    automatico.current = siguiente === 'auto';
+    try {
+      localStorage.setItem(CLAVE_MODO, siguiente);
+    } catch {
+      // Sin almacenamiento el modo vale para esta sesion y ya.
+    }
+    if (siguiente === 'siempre') setVisible(true);
+    else if (siguiente === 'nunca') setVisible(false);
+    // En automatico se deja lo que diga el aparato ahora mismo.
+    else setVisible(globalThis.matchMedia?.(TACTIL).matches ?? false);
+  }, []);
+
   return {
-    visible,
-    fijar: (quiere: boolean) => {
-      automatico.current = false;
-      setVisible(quiere);
-    },
+    visible: modo === 'siempre' ? true : modo === 'nunca' ? false : visible,
+    modo,
+    cambiarModo,
+    fijar: (quiere: boolean) => cambiarModo(quiere ? 'siempre' : 'nunca'),
   };
 };

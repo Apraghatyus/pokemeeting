@@ -44,12 +44,12 @@ const page = await abrir();
 
 // --- las teclas de fabrica son las de todo el mundo ---
 await page.locator('.iconbutton--opciones').click();
-await page.waitForSelector('.kv--teclas', { timeout: 10_000 });
+await page.waitForSelector('.teclas', { timeout: 10_000 });
 
 // Por texto exacto del <dt>: buscar "A" por contenido casa tambien con
 // "Arriba", y entonces la prueba mide la fila equivocada sin que se note.
 const filaDe = (etiqueta) =>
-  page.locator('.kv--teclas .kv__row').filter({ has: page.getByText(etiqueta, { exact: true }) }).first();
+  page.locator('.teclas__fila').filter({ has: page.getByText(etiqueta, { exact: true }) }).first();
 
 const teclaDe = async (etiqueta) => (await filaDe(etiqueta).locator('.tecla').textContent())?.trim();
 
@@ -62,7 +62,7 @@ check('el avance rapido va en el espacio',
 const filaA = filaDe('A');
 await filaA.locator('.tecla').click();
 check('al pedirlo, el boton avisa de que espera',
-  (await filaA.locator('.tecla').textContent())?.includes('pulsa'));
+  (await filaA.locator('.tecla').textContent())?.includes('···'));
 
 await page.keyboard.press('KeyJ');
 await page.waitForTimeout(300);
@@ -74,8 +74,8 @@ check('y se recuerda al recargar la pagina',
   await page.evaluate(() => JSON.parse(localStorage.getItem('emupoke.teclas') ?? '{}').A === 'J'));
 
 await page.locator('.iconbutton--opciones').click();
-await page.waitForSelector('.kv--teclas', { timeout: 10_000 });
-await page.getByRole('button', { name: /Volver a las teclas de siempre/ }).click();
+await page.waitForSelector('.teclas', { timeout: 10_000 });
+await page.getByRole('button', { name: 'Restablecer' }).click();
 await page.waitForTimeout(300);
 check('se pueden devolver a las de fabrica', (await teclaDe('A')) === 'Z', await teclaDe('A'));
 
@@ -84,7 +84,7 @@ check('se pueden devolver a las de fabrica', (await teclaDe('A')) === 'Z', await
 // mitad de una partida para encenderlo no tenia sentido. Queda el espacio en
 // escritorio y su boton en el mando tactil, que es lo que se comprueba abajo.
 check('el avance rapido no ocupa sitio en el menu',
-  (await page.locator('.toolbar').getByText(/Avance rapido/).count()) === 0);
+  (await page.locator('.acciones').getByText(/Avance rapido/).count()) === 0);
 
 await page.keyboard.press('Escape');
 await page.waitForTimeout(400);
@@ -114,7 +114,7 @@ check('exportar sin guardar avisa', salio);
 if (salio) {
   // Esto es lo que fallaba: el aviso apagaba todo lo demas.
   const estado = await page.evaluate(() => ({
-    barra: [...document.querySelectorAll('.toolbar button')].filter((b) => !b.disabled).length,
+    barra: [...document.querySelectorAll('.acciones button')].filter((b) => !b.disabled).length,
     canvas: document.querySelector('canvas') !== null,
   }));
   check('y el juego y la barra siguen funcionando', estado.barra > 0 && estado.canvas,

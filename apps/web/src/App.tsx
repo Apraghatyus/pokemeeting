@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RomFingerprint } from '@emupoke/protocol';
-import { useTeclas, BOTONES, nombreVisible } from './core/useTeclas';
+import { useTeclas } from './core/useTeclas';
 import { useEmulator } from './core/useEmulator';
 import { useKeyboardOwnership } from './core/useKeyboardOwnership';
 import { useSession } from './net/useSession';
@@ -12,13 +12,11 @@ import { codificarSemilla } from './core/semilla';
 import { sePuedeRehacer, todasLasPartidas } from './core/partidas';
 import { motesDebilitados } from '@emupoke/pokemon';
 import { EquipoPanel } from './ui/EquipoPanel';
-import { Modal } from './ui/Modal';
+import { AjustesModal } from './ui/AjustesModal';
 import { RandomizerModal } from './ui/RandomizerModal';
 import { RomDropZone, RoomDropZoneHint } from './ui/RomDropZone';
-import { RomInfoCard } from './ui/RomInfoCard';
 import { RoomModal } from './ui/RoomModal';
 import { Stage } from './ui/Stage';
-import { Toolbar } from './ui/Toolbar';
 import { TouchControls } from './ui/TouchControls';
 import { TopBar } from './ui/TopBar';
 import { VoiceBar } from './ui/VoiceBar';
@@ -253,150 +251,21 @@ export const App = () => {
         {/* Todos los ajustes viven en un modal y no en un cajon lateral: el
             cajon empujaba la partida a un lado cada vez que se abria, y aqui
             lo que no puede moverse es justo la pantalla del juego. */}
-        <Modal
+        <AjustesModal
           open={menuOpen}
           onClose={() => setMenuOpen(false)}
-          icon="⚙"
-          title="Ajustes"
-          subtitle="Emulador, mando y partida"
-        >
-          <section className="panel panel--wide">
-            <h2>Emulador</h2>
-            <Toolbar
-              state={state}
-              onTogglePause={emulator.togglePause}
-              onReset={emulator.reset}
-              onSaveState={emulator.saveState}
-              onLoadState={emulator.loadState}
-              onDownloadSave={emulator.downloadSave}
-              onExportState={emulator.exportState}
-              onImportSave={emulator.importSave}
-            />
-            {state.lastSaveAt && (
-              <p className="note">
-                Guardado a las {new Date(state.lastSaveAt).toLocaleTimeString('es')}. La partida
-                queda en este navegador.
-              </p>
-            )}
-          </section>
-
-          {hasRom && (
-            <>
-              <RomInfoCard
-                header={state.header!}
-                platform={state.platform!}
-                romName={state.romName!}
-              />
-              <section className="panel">
-                <h2>Cambiar ROM</h2>
-                <p className="hint">
-                  Cierra esta ROM y vuelve a la pantalla de carga para elegir otra.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    emulator.closeRom();
-                  }}
-                >
-                  Cargar otra ROM
-                </button>
-              </section>
-            </>
-          )}
-
-          {hasRom && (
-            <section className="panel">
-              <h2>Aleatorizar</h2>
-              <p className="hint">
-                Cambia que Pokemon, objetos y entrenadores aparecen en tu partida.
-              </p>
-              <div className="modal__acciones">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    setRandomizerOpen(true);
-                  }}
-                >
-                  Opciones
-                </button>
-                {/* La semilla es lo unico que hace falta para rehacer este mundo
-                    exacto, asi que tiene que poder copiarse en cualquier momento
-                    y no solo en el rato en que se genero. */}
-                <CopiarSemilla crc32={state.header?.crc32 ?? null} />
-              </div>
-              {state.romSource === 'generada' && (
-                <p className="hint">
-                  Estas jugando una copia aleatorizada. Aleatorizar otra vez parte siempre de tu
-                  ROM original, no de esta.
-                </p>
-              )}
-            </section>
-          )}
-
-          <section className="panel">
-            <h2>Controles</h2>
-            <dl className="kv kv--teclas">
-              {BOTONES.map(({ entrada, etiqueta }) => (
-                <div className="kv__row" key={entrada}>
-                  <dt>{etiqueta}</dt>
-                  <dd>
-                    <button
-                      type="button"
-                      className={`tecla${teclas.esperando === entrada ? ' tecla--esperando' : ''}`}
-                      onClick={() =>
-                        teclas.esperando === entrada ? teclas.cancelar() : teclas.pedir(entrada)
-                      }
-                    >
-                      {teclas.esperando === entrada
-                        ? 'pulsa una tecla...'
-                        : (teclas.mapa[entrada] ? nombreVisible(teclas.mapa[entrada]!) : 'sin asignar')}
-                    </button>
-                  </dd>
-                </div>
-              ))}
-              <div className="kv__row">
-                <dt>Avance rapido</dt>
-                <dd>
-                  <span className="tecla tecla--fija">Espacio</span>
-                </dd>
-              </div>
-            </dl>
-
-            {teclas.problema && <p className="warn">{teclas.problema}</p>}
-
-            <div className="modal__acciones">
-              <button type="button" onClick={teclas.restaurar}>
-                Volver a las teclas de siempre
-              </button>
-            </div>
-
-            <p className="hint">
-              Pulsa un boton y despues la tecla que quieras. Se guarda por posicion en el teclado,
-              no por la letra, asi que el mando sigue donde lo dejaste aunque cambies de
-              distribucion. Escape cancela.
-            </p>
-            <p className="hint">
-              Mientras escribes en un campo, el juego suelta el teclado y lo recupera al salir.
-            </p>
-            <button
-              type="button"
-              className={mando.visible ? 'is-active' : undefined}
-              onClick={() => mando.fijar(!mando.visible)}
-            >
-              {mando.visible ? 'Ocultar mando tactil' : 'Mostrar mando tactil'}
-            </button>
-            <p className="hint">
-              El mando sale solo si juegas tocando la pantalla y se va si usas el teclado. Si lo
-              cambias aqui, se queda como lo dejes.
-            </p>
-          </section>
-
-          {/* El registro del nucleo ya no se enseña: para quien juega es ruido,
-              y lo que de verdad hace falta saber se dice con palabras donde
-              toca. Se sigue guardando en el estado por si hace falta depurar. */}
-        </Modal>
+          state={state}
+          emulator={emulator}
+          teclas={teclas}
+          mando={mando}
+          hasRom={hasRom}
+          conCompanero={conCompanero}
+          onAleatorizar={() => {
+            setMenuOpen(false);
+            setRandomizerOpen(true);
+          }}
+          copiarSemilla={<CopiarSemilla crc32={state.header?.crc32 ?? null} />}
+        />
       </main>
 
       <RandomizerModal

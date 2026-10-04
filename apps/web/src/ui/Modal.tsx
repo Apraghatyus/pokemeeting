@@ -7,6 +7,8 @@ type Props = {
   subtitle?: string;
   /** Simbolo decorativo de la esquina superior izquierda. */
   icon?: ReactNode;
+  /** Barra de abajo, para lo que acompaña sin ser una accion. */
+  pie?: ReactNode;
   children: ReactNode;
 };
 
@@ -17,7 +19,7 @@ type Props = {
  * olvidarse: atrapar el foco dentro, cerrar con Escape y quedar por encima de
  * todo sin pelearse con el z-index del canvas.
  */
-export const Modal = ({ open, onClose, title, subtitle, icon, children }: Props) => {
+export const Modal = ({ open, onClose, title, subtitle, icon, pie, children }: Props) => {
   const ref = useRef<HTMLDialogElement | null>(null);
 
   useEffect(() => {
@@ -38,6 +40,7 @@ export const Modal = ({ open, onClose, title, subtitle, icon, children }: Props)
       <h2 className="modal__title">{title}</h2>
       {subtitle && <p className="modal__subtitle">{subtitle}</p>}
       <div className="modal__body">{children}</div>
+      {pie && <div className="modal__pie">{pie}</div>}
     </dialog>
   );
 };

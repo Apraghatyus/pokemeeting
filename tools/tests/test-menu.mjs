@@ -46,26 +46,57 @@ await page.waitForTimeout(600);
 
 // --- el menu ---
 await page.locator('.iconbutton--opciones').click();
-await page.waitForSelector('.toolbar', { timeout: 10_000 });
+await page.waitForSelector('.acciones', { timeout: 10_000 });
 
 const hay = async (nombre) => (await page.getByRole('button', { name: nombre, exact: true }).count()) > 0;
 
-check('reiniciar dice que reinicia la partida', await hay('Reiniciar partida'));
+check('reiniciar esta como baldosa', await hay('Reiniciar'));
 check('guardar y cargar estado siguen', (await hay('Guardar estado')) && (await hay('Cargar estado')));
 check('exportar e importar ya no dicen ".sav"',
   (await hay('Exportar partida')) && (await hay('Importar partida')));
 check('y no queda ningun ".sav" suelto en el menu',
   (await page.locator('.modal').getByText('.sav', { exact: false }).count()) === 0);
 check('el avance rapido ya no esta en el menu',
-  (await page.locator('.toolbar').getByText(/Avance rapido/).count()) === 0);
+  (await page.locator('.acciones').getByText(/Avance rapido/).count()) === 0);
 check('el registro del nucleo ya no se enseña',
   (await page.locator('.modal').getByText('Registro del nucleo').count()) === 0);
-check('la seccion de ROM se llama "Cambiar ROM"',
-  (await page.locator('.modal').getByText('Cambiar ROM', { exact: true }).count()) === 1);
+check('el boton de cambiar dice "Cambiar ROM"', await hay('Cambiar ROM'));
 check('aleatorizar tiene su boton de opciones', await hay('Opciones'));
 
+// --- la forma nueva: dos columnas y tarjetas ---
+const forma = await page.evaluate(() => {
+  const rejilla = document.querySelector('.ajustes');
+  if (!rejilla) return null;
+  return {
+    columnas: getComputedStyle(rejilla).gridTemplateColumns.split(' ').length,
+    tarjetas: document.querySelectorAll('.tarjeta').length,
+    baldosas: document.querySelectorAll('.baldosa').length,
+    pares: document.querySelectorAll('.par').length,
+    pie: document.querySelector('.modal__pie') !== null,
+  };
+});
+check('el menu va en dos columnas', forma?.columnas === 2, `${forma?.columnas}`);
+check('y en tarjetas', (forma?.tarjetas ?? 0) >= 4, `${forma?.tarjetas}`);
+check('con las acciones sueltas en baldosas', (forma?.baldosas ?? 0) === 3, `${forma?.baldosas}`);
+check('y las de ida y vuelta en parejas', (forma?.pares ?? 0) === 2, `${forma?.pares}`);
+check('tiene pie con la ficha de la ROM', forma?.pie);
+
+// --- el mando tactil, con sus tres modos ---
+const modos = await page.locator('.modos button').allTextContents();
+check('el mando tactil ofrece auto, siempre y nunca',
+  modos.length === 3 && modos.join('/') === 'Auto/Siempre/Nunca', modos.join('/'));
+await page.locator('.modos button', { hasText: 'Siempre' }).click();
+await page.waitForTimeout(300);
+check('elegir "siempre" saca el mando en escritorio',
+  (await page.locator('.pad').count()) === 1);
+check('y se recuerda', await page.evaluate(() => localStorage.getItem('emupoke.mando')) === 'siempre');
+await page.locator('.modos button', { hasText: 'Auto' }).click();
+await page.waitForTimeout(300);
+check('y volver a "auto" lo quita de un escritorio',
+  (await page.locator('.pad').count()) === 0);
+
 // --- reiniciar pide confirmacion ---
-const reiniciar = page.getByRole('button', { name: 'Reiniciar partida' });
+const reiniciar = page.getByRole('button', { name: 'Reiniciar', exact: true });
 await reiniciar.click();
 await page.waitForTimeout(200);
 check('al primer clic pregunta en vez de reiniciar',
