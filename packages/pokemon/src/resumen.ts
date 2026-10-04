@@ -72,13 +72,18 @@ const resumirBloque = (bloque: Uint8Array, ranura: number): PokemonResumen => {
 const resumirGen3 = (
   estado: Uint8Array,
 ): { resumen: EquipoResumen; equipo: Equipo } | null => {
-  const equipo = localizarEquipo(estado);
+  // El codigo del juego se saca antes de buscar y se le pasa: con el, el
+  // localizador ancla en la direccion del equipo del JUGADOR en vez de elegir
+  // por forma, que es lo que hacia que durante un combate saliera en el panel
+  // el equipo del entrenador rival.
+  const codigoJuego = leerCabecera(estado).codigoJuego;
+  const equipo = localizarEquipo(estado, undefined, codigoJuego);
   if (!equipo) return null;
 
   return {
     equipo,
     resumen: {
-      juego: leerCabecera(estado).codigoJuego,
+      juego: codigoJuego,
       momento: Date.now(),
       ranuras: equipo.ranuras.map((r) => resumirBloque(r.bloque, r.indice)),
     },

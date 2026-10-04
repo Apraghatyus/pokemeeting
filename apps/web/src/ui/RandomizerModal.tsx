@@ -203,8 +203,20 @@ export const RandomizerModal = ({
   const toggle = (id: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+        return next;
+      }
+      next.add(id);
+
+      // Al marcar una, se desmarcan las que escriben en el mismo ajuste. Si no,
+      // el randomizer aplica una de las dos en silencio y el jugador se entera
+      // al empezar la partida.
+      const elegida = options.find((o) => o.id === id);
+      for (const otra of elegida?.chocaCon ?? []) next.delete(otra);
+      for (const o of options) {
+        if (o.id !== id && o.chocaCon?.includes(id)) next.delete(o.id);
+      }
       return next;
     });
   };
@@ -708,7 +720,21 @@ export const RandomizerModal = ({
               </div>
 
               <div className="opciones__acciones">
-                <button type="button" onClick={() => setSelected(new Set(options.map((o) => o.id)))}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Marcar todas no puede meter dos que choquen: se queda la
+                    // primera de cada grupo.
+                    const todas = new Set<string>();
+                    for (const o of options) {
+                      const choca =
+                        o.chocaCon?.some((otra) => todas.has(otra)) ||
+                        options.some((x) => todas.has(x.id) && x.chocaCon?.includes(o.id));
+                      if (!choca) todas.add(o.id);
+                    }
+                    setSelected(todas);
+                  }}
+                >
                   Marcar todo
                 </button>
                 <button type="button" onClick={() => setSelected(new Set())}>

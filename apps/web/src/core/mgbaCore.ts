@@ -198,13 +198,20 @@ export const loadRomFile = async (
  * mGBA gestiona el teclado por su cuenta via SDL; fijamos los enlaces de forma
  * explicita para que el control no dependa de los valores por defecto del nucleo.
  */
+/**
+ * Las teclas de salida de fabrica.
+ *
+ * Z es A y X es B, que es como lo tienen VisualBoy, mGBA de escritorio y
+ * RetroArch. Antes estaban al reves, y jugando se nota enseguida: la memoria
+ * muscular de cualquiera que haya emulado antes manda la Z a aceptar.
+ */
 export const DEFAULT_KEY_BINDINGS: readonly (readonly [sdlKey: string, gbaInput: string])[] = [
   ['Up', 'Up'],
   ['Down', 'Down'],
   ['Left', 'Left'],
   ['Right', 'Right'],
-  ['X', 'A'],
-  ['Z', 'B'],
+  ['Z', 'A'],
+  ['X', 'B'],
   ['A', 'L'],
   ['S', 'R'],
   ['Return', 'Start'],

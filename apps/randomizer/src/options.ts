@@ -30,6 +30,14 @@ export type RandomizerOption = {
    * habia cambiado. Ya paso una vez con unos ajustes que no tocaban nada.
    */
   generaciones: readonly Generacion[];
+  /**
+   * Otras opciones con las que esta no puede ir a la vez.
+   *
+   * Pasa cuando dos opciones escriben en el mismo ajuste del randomizer: no da
+   * error, simplemente gana una y el jugador nunca sabe cual. Mejor no dejar
+   * marcar las dos.
+   */
+  chocaCon?: readonly string[];
 };
 
 /** Casi todo existe en las dos; se nombra una vez para no repetirlo catorce. */
@@ -53,6 +61,22 @@ export const OPTIONS: readonly RandomizerOption[] = [
     index: 2, // COMPLETELY_RANDOM
     total: 4,
     generaciones: AMBAS,
+  },
+  {
+    // Comprobado contra el propio jar: StartersMod es
+    // [UNCHANGED, CUSTOM, COMPLETELY_RANDOM, RANDOM_WITH_TWO_EVOLUTIONS].
+    id: 'iniciales-evolucionables',
+    label: 'Iniciales con dos evoluciones',
+    description:
+      'Como el anterior, pero solo salen Pokemon que evolucionan dos veces. Se juega mejor: un inicial sin evoluciones se queda corto enseguida.',
+    setter: 'setStartersMod',
+    index: 3, // RANDOM_WITH_TWO_EVOLUTIONS
+    total: 4,
+    generaciones: AMBAS,
+    // Las dos escriben en setStartersMod, asi que marcar ambas dejaria que
+    // ganase la ultima en salir del catalogo, en silencio y sin que el jugador
+    // supiera cual le toco.
+    chocaCon: ['iniciales'],
   },
   {
     id: 'fijos',
@@ -172,11 +196,12 @@ export const optionById = (id: string): RandomizerOption | undefined =>
 
 /** Lo que ve la interfaz: sin los detalles de como se aplica. */
 export const publicOptions = () =>
-  OPTIONS.map(({ id, label, description, generaciones }) => ({
+  OPTIONS.map(({ id, label, description, generaciones, chocaCon }) => ({
     id,
     label,
     description,
     generaciones,
+    ...(chocaCon ? { chocaCon } : {}),
   }));
 
 /** Las opciones que tienen sentido en un juego de esa generacion. */

@@ -21,6 +21,19 @@ export type EmulatorState = {
    *  Sirve para no volver a preguntar por aleatorizacion tras aleatorizar. */
   romSource: 'usuario' | 'generada' | null;
   error: string | null;
+  /**
+   * Un aviso para el jugador que NO es un fallo del emulador.
+   *
+   * Existe aparte de `error` por algo que se vio jugando: intentar exportar una
+   * partida todavia sin guardar ponia `status: 'error'`, y eso apagaba la barra
+   * entera -sus botones piden estar "running"- y ademas paraba la lectura del
+   * equipo. Un mensaje de ayuda dejaba media aplicacion inservible, y como nada
+   * volvia a limpiarlo, se quedaba asi para siempre.
+   *
+   * Un aviso se quita solo cuando deja de tener sentido, y el jugador puede
+   * cerrarlo. El juego sigue corriendo por debajo.
+   */
+  aviso: string | null;
   /** Momento del ultimo guardado del juego en SRAM, para dar senal al jugador. */
   lastSaveAt: number | null;
   fastForward: boolean;
@@ -111,6 +124,7 @@ const initialState: EmulatorState = {
   romName: null,
   romSource: null,
   error: null,
+  aviso: null,
   lastSaveAt: null,
   fastForward: false,
   volume: DEFAULT_VOLUME,
@@ -186,7 +200,10 @@ export const useEmulator = () => {
           // partida a IndexedDB para que sobreviva a cerrar la pestana.
           saveDataUpdatedCallback: () => {
             void core.FSSync();
-            setState((prev) => ({ ...prev, lastSaveAt: Date.now() }));
+            // Si el aviso era "guarda dentro del juego", acaba de hacerlo: se
+            // quita solo. Dejarlo puesto despues de resolverlo era justo la
+            // parte mas confusa del fallo.
+            setState((prev) => ({ ...prev, lastSaveAt: Date.now(), aviso: null }));
           },
         });
 
@@ -429,11 +446,14 @@ export const useEmulator = () => {
     // fichero parece correcto y esta vacio. Solo se escribe al guardar DENTRO
     // del juego, no basta con haber jugado.
     if (save.every((byte) => byte === 0)) {
-      fail(
-        new Error(
+      // Un aviso, no un fallo: el emulador esta perfectamente y el juego sigue
+      // corriendo. Marcarlo como error apagaba la barra entera y la lectura del
+      // equipo, y no habia forma de recuperarlos.
+      setState((prev) => ({
+        ...prev,
+        aviso:
           'Tu partida esta vacia: el juego solo la escribe al guardar desde su menu. Guarda dentro del juego y vuelve a exportar.',
-        ),
-      );
+      }));
       return;
     }
     const baseName = (core.gameName ?? 'partida').replace(/\.[^.]+$/, '');
@@ -503,6 +523,28 @@ export const useEmulator = () => {
     if (!core) return;
     core.setFastForwardMultiplier(enabled ? FAST_FORWARD_MULTIPLIER : 1);
     setState((prev) => ({ ...prev, fastForward: enabled }));
+  }, []);
+
+  /**
+   * Enciende o apaga el avance rapido.
+   *
+   * Antes habia que mantener pulsado, y para lo que de verdad se usa -pasar
+   * dialogos largos o cruzar una ruta ya conocida- eso obliga a tener el dedo
+   * ocupado justo mientras necesitas las otras teclas para jugar.
+   */
+  const toggleFastForward = useCallback(() => {
+    const core = coreRef.current;
+    if (!core) return;
+    setState((prev) => {
+      const siguiente = !prev.fastForward;
+      core.setFastForwardMultiplier(siguiente ? FAST_FORWARD_MULTIPLIER : 1);
+      return { ...prev, fastForward: siguiente };
+    });
+  }, []);
+
+  /** Cierra el aviso. Lo pide el jugador; un fallo de verdad no se cierra asi. */
+  const descartarAviso = useCallback(() => {
+    setState((prev) => (prev.aviso === null ? prev : { ...prev, aviso: null }));
   }, []);
 
   const setVolume = useCallback((percent: number) => {
@@ -580,6 +622,8 @@ export const useEmulator = () => {
     exportState,
     importSave,
     setFastForward,
+    toggleFastForward,
+    descartarAviso,
     setVolume,
     toggleMute,
   };
