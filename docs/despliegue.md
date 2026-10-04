@@ -7,6 +7,23 @@ Lo que hay aqui esta comprobado contra el proyecto tal y como esta: los puertos
 son los que usa el codigo, los tiempos estan medidos y la compilacion de
 produccion se probo arrancando el emulador con ella.
 
+## Con Docker (lo mas corto)
+
+En `deploy/` hay una version en contenedores que no necesita instalar nada en
+la maquina salvo Docker: `deploy/Dockerfile` construye las dos piezas de
+servidor (con Java 8, `jjs` y el jar oficial del randomizer) y una web con Caddy
+que pone las dos cabeceras y reparte `/signaling` y `/randomizer`. El HTTPS lo
+pone lo que este delante (Cloudflare Tunnel, Nginx Proxy Manager...), apuntando
+a `http://emupoke-web:80`.
+
+```bash
+docker network create cloudflared-net   # si no existe ya
+docker compose -f deploy/docker-compose.yml up -d --build
+```
+
+Sin Docker, `sudo bash deploy/instalar.sh` hace lo de este documento con Caddy
+y un dominio `<ip>.sslip.io`.
+
 ## Lo que vas a montar
 
 Son tres piezas, y solo una mira a internet:
