@@ -205,6 +205,48 @@ body {
   min-height: 0;
 }
 
+/* El marco que se pone a pantalla completa: la partida y el mando juntos.
+   En flujo normal no pinta nada, solo hereda la columna de .app__main. */
+.juego {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: inherit;
+}
+
+/* ---------- pantalla completa ---------- */
+
+/*
+ * En pantalla completa manda la partida y el mando; lo demas sobra.
+ *
+ * Los equipos se esconden a proposito: en un movil, dejarlos obligaria a
+ * repartir el alto entre tres cosas y ninguna quedaria usable. Se vuelven a ver
+ * al salir.
+ */
+.juego:fullscreen {
+  background: var(--bg);
+  padding: 8px;
+  gap: 8px;
+  justify-content: center;
+}
+
+.juego:fullscreen .equipo {
+  display: none;
+}
+
+.juego:fullscreen .mesa {
+  grid-template-columns: minmax(0, 1fr);
+  flex: 0 1 auto;
+  min-height: 0;
+}
+
+/* El mando se queda con lo que sobre, que es justo lo que se queria. */
+.juego:fullscreen .pad {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 /* ---------- las pantallas: la tuya y la de tu companero ---------- */
 
 /*
@@ -2219,4 +2261,186 @@ details.partidas[open] > summary::before {
 
 .equipo__cambiar:hover {
   border-color: var(--accent-dim);
+}
+
+/* ====================================================================
+   Movil: que el mando quepa entero
+   ====================================================================
+
+   Medido en un Pixel 5 (727px de alto): la barra se llevaba 97 pixeles, la
+   partida 249, el equipo con un Pokemon dentro unos 160 y el mando pide 274.
+   Suman mas de lo que hay, y lo que sobresalia por abajo era justo el mando,
+   que es lo unico que no puede faltar para jugar.
+
+   Asi que se recorta de donde no duele: la barra pasa a una fila y las fichas
+   del equipo adelgazan. La partida y el mando no se tocan. */
+
+@media (max-width: 720px) {
+  /* --- la barra, a una sola fila mientras se juega --- */
+
+  .app--jugando .topbar {
+    padding: 6px 10px;
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+
+  /* El nombre sobra: ya sabes en que estas. El simbolo se queda porque es lo
+     que da a entender que esa esquina es de la aplicacion. */
+  .app--jugando .brand div {
+    display: none;
+  }
+
+  .app--jugando .brand__mark {
+    width: 30px;
+    height: 30px;
+    font-size: 13px;
+  }
+
+  /* Y sobre todo: deja de ser una fila entera para abajo. */
+  .app--jugando .roomchip {
+    order: 0;
+    width: auto;
+    flex: 1;
+    min-width: 0;
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+
+  .app--jugando .roomchip__label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .app--jugando .app__main {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  /* --- el equipo, mas bajo --- */
+
+  /* Lo que se recorta es alto, no legibilidad: el sprite baja de 56 a 44 y el
+     relleno se aprieta. El nombre y el nivel se quedan, que son lo que se mira
+     de reojo mientras juegas. */
+  .app--jugando .equipo__sprite,
+  .app--jugando .ficha__sprite,
+  .app--jugando .ficha__sprite--imagen {
+    width: 44px;
+    height: 44px;
+  }
+
+  .app--jugando .equipo__lista .ficha {
+    width: 76px;
+    padding: 3px 3px;
+    gap: 1px;
+  }
+
+  .app--jugando .equipo__titulo {
+    font-size: 10px;
+    margin-bottom: 2px;
+  }
+
+  .app--jugando .equipo {
+    gap: 4px;
+  }
+
+  /* El tipo es lo primero que sobra cuando falta sitio: se adivina por el
+     Pokemon y ocupa una linea entera. */
+  .app--jugando .equipo__lista .ficha .tipo {
+    display: none;
+  }
+}
+
+/* ====================================================================
+   Movil en horizontal: la partida manda y el mando la rodea
+   ====================================================================
+
+   Girar el telefono es lo que se hace justo para ver mejor el juego, asi que
+   aqui la partida se lo queda casi todo y los botones flotan por encima, en
+   los bordes, como en cualquier emulador de movil.
+
+   Medido antes de tocarlo: en un Pixel 5 tumbado la partida se quedaba en 104
+   pixeles de los 293 que hay. El resto se lo comian la barra, el equipo y las
+   columnas de la rejilla, que en horizontal no tienen donde caber.
+
+   El ancho no entra en la condicion a proposito: un telefono tumbado mide mas
+   de 720 pixeles de ancho, asi que una regla por ancho no le llega nunca. Lo
+   que de verdad distingue este caso es que sobra anchura y falta altura. */
+
+@media (max-height: 520px) and (orientation: landscape) {
+  /* Nada de barra: son sesenta pixeles de los trescientos que hay. */
+  .app--jugando .topbar {
+    display: none;
+  }
+
+  /* Y el equipo tampoco cabe. Se sigue viendo al girar el telefono. */
+  .app--jugando .equipo {
+    display: none;
+  }
+
+  .app--jugando .app__main {
+    padding: 0;
+    gap: 0;
+  }
+
+  .app--jugando .mesa {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .app--jugando .mesa__centro {
+    padding: 0;
+  }
+
+  /* La partida, todo el alto que haya.
+   *
+   * En vertical se calcula como "el alto de la ventana menos 190", que es el
+   * hueco que se reserva para la barra, el equipo y el mando. Aqui no hay nada
+   * de eso -la barra y el equipo se esconden y el mando flota por encima-, asi
+   * que esos 190 pixeles son justo los que le faltaban: de 293 quedaban 103, y
+   * esa era exactamente la altura que se media. */
+  .app--jugando .pantalla--grande {
+    width: min(100%, calc(100dvh * var(--proporcion, 1.5)));
+    max-height: 100dvh;
+  }
+
+  /* Y que la mesa pueda darle ese alto, en vez de encogerse al contenido. */
+  .app--jugando .mesa,
+  .app--jugando .mesa--solo {
+    flex: 1;
+    min-height: 0;
+    align-content: center;
+  }
+
+  .app--jugando .mesa__centro {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+  }
+
+  /* Los botones no pueden tapar el centro de la partida: se van a las esquinas
+     y se quedan ahi, que es donde caen los pulgares al sujetar el telefono. */
+  .app--jugando .dpad {
+    left: 10px;
+    bottom: 8px;
+  }
+
+  .app--jugando .pad__face {
+    right: 10px;
+    bottom: 8px;
+  }
+
+  .app--jugando .pad__shoulders {
+    top: 6px;
+    left: 10px;
+    right: 10px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .app--jugando .pad__menu {
+    bottom: 8px;
+    gap: 10px;
+  }
 }

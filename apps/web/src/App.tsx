@@ -128,11 +128,19 @@ export const App = () => {
   // En pantalla estrecha no caben las dos columnas, asi que se ve un equipo y
   // se cambia con un boton, igual que con las dos partidas.
   const estrecha = useEsEstrecha();
+
+  // Lo que se pone a pantalla completa: la partida Y el mando. Pedirla solo
+  // sobre la partida dejaba al jugador de movil sin botones, porque el
+  // navegador en pantalla completa pinta unicamente ese elemento.
+  const marcoDeJuego = useRef<HTMLDivElement | null>(null);
   const [verSuEquipo, setVerSuEquipo] = useState(false);
   const unoSolo = estrecha && conCompanero;
 
   return (
-    <div className="app">
+    // Jugando en una pantalla estrecha, la barra se encoge a una sola fila: los
+    // 97 pixeles que ocupaba salian del mando, y medidos son justo los que
+    // faltaban para que los botones de abajo entraran enteros.
+    <div className={`app${estrecha && hasRom ? ' app--jugando' : ''}`}>
       <TopBar
         session={session.state}
         keyboardOwner={keyboardOwner}
@@ -146,6 +154,7 @@ export const App = () => {
       />
 
       <main className="app__main">
+       <div className="juego" ref={marcoDeJuego}>
         <div className={`mesa${conCompanero ? '' : ' mesa--solo'}`}>
           {/* Con sitio, los dos equipos a los lados. En pantalla estrecha solo
               cabe uno, asi que se enseña ese y se cambia con el boton. */}
@@ -161,6 +170,7 @@ export const App = () => {
 
           <div className="mesa__centro">
         <Stage
+          marcoCompleto={marcoDeJuego}
           canvasRef={emulator.canvasRef}
           remoteStream={session.state.remoteStream}
           /* El nombre del fichero de su ROM no le dice nada a nadie, y ademas
@@ -213,6 +223,7 @@ export const App = () => {
             onAvanceRapido={emulator.toggleFastForward}
           />
         )}
+       </div>
 
         {state.error && (
           <p className="alert" role="alert">

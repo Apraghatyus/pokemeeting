@@ -19,6 +19,17 @@ type Props = {
   dropzone: ReactNode;
   /** Botones que flotan sobre la partida: voz y demas. */
   controles?: ReactNode;
+  /**
+   * Que elemento se pone a pantalla completa.
+   *
+   * Hace falta decirlo desde fuera porque el mando tactil **no** esta dentro de
+   * esta pantalla, y el navegador en pantalla completa solo pinta el elemento
+   * que se le pidio y lo que cuelga de el. Pidiendola sobre la pantalla sola,
+   * en el movil desaparecian los botones y no se podia jugar.
+   *
+   * Sin este dato se usa la pantalla, que es lo correcto en escritorio.
+   */
+  marcoCompleto?: RefObject<HTMLElement | null>;
 };
 
 /**
@@ -213,6 +224,7 @@ export const Stage = ({
   proporcion,
   dropzone,
   controles,
+  marcoCompleto,
 }: Props) => {
   const marcoRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -238,15 +250,19 @@ export const Stage = ({
     if (remoteStream) void video.play().catch(() => {});
   }, [remoteStream]);
 
+  // El elemento que se pone a pantalla completa: el que digan desde fuera -que
+  // incluye el mando- o, si no dicen nada, esta pantalla.
+  const objetivo = () => marcoCompleto?.current ?? marcoRef.current;
+
   useEffect(() => {
-    const onChange = () => setFullscreen(document.fullscreenElement === marcoRef.current);
+    const onChange = () => setFullscreen(document.fullscreenElement === objetivo());
     document.addEventListener('fullscreenchange', onChange);
     return () => document.removeEventListener('fullscreenchange', onChange);
-  }, []);
+  });
 
   const toggleFullscreen = () => {
     if (document.fullscreenElement) void document.exitFullscreen();
-    else void marcoRef.current?.requestFullscreen().catch(() => {});
+    else void objetivo()?.requestFullscreen().catch(() => {});
   };
 
   // Sin companero no hay segunda pantalla: la tuya se queda todo el alto.

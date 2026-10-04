@@ -21,6 +21,7 @@
     "test:mobile": "node tools/tests/test-mobile.mjs",
     "test:mando": "node tools/tests/test-mando.mjs",
     "test:controles": "node tools/tests/test-controles.mjs",
+    "test:movil:mando": "node tools/tests/test-movil-mando.mjs",
     "test:equipo:rival": "npx tsx tools/tests/test-equipo-rival.mjs",
     "test:roms": "npx tsx tools/tests/test-roms.mjs",
     "dev:randomizer": "npm run dev --workspace=@emupoke/randomizer",
