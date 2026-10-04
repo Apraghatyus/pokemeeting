@@ -158,16 +158,6 @@ export const AjustesModal = ({
           </div>
 
           {teclas.problema && <p className="warn">{teclas.problema}</p>}
-
-          <p className="hint">
-            <strong>Pulsa un boton</strong> y despues la tecla que quieras; Escape cancela. Se
-            guarda por posicion en el teclado, no por la letra, asi que el mando sigue donde lo
-            dejaste aunque cambies de distribucion.
-          </p>
-          <p className="hint">
-            En <strong>Auto</strong>, el mando tactil sale si juegas tocando la pantalla y se va
-            si usas el teclado.
-          </p>
         </section>
       </div>
 

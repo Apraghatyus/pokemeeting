@@ -81,6 +81,29 @@ check('con las acciones sueltas en baldosas', (forma?.baldosas ?? 0) === 3, `${f
 check('y las de ida y vuelta en parejas', (forma?.pares ?? 0) === 2, `${forma?.pares}`);
 check('tiene pie con la ficha de la ROM', forma?.pie);
 
+// --- la cabecera, de una sola fila ---
+const cabecera = await page.evaluate(() => {
+  const icono = document.querySelector('.modal[open] .modal__icon')?.getBoundingClientRect();
+  const titulo = document.querySelector('.modal[open] .modal__title')?.getBoundingClientRect();
+  const head = document.querySelector('.modal[open] .modal__head')?.getBoundingClientRect();
+  return {
+    // Mismo centro vertical = estan uno al lado del otro, no apilados.
+    enLinea: icono && titulo
+      ? Math.abs((icono.top + icono.bottom) / 2 - (titulo.top + titulo.bottom) / 2) < 12
+      : null,
+    alto: head ? Math.round(head.height) : null,
+  };
+});
+check('el icono y el titulo van en la misma fila', cabecera.enLinea,
+  `cabecera de ${cabecera.alto}px`);
+
+// --- y en escritorio no hace falta desplazar ---
+const bajar = await page.evaluate(() => {
+  const c = document.querySelector('.modal[open] .modal__body');
+  return Math.max(0, c.scrollHeight - c.clientHeight);
+});
+check('en escritorio se ve todo sin barra de desplazamiento', bajar === 0, `${bajar}px por bajar`);
+
 // --- el mando tactil, con sus tres modos ---
 const modos = await page.locator('.modos button').allTextContents();
 check('el mando tactil ofrece auto, siempre y nunca',

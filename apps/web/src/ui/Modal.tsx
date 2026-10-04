@@ -31,14 +31,21 @@ export const Modal = ({ open, onClose, title, subtitle, icon, pie, children }: P
 
   return (
     <dialog ref={ref} className="modal" onClose={onClose}>
+      {/* El icono y los titulos van juntos en una fila, no apilados: asi la
+          cabecera ocupa un alto y no tres, que es sitio que le hacia falta al
+          contenido. */}
       <div className="modal__head">
-        {icon && <span className="modal__icon">{icon}</span>}
+        <div className="modal__marca">
+          {icon && <span className="modal__icon">{icon}</span>}
+          <div className="modal__textos">
+            <h2 className="modal__title">{title}</h2>
+            {subtitle && <p className="modal__subtitle">{subtitle}</p>}
+          </div>
+        </div>
         <button type="button" className="modal__close" onClick={onClose} aria-label="Cerrar">
           ×
         </button>
       </div>
-      <h2 className="modal__title">{title}</h2>
-      {subtitle && <p className="modal__subtitle">{subtitle}</p>}
       <div className="modal__body">{children}</div>
       {pie && <div className="modal__pie">{pie}</div>}
     </dialog>
