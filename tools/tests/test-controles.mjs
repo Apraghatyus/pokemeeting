@@ -79,15 +79,12 @@ await page.getByRole('button', { name: /Volver a las teclas de siempre/ }).click
 await page.waitForTimeout(300);
 check('se pueden devolver a las de fabrica', (await teclaDe('A')) === 'Z', await teclaDe('A'));
 
-// --- el avance rapido es conmutador ---
-const botonFF = page.getByRole('button', { name: /Avance rapido/ }).first();
-check('empieza apagado', (await botonFF.getAttribute('aria-pressed')) === 'false');
-await botonFF.click();
-await page.waitForTimeout(200);
-check('un clic lo enciende', (await botonFF.getAttribute('aria-pressed')) === 'true');
-await botonFF.click();
-await page.waitForTimeout(200);
-check('y otro lo apaga, sin tener que mantenerlo', (await botonFF.getAttribute('aria-pressed')) === 'false');
+// --- el avance rapido ---
+// Ya no esta en el menu a proposito: se usa sobre la marcha, y abrir el menu en
+// mitad de una partida para encenderlo no tenia sentido. Queda el espacio en
+// escritorio y su boton en el mando tactil, que es lo que se comprueba abajo.
+check('el avance rapido no ocupa sitio en el menu',
+  (await page.locator('.toolbar').getByText(/Avance rapido/).count()) === 0);
 
 await page.keyboard.press('Escape');
 await page.waitForTimeout(400);
@@ -105,7 +102,7 @@ check('y el espacio otra vez lo apaga', traSegundo === 1, `x${traSegundo}`);
 
 // --- el aviso de partida vacia ya no deja inservible la pantalla ---
 await page.locator('.iconbutton--opciones').click();
-await page.getByRole('button', { name: 'Exportar .sav' }).first().click({ timeout: 10_000 });
+await page.getByRole('button', { name: 'Exportar partida' }).first().click({ timeout: 10_000 });
 await page.waitForTimeout(800);
 await page.keyboard.press('Escape');
 await page.waitForTimeout(400);

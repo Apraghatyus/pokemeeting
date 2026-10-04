@@ -234,9 +234,21 @@ body {
   justify-content: center;
 }
 
+/*
+ * Tiene que CRECER, no encogerse al contenido.
+ *
+ * Con `flex: 0 1 auto` la mesa se ajustaba a su contenido, y eso aqui es una
+ * pescadilla que se muerde la cola: `.mesa__centro` es un contenedor de medida
+ * (`container-type: size`) y la partida saca su tamano de el con unidades cq.
+ * Si el contenedor mide lo que mide su contenido, y el contenido mide lo que
+ * mide el contenedor, el resultado es cero: en escritorio la pantalla completa
+ * se quedaba en negro con solo el equipo a la vista.
+ *
+ * En movil no se notaba porque alli ese contenedor esta desactivado y la
+ * partida se mide contra el alto de la ventana.
+ */
 .juego:fullscreen .mesa {
-  grid-template-columns: minmax(0, 1fr);
-  flex: 0 1 auto;
+  flex: 1;
   min-height: 0;
 }
 
@@ -1559,9 +1571,9 @@ button.is-active {
   color: var(--muted);
 }
 
-/* La receta es una linea larga que hay que poder leer entera y copiar de un
+/* La semilla es una linea larga que hay que poder leer entera y copiar de un
    tiron. Se parte por donde sea, que no es texto para leer sino para copiar. */
-.receta {
+.semilla {
   font-size: 12px;
   line-height: 1.5;
   overflow-wrap: anywhere;
@@ -1569,7 +1581,7 @@ button.is-active {
   overflow-y: auto;
 }
 
-.receta-pegada {
+.semilla-pegada {
   width: 100%;
   resize: vertical;
   font-size: 12px;
@@ -2189,8 +2201,8 @@ details.partidas[open] > summary::before {
   filter: grayscale(1) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
 }
 
-/* Copiar la receta de una partida ya creada, desde su fila de la lista. */
-.partida__receta {
+/* Copiar la semilla de una partida ya creada, desde su fila de la lista. */
+.partida__semilla {
   flex: none;
   width: 34px;
   padding: 0;
@@ -2202,12 +2214,12 @@ details.partidas[open] > summary::before {
   cursor: pointer;
 }
 
-.partida__receta:hover {
+.partida__semilla:hover {
   color: var(--text);
   border-color: var(--accent-dim);
 }
 
-.partida__receta.is-copiada {
+.partida__semilla.is-copiada {
   color: var(--accent-ink);
   background: var(--accent);
   border-color: var(--accent);

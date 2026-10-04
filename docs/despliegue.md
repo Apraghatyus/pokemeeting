@@ -333,7 +333,7 @@ saber exactamente que pasa en tu servidor:
   en un `finally`, pase lo que pase. Procesar el fichero de alguien y
   devolverselo no es distribuir; entregarselo a un tercero si lo seria, y eso
   no ocurre en ningun camino del codigo.
-- **Las recetas no llevan el juego dentro.** Se pueden compartir sin repartir
+- **Las semillas no llevan el juego dentro.** Se pueden compartir sin repartir
   nada.
 
 Si aun asi prefieres no recibir ficheros de nadie, quita el bloque

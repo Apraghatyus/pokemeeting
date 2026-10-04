@@ -8,6 +8,8 @@ import { useEquipo } from './core/useEquipo';
 import { useEsEstrecha } from './core/useEsEstrecha';
 import { useEspecies } from './core/useEspecies';
 import { useMandoTactil } from './core/useMandoTactil';
+import { codificarSemilla } from './core/semilla';
+import { sePuedeRehacer, todasLasPartidas } from './core/partidas';
 import { motesDebilitados } from '@emupoke/pokemon';
 import { EquipoPanel } from './ui/EquipoPanel';
 import { Modal } from './ui/Modal';
@@ -269,7 +271,6 @@ export const App = () => {
               onDownloadSave={emulator.downloadSave}
               onExportState={emulator.exportState}
               onImportSave={emulator.importSave}
-              onToggleFastForward={emulator.toggleFastForward}
             />
             {state.lastSaveAt && (
               <p className="note">
@@ -287,7 +288,7 @@ export const App = () => {
                 romName={state.romName!}
               />
               <section className="panel">
-                <h2>Cambiar de juego</h2>
+                <h2>Cambiar ROM</h2>
                 <p className="hint">
                   Cierra esta ROM y vuelve a la pantalla de carga para elegir otra.
                 </p>
@@ -310,15 +311,21 @@ export const App = () => {
               <p className="hint">
                 Cambia que Pokemon, objetos y entrenadores aparecen en tu partida.
               </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setMenuOpen(false);
-                  setRandomizerOpen(true);
-                }}
-              >
-                Abrir opciones
-              </button>
+              <div className="modal__acciones">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setRandomizerOpen(true);
+                  }}
+                >
+                  Opciones
+                </button>
+                {/* La semilla es lo unico que hace falta para rehacer este mundo
+                    exacto, asi que tiene que poder copiarse en cualquier momento
+                    y no solo en el rato en que se genero. */}
+                <CopiarSemilla crc32={state.header?.crc32 ?? null} />
+              </div>
               {state.romSource === 'generada' && (
                 <p className="hint">
                   Estas jugando una copia aleatorizada. Aleatorizar otra vez parte siempre de tu
@@ -386,12 +393,9 @@ export const App = () => {
             </p>
           </section>
 
-          {state.log.length > 0 && (
-            <section className="panel">
-              <h2>Registro del nucleo</h2>
-              <pre className="log">{state.log.join('\n')}</pre>
-            </section>
-          )}
+          {/* El registro del nucleo ya no se enseña: para quien juega es ruido,
+              y lo que de verdad hace falta saber se dice con palabras donde
+              toca. Se sigue guardando en el estado por si hace falta depurar. */}
         </Modal>
       </main>
 
@@ -423,5 +427,54 @@ export const App = () => {
         onRetry={session.retryNow}
       />
     </div>
+  );
+};
+
+/**
+ * Copia la semilla de la partida que se esta jugando.
+ *
+ * La semilla -ROM base, numero y ajustes- es lo unico que hace falta para
+ * rehacer este mundo exacto, asi que el jugador tiene que poder llevarsela en
+ * cualquier momento. Antes solo aparecia justo despues de generarla: quien
+ * cerraba la pestana se quedaba sin ella.
+ *
+ * Se busca por el CRC de la ROM que esta corriendo, que es lo que une una
+ * partida con su copia. Si no es una copia aleatorizada, o es de las antiguas
+ * que nacieron sin semilla, no hay nada que copiar y el boton no sale.
+ */
+const CopiarSemilla = ({ crc32 }: { crc32: string | null }) => {
+  const [copiada, setCopiada] = useState(false);
+
+  const partida = crc32
+    ? todasLasPartidas().find((p) => p.crc32 === crc32 && sePuedeRehacer(p))
+    : undefined;
+  if (!partida) return null;
+
+  const texto = codificarSemilla({
+    baseCrc32: partida.baseCrc32,
+    crc32: partida.crc32!,
+    semilla: partida.semilla!,
+    ajustes: partida.ajustes!,
+  });
+
+  const copiar = async () => {
+    try {
+      await navigator.clipboard.writeText(texto);
+      setCopiada(true);
+      setTimeout(() => setCopiada(false), 2200);
+    } catch {
+      // Si el navegador no deja copiar, al menos queda a la vista en el titulo.
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      className={copiada ? 'is-active' : undefined}
+      onClick={() => void copiar()}
+      title={copiada ? 'Copiada' : texto}
+    >
+      {copiada ? 'Semilla copiada' : 'Copiar semilla'}
+    </button>
   );
 };

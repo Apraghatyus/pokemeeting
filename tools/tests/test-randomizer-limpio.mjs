@@ -49,7 +49,7 @@ const aleatorizar = async () => {
   const texto = ((await modal.textContent()) ?? '').replace(/\s+/g, ' ');
   await modal.getByRole('button', { name: 'Empezar a jugar' }).click();
   await page.waitForTimeout(2500);
-  // La semilla va dentro de la receta, que es el cuarto campo de la linea.
+  // La semilla va dentro de la semilla, que es el cuarto campo de la linea.
   return /EMUPOKE1\.[0-9a-f]{8}\.[0-9a-f]{8}\.(\d+)\./.exec(texto)?.[1] ?? null;
 };
 

@@ -33,14 +33,14 @@ aleatorizaste y cuando la creaste. Un clic y sigues donde lo dejaste: la copia y
 su guardado viven en el navegador, persistidos entre sesiones.
 
 Solo cuando esa copia ya no esta -porque el navegador tiro sus datos, o porque
-estas en otro ordenador- hace falta la **receta**: una linea de texto que se da
+estas en otro ordenador- hace falta la **semilla**: una linea de texto que se da
 al crear la partida y que dice con que semilla y que ajustes se genero. Con esa
 linea y tu ROM original se vuelve a generar el mismo mundo, identico, y se
 comprueba comparandolo con el que se creo aquel dia. Si no coincidiera, se avisa
 en vez de cargarlo, porque un mundo parecido pero distinto estropearia tu
 guardado sin que se notara hasta mucho despues.
 
-La receta tambien sirve para darle a tu companero exactamente el mismo mundo.
+La semilla tambien sirve para darle a tu companero exactamente el mismo mundo.
 Lo que no lleva dentro es el juego: sin la ROM original no vale para nada, que
 es justo lo que permite compartirla sin repartir nada que no se pueda repartir.
 
@@ -110,10 +110,10 @@ distinto ya es otro juego.
 
 Para no tener que guardar la ROM generada en ningun sitio. Una partida
 aleatorizada se describe con tres cosas -la ROM original, la semilla y los
-ajustes- y con eso se vuelve a generar cuando haga falta. Eso es la **receta**,
+ajustes- y con eso se vuelve a generar cuando haga falta. Eso es la **semilla**,
 y es lo que se le ofrece al jugador en vez de un boton de descarga.
 
-Tambien deja que dos jugadores tengan el mismo mundo, si se pasan la receta.
+Tambien deja que dos jugadores tengan el mismo mundo, si se pasan la semilla.
 No es obligatorio: cada uno puede seguir jugando el suyo.
 
 ### Un detalle que costo encontrar

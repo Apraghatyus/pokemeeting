@@ -21,7 +21,7 @@
  * reconoce la ROM, cargarla, ajustar los ajustes a esa ROM y aleatorizar.
  *
  * Escribe en la salida estandar la semilla y la cadena de ajustes, que juntas
- * son la receta para rehacer esta misma copia mas adelante.
+ * son la semilla para rehacer esta misma copia mas adelante.
  */
 export const buildRandomizeScript = (): string => `var Settings = Java.type('com.dabomstew.pkrandom.Settings');
 var Randomizer = Java.type('com.dabomstew.pkrandom.Randomizer');

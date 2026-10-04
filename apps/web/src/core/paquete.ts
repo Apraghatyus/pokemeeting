@@ -5,7 +5,7 @@
 // solo encaja con la copia exacta con la que se jugo. Quien quisiera seguir en
 // el movil se llevaba el guardado y no tenia donde cargarlo.
 //
-// Asi que el fichero lleva dos cosas: el guardado y la receta -ROM base,
+// Asi que el fichero lleva dos cosas: el guardado y la semilla -ROM base,
 // semilla y ajustes- con la que se vuelve a generar esa copia exacta.
 //
 // Lo que NO lleva es la ROM. Y no es un descuido: es lo que permite que este
@@ -16,12 +16,12 @@
 // dos lineas legibles y detras el guardado tal cual. Si algun dia esto se
 // rompe, se ve de un vistazo por donde.
 
-import type { Receta } from './receta';
+import type { Semilla } from './semilla';
 
 const MARCA = 'EMUPOKE-PARTIDA-1';
 
 export type Partida = {
-  receta: Receta;
+  semilla: Semilla;
   /** El guardado del juego, tal cual lo escribio la consola. */
   sav: Uint8Array;
   /** Nombre con el que se enseña, normalmente el del juego. */
@@ -33,9 +33,9 @@ export type Partida = {
 const SALTO = 0x0a;
 
 /** Empaqueta una partida para descargarla. */
-export const empaquetar = ({ receta, sav, nombre }: Omit<Partida, 'creada'>): Uint8Array => {
+export const empaquetar = ({ semilla, sav, nombre }: Omit<Partida, 'creada'>): Uint8Array => {
   const cabecera = new TextEncoder().encode(
-    `${MARCA}\n${JSON.stringify({ receta, nombre, creada: Date.now() })}\n`,
+    `${MARCA}\n${JSON.stringify({ semilla, nombre, creada: Date.now() })}\n`,
   );
   const todo = new Uint8Array(cabecera.length + sav.length);
   todo.set(cabecera, 0);
@@ -60,7 +60,7 @@ export const leerPaquete = (bytes: Uint8Array): Partida | null => {
   const segundoSalto = bytes.indexOf(SALTO, primerSalto + 1);
   if (segundoSalto < 0) return null;
 
-  let cabecera: { receta?: Receta; nombre?: string; creada?: number };
+  let cabecera: { semilla?: Semilla; nombre?: string; creada?: number };
   try {
     cabecera = JSON.parse(
       new TextDecoder().decode(bytes.subarray(primerSalto + 1, segundoSalto)),
@@ -69,24 +69,24 @@ export const leerPaquete = (bytes: Uint8Array): Partida | null => {
     return null;
   }
 
-  const receta = cabecera.receta;
+  const semilla = cabecera.semilla;
   if (
-    !receta ||
-    typeof receta.baseCrc32 !== 'string' ||
-    typeof receta.crc32 !== 'string' ||
-    typeof receta.semilla !== 'string' ||
-    typeof receta.ajustes !== 'string'
+    !semilla ||
+    typeof semilla.baseCrc32 !== 'string' ||
+    typeof semilla.crc32 !== 'string' ||
+    typeof semilla.semilla !== 'string' ||
+    typeof semilla.ajustes !== 'string'
   ) {
     return null;
   }
 
   const sav = bytes.slice(segundoSalto + 1);
   // Un guardado de GBA son 128 KB y uno de Game Boy menos, pero vacio no vale:
-  // sin el, esto es una receta con pasos de mas.
+  // sin el, esto es una semilla con pasos de mas.
   if (sav.length === 0) return null;
 
   return {
-    receta,
+    semilla,
     sav,
     nombre: typeof cabecera.nombre === 'string' ? cabecera.nombre : 'partida',
     creada: typeof cabecera.creada === 'number' ? cabecera.creada : Date.now(),

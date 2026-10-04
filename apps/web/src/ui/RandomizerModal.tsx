@@ -22,7 +22,7 @@ import {
 } from '../core/partidas';
 import { parseGameCode } from '@emupoke/pokemon';
 import { crc32 } from '../core/romHeader';
-import { codificarReceta, descodificarReceta } from '../core/receta';
+import { codificarSemilla, descodificarSemilla } from '../core/semilla';
 import { empaquetar, leerPaquete, nombreDeFichero } from '../core/paquete';
 import { Modal } from './Modal';
 
@@ -62,7 +62,7 @@ type Progress =
       fileName: string;
       summary: RandomizeSummary;
       /** Como rehacer esta copia, o null si no se va a poder. */
-      receta: string | null;
+      semilla: string | null;
     }
   | { fase: 'error'; message: string };
 
@@ -150,7 +150,7 @@ export const RandomizerModal = ({
   const [selected, setSelected] = useState<Set<string>>(new Set(DEFAULT_SELECTION));
   const [partidas, setPartidas] = useState<PartidaGuardada[]>([]);
   const [otras, setOtras] = useState<PartidaGuardada[]>([]);
-  const [recetaPegada, setRecetaPegada] = useState('');
+  const [semillaPegada, setSemillaPegada] = useState('');
 
   // La lista se relee al abrir: puede haber cambiado desde la vez anterior.
   const releer = useCallback(() => {
@@ -249,10 +249,10 @@ export const RandomizerModal = ({
         seed: result.seed,
         fileName,
         summary: result.summary,
-        // La receta solo tiene sentido si de verdad se puede rehacer con ella.
-        receta:
+        // La semilla solo tiene sentido si de verdad se puede rehacer con ella.
+        semilla:
           result.reproducible && result.seed && result.ajustes
-            ? codificarReceta({
+            ? codificarSemilla({
                 baseCrc32: base.crc32,
                 crc32: generada,
                 semilla: result.seed,
@@ -269,7 +269,7 @@ export const RandomizerModal = ({
   };
 
   /**
-   * Descarga una partida entera: el guardado y la receta, en un fichero.
+   * Descarga una partida entera: el guardado y la semilla, en un fichero.
    *
    * Es lo que se lleva uno al movil o a otro ordenador. No lleva la ROM dentro
    * -de ahi que pese lo que pesa el guardado- asi que al cargarlo hace falta la
@@ -288,13 +288,13 @@ export const RandomizerModal = ({
     if (!partida.semilla || !partida.ajustes || !partida.crc32) {
       setProgress({
         fase: 'error',
-        message: 'De esa partida no se guardo la receta, asi que no se puede rehacer en otro sitio.',
+        message: 'De esa partida no se guardo la semilla, asi que no se puede rehacer en otro sitio.',
       });
       return;
     }
 
     const bytes = empaquetar({
-      receta: {
+      semilla: {
         baseCrc32: partida.baseCrc32,
         crc32: partida.crc32,
         semilla: partida.semilla,
@@ -315,7 +315,7 @@ export const RandomizerModal = ({
   /**
    * Continua una partida traida de otro aparato.
    *
-   * Se rehace la copia desde su receta, se comprueba que salio identica y solo
+   * Se rehace la copia desde su semilla, se comprueba que salio identica y solo
    * entonces se mete el guardado. El guardado se escribe ANTES de cargar la
    * ROM: asi el juego lo encuentra al arrancar y no hay que reiniciarlo.
    */
@@ -331,7 +331,7 @@ export const RandomizerModal = ({
       });
       return;
     }
-    if (traida.receta.baseCrc32 !== base.crc32) {
+    if (traida.semilla.baseCrc32 !== base.crc32) {
       setProgress({
         fase: 'error',
         message:
@@ -343,11 +343,11 @@ export const RandomizerModal = ({
     setProgress({ fase: 'trabajando' });
     try {
       const result = await randomizeRom(
-        { settingsString: traida.receta.ajustes, seed: traida.receta.semilla },
+        { settingsString: traida.semilla.ajustes, seed: traida.semilla.semilla },
         base.bytes,
         avisarDeLaCola,
       );
-      if (crc32(result.rom) !== traida.receta.crc32) {
+      if (crc32(result.rom) !== traida.semilla.crc32) {
         setProgress({
           fase: 'error',
           message:
@@ -363,9 +363,9 @@ export const RandomizerModal = ({
         fichero: nombre,
         baseNombre: base.fileName,
         baseCrc32: base.crc32,
-        semilla: traida.receta.semilla,
-        ajustes: traida.receta.ajustes,
-        crc32: traida.receta.crc32,
+        semilla: traida.semilla.semilla,
+        ajustes: traida.semilla.ajustes,
+        crc32: traida.semilla.crc32,
         cambiado: result.summary.changed,
       });
       onClose();
@@ -378,25 +378,25 @@ export const RandomizerModal = ({
   };
 
   /**
-   * Rehace una partida a partir de una receta que trae el jugador.
+   * Rehace una partida a partir de una semilla que trae el jugador.
    *
    * El mismo camino que `rehacer`, pero para una copia de la que este
    * navegador no sabe nada: otro ordenador, u otra persona que quiere jugar
    * exactamente el mismo mundo.
    */
-  const desdeReceta = async () => {
+  const desdeSemilla = async () => {
     const base = baseRom.current;
-    const receta = descodificarReceta(recetaPegada);
+    const semilla = descodificarSemilla(semillaPegada);
     if (!base) return;
-    if (!receta) {
-      setProgress({ fase: 'error', message: 'Esa receta no se entiende. Copiala entera.' });
+    if (!semilla) {
+      setProgress({ fase: 'error', message: 'Esa semilla no se entiende. Copiala entera.' });
       return;
     }
-    if (receta.baseCrc32 !== base.crc32) {
+    if (semilla.baseCrc32 !== base.crc32) {
       setProgress({
         fase: 'error',
         message:
-          'Esa receta es de otra copia de la ROM original. Hace falta exactamente la misma con la que se creo.',
+          'Esa semilla es de otra copia de la ROM original. Hace falta exactamente la misma con la que se creo.',
       });
       return;
     }
@@ -404,16 +404,16 @@ export const RandomizerModal = ({
     setProgress({ fase: 'trabajando' });
     try {
       const result = await randomizeRom(
-        { settingsString: receta.ajustes, seed: receta.semilla },
+        { settingsString: semilla.ajustes, seed: semilla.semilla },
         base.bytes,
         avisarDeLaCola,
       );
       const generada = crc32(result.rom);
-      if (generada !== receta.crc32) {
+      if (generada !== semilla.crc32) {
         setProgress({
           fase: 'error',
           message:
-            'Lo generado no coincide con lo que dice la receta, seguramente por una version distinta del randomizer. No lo cargo: seria otro mundo.',
+            'Lo generado no coincide con lo que dice la semilla, seguramente por una version distinta del randomizer. No lo cargo: seria otro mundo.',
         });
         return;
       }
@@ -423,8 +423,8 @@ export const RandomizerModal = ({
         fichero: fileName,
         baseNombre: base.fileName,
         baseCrc32: base.crc32,
-        semilla: receta.semilla,
-        ajustes: receta.ajustes,
+        semilla: semilla.semilla,
+        ajustes: semilla.ajustes,
         crc32: generada,
         cambiado: result.summary.changed,
       });
@@ -582,17 +582,17 @@ export const RandomizerModal = ({
                         </button>
                         <button
                           type="button"
-                          className="partida__receta"
+                          className="partida__semilla"
                           onClick={() => exportarPartida(partida)}
                           title={
-                            'Descargar esta partida entera: el guardado y la receta.\n' +
+                            'Descargar esta partida entera: el guardado y la semilla.\n' +
                             'Es lo que te llevas a otro aparato para seguir ahi.'
                           }
                           aria-label="Descargar esta partida para otro aparato"
                         >
                           ⤓
                         </button>
-                        <BotonReceta partida={partida} />
+                        <BotonSemilla partida={partida} />
                         <button
                           type="button"
                           className="partida__borrar"
@@ -647,29 +647,29 @@ export const RandomizerModal = ({
                 </div>
               )}
 
-              {/* La vuelta de la receta: alguien que juega desde otro ordenador,
+              {/* La vuelta de la semilla: alguien que juega desde otro ordenador,
                   o que perdio los datos del navegador, trae su linea de texto y
                   su ROM original y recupera el mismo mundo exacto. */}
               <details className="partidas">
-                <summary className="partidas__titulo">Tengo una receta</summary>
+                <summary className="partidas__titulo">Tengo una semilla</summary>
                 <textarea
-                  className="field__value mono receta-pegada"
+                  className="field__value mono semilla-pegada"
                   rows={2}
-                  value={recetaPegada}
+                  value={semillaPegada}
                   placeholder="EMUPOKE1..."
-                  onChange={(event) => setRecetaPegada(event.target.value)}
-                  aria-label="Receta de una partida"
+                  onChange={(event) => setSemillaPegada(event.target.value)}
+                  aria-label="semilla de una partida"
                 />
                 <button
                   type="button"
                   className="button--wide"
-                  disabled={recetaPegada.trim() === '' || lleno || progress.fase === 'trabajando'}
-                  onClick={() => void desdeReceta()}
+                  disabled={semillaPegada.trim() === '' || lleno || progress.fase === 'trabajando'}
+                  onClick={() => void desdeSemilla()}
                 >
                   Rehacer esa partida
                 </button>
                 <p className="hint">
-                  Hace falta la misma ROM original con la que se creo. La receta sola no sirve de
+                  Hace falta la misma ROM original con la que se creo. La semilla sola no sirve de
                   nada: no lleva el juego dentro.
                 </p>
 
@@ -774,18 +774,18 @@ export const RandomizerModal = ({
 };
 
 /**
- * Copia al portapapeles la receta de una partida ya creada.
+ * Copia al portapapeles la semilla de una partida ya creada.
  *
- * Existe porque antes la receta solo se veia en el momento de generarla: quien
+ * Existe porque antes la semilla solo se veia en el momento de generarla: quien
  * cerraba la pestaña se quedaba sin forma de volver a copiarla, y es justo lo
  * que hace falta para seguir en otro ordenador o para darsela al companero.
  */
-const BotonReceta = ({ partida }: { partida: PartidaGuardada }) => {
+const BotonSemilla = ({ partida }: { partida: PartidaGuardada }) => {
   const [copiada, setCopiada] = useState(false);
 
   if (!sePuedeRehacer(partida) || !partida.crc32) return null;
 
-  const receta = codificarReceta({
+  const semilla = codificarSemilla({
     baseCrc32: partida.baseCrc32,
     crc32: partida.crc32,
     semilla: partida.semilla!,
@@ -794,7 +794,7 @@ const BotonReceta = ({ partida }: { partida: PartidaGuardada }) => {
 
   const copiar = async () => {
     try {
-      await navigator.clipboard.writeText(receta);
+      await navigator.clipboard.writeText(semilla);
       setCopiada(true);
       setTimeout(() => setCopiada(false), 2200);
     } catch {
@@ -805,10 +805,10 @@ const BotonReceta = ({ partida }: { partida: PartidaGuardada }) => {
   return (
     <button
       type="button"
-      className={`partida__receta${copiada ? ' is-copiada' : ''}`}
+      className={`partida__semilla${copiada ? ' is-copiada' : ''}`}
       onClick={() => void copiar()}
-      title={copiada ? 'Copiada' : `Copiar la receta de esta partida:\n${receta}`}
-      aria-label="Copiar la receta de esta partida"
+      title={copiada ? 'Copiada' : `Copiar la semilla de esta partida:\n${semilla}`}
+      aria-label="Copiar la semilla de esta partida"
     >
       {copiada ? '✓' : '⧉'}
     </button>
@@ -825,13 +825,13 @@ const Resultado = ({
   const [copiada, setCopiada] = useState<'no' | 'si' | 'fallo'>('no');
 
   const copiar = async () => {
-    if (!progress.receta) return;
+    if (!progress.semilla) return;
     try {
-      await navigator.clipboard.writeText(progress.receta);
+      await navigator.clipboard.writeText(progress.semilla);
       setCopiada('si');
       setTimeout(() => setCopiada('no'), 2200);
     } catch {
-      // El portapapeles puede estar denegado. La receta sigue a la vista.
+      // El portapapeles puede estar denegado. La semilla sigue a la vista.
       setCopiada('fallo');
     }
   };
@@ -862,19 +862,19 @@ const Resultado = ({
         </div>
       )}
 
-      {progress.receta ? (
+      {progress.semilla ? (
         <>
           <label className="field">
-            Receta de esta partida
-            <output className="field__value mono receta">{progress.receta}</output>
+            semilla de esta partida
+            <output className="field__value mono semilla">{progress.semilla}</output>
           </label>
           <button type="button" className="button--wide" onClick={() => void copiar()}>
-            {copiada === 'si' ? 'Receta copiada' : 'Copiar la receta'}
+            {copiada === 'si' ? 'semilla copiada' : 'Copiar la semilla'}
           </button>
           <p className="hint">
             {copiada === 'fallo'
               ? 'El navegador no ha dejado copiar. Puedes leerla de arriba.'
-              : 'Tu partida se queda guardada en este navegador, asi que normalmente no te hara falta. Guarda la receta por si juegas desde otro ordenador o pierdes los datos: con ella y tu ROM original se vuelve a generar este mismo mundo, identico. Tambien puedes darsela a tu companero para que juegue el mismo.'}
+              : 'Tu partida se queda guardada en este navegador, asi que normalmente no te hara falta. Guarda la semilla por si juegas desde otro ordenador o pierdes los datos: con ella y tu ROM original se vuelve a generar este mismo mundo, identico. Tambien puedes darsela a tu companero para que juegue el mismo.'}
           </p>
         </>
       ) : (

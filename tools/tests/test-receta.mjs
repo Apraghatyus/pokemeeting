@@ -3,20 +3,20 @@
 // Lo que se comprueba es justo lo que preocupaba: que una partida se pueda
 // recuperar al dia siguiente sin haber guardado la ROM en ningun sitio.
 //
-//   1. Se aleatoriza: arranca sola y da una receta, sin boton de descarga.
+//   1. Se aleatoriza: arranca sola y da una semilla, sin boton de descarga.
 //   2. Se recarga la pagina y se vuelve a cargar la ROM original: la partida
 //      aparece en la lista y se continua con un clic.
 //   3. Se borra la copia del navegador, como si el navegador la hubiera
-//      tirado, y la partida se rehace desde su receta: la ROM que sale es la
+//      tirado, y la partida se rehace desde su semilla: la ROM que sale es la
 //      misma, byte a byte.
 //
-// Uso: node tools/tests/test-receta.mjs <rom.gba>
+// Uso: node tools/tests/test-semilla.mjs <rom.gba>
 import { chromium } from 'playwright';
 
 const ROM = process.argv[2];
 const URL = process.env.SMOKE_URL ?? 'http://localhost:5173/';
 if (!ROM) {
-  console.error('Falta la ROM.\nUso: node tools/tests/test-receta.mjs <rom.gba>');
+  console.error('Falta la ROM.\nUso: node tools/tests/test-semilla.mjs <rom.gba>');
   process.exit(2);
 }
 
@@ -61,8 +61,8 @@ await page.waitForSelector('text=Partida aleatorizada', { timeout: 300_000 });
 const hayDescarga = await page.getByRole('button', { name: /Descargar la ROM/ }).count();
 check('ya no ofrece descargar la ROM', hayDescarga === 0);
 
-const receta = (await page.locator('output.receta').textContent())?.trim() ?? '';
-check('da una receta para rehacerla', receta.startsWith('EMUPOKE1.'), receta.slice(0, 32) + '...');
+const semilla = (await page.locator('output.semilla').textContent())?.trim() ?? '';
+check('da una semilla para rehacerla', semilla.startsWith('EMUPOKE1.'), semilla.slice(0, 32) + '...');
 
 await page.getByRole('button', { name: 'Empezar a jugar' }).click();
 await page.waitForTimeout(4000);
@@ -85,7 +85,7 @@ const continuada = await huellaEnMarcha();
 check('se continua con un clic, sin volver a aleatorizar', continuada.hash === original.hash,
   `${original.hash} vs ${continuada.hash}`);
 
-// --- 3. el navegador tira la copia: se rehace desde la receta ---
+// --- 3. el navegador tira la copia: se rehace desde la semilla ---
 // Borrarlo del sistema de ficheros en memoria no basta: si no se sincroniza,
 // IndexedDB lo devuelve intacto al recargar y no se estaria probando nada.
 const borrada = await page.evaluate(async (nombre) => {

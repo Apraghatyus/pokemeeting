@@ -41,9 +41,9 @@ export type PartidaGuardada = {
 };
 
 /**
- * Si una partida se puede volver a generar desde su receta.
+ * Si una partida se puede volver a generar desde su semilla.
  *
- * Las partidas creadas antes de que existiera la receta no la tienen, y las
+ * Las partidas creadas antes de que existiera la semilla no la tienen, y las
  * hechas sin jjs tampoco: en esos casos la copia vive solo en este navegador.
  */
 export const sePuedeRehacer = (partida: PartidaGuardada): boolean =>

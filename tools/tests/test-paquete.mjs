@@ -1,6 +1,6 @@
 // Comprueba el fichero de partida: el que te llevas a otro aparato.
 //
-// Lleva dentro el guardado y la receta con la que se vuelve a generar la copia
+// Lleva dentro el guardado y la semilla con la que se vuelve a generar la copia
 // aleatorizada. Lo que no lleva es la ROM, y eso tambien se comprueba aqui:
 // es lo que hace que este fichero se pueda mover sin repartir el juego.
 //
@@ -9,7 +9,7 @@ import { pathToFileURL } from 'node:url';
 
 const base = pathToFileURL(`${process.cwd()}/apps/web/src/core/`).href;
 const { empaquetar, leerPaquete, nombreDeFichero } = await import(`${base}paquete.ts`);
-const { codificarReceta, descodificarReceta } = await import(`${base}receta.ts`);
+const { codificarSemilla, descodificarSemilla } = await import(`${base}semilla.ts`);
 
 let fallos = 0;
 const check = (nombre, ok, detalle = '') => {
@@ -17,7 +17,7 @@ const check = (nombre, ok, detalle = '') => {
   if (!ok) fallos += 1;
 };
 
-const receta = {
+const semilla = {
   baseCrc32: '9f08064e',
   crc32: 'becc1ebf',
   semilla: '138536082248422',
@@ -32,25 +32,25 @@ for (let i = 0; i < sav.length; i += 1) sav[i] = i % 256;
 sav[100] = 0x0a;
 sav[101] = 0x0a;
 
-const paquete = empaquetar({ receta, sav, nombre: 'Rojo Fuego aleatorizada' });
+const paquete = empaquetar({ semilla, sav, nombre: 'Rojo Fuego aleatorizada' });
 check('se empaqueta', paquete.length > sav.length, `${paquete.length} bytes`);
 check('y ocupa poco mas que el guardado', paquete.length - sav.length < 500,
   `${paquete.length - sav.length} bytes de cabecera`);
 
 const leido = leerPaquete(paquete);
 check('se vuelve a leer', leido !== null);
-check('con la receta intacta',
-  leido.receta.semilla === receta.semilla && leido.receta.ajustes === receta.ajustes);
+check('con la semilla intacta',
+  leido.semilla.semilla === semilla.semilla && leido.semilla.ajustes === semilla.ajustes);
 check('y el guardado intacto byte a byte',
   leido.sav.length === sav.length && leido.sav.every((b, i) => b === sav[i]));
 check('incluidos los saltos de linea de dentro',
   leido.sav[100] === 0x0a && leido.sav[101] === 0x0a);
 check('y con su nombre', leido.nombre === 'Rojo Fuego aleatorizada', leido.nombre);
 
-// La receta de dentro tiene que valer tal cual para rehacer la ROM.
-const comoTexto = codificarReceta(leido.receta);
-check('la receta de dentro sirve para rehacer la copia',
-  descodificarReceta(comoTexto)?.crc32 === receta.crc32, comoTexto.slice(0, 32) + '...');
+// La semilla de dentro tiene que valer tal cual para rehacer la ROM.
+const comoTexto = codificarSemilla(leido.semilla);
+check('la semilla de dentro sirve para rehacer la copia',
+  descodificarSemilla(comoTexto)?.crc32 === semilla.crc32, comoTexto.slice(0, 32) + '...');
 
 // --- lo que NO lleva ---
 //
@@ -63,11 +63,11 @@ check('no cabe una ROM dentro: el fichero pesa lo que el guardado',
 check('un .sav suelto no pasa por fichero de partida', leerPaquete(sav) === null);
 check('ni un fichero vacio', leerPaquete(new Uint8Array(0)) === null);
 check('ni uno con la marca pero sin guardado',
-  leerPaquete(new TextEncoder().encode(`EMUPOKE-PARTIDA-1\n{"receta":${JSON.stringify(receta)}}\n`)) ===
+  leerPaquete(new TextEncoder().encode(`EMUPOKE-PARTIDA-1\n{"semilla":${JSON.stringify(semilla)}}\n`)) ===
     null);
 check('ni uno con la cabecera rota',
   leerPaquete(new TextEncoder().encode('EMUPOKE-PARTIDA-1\n{roto\nxx')) === null);
-check('ni uno sin receta',
+check('ni uno sin semilla',
   leerPaquete(new TextEncoder().encode('EMUPOKE-PARTIDA-1\n{"nombre":"x"}\nxx')) === null);
 
 // --- el nombre del fichero ---

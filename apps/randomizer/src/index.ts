@@ -349,7 +349,7 @@ const findJjs = async (): Promise<string | null> => {
  * La clave va ordenada porque el orden no influye en el resultado. Eso no se
  * supuso, se comprobo: con las cinco opciones en un orden y en el inverso salen
  * los mismos 88 bytes. Importaba asegurarlo antes de cachear, porque la cadena
- * de ajustes es media receta y una receta que dejara de rehacer la misma copia
+ * de ajustes es media semilla y una semilla que dejara de rehacer la misma copia
  * seria el peor fallo posible de este proyecto.
  *
  * Cabe en memoria de sobra: son 88 bytes por combinacion y las combinaciones
@@ -522,8 +522,8 @@ const handleRandomize = async (req: IncomingMessage, res: ServerResponse): Promi
   }
 
   // Resolver que opciones se piden, antes de tocar el disco. Rehaciendo una
-  // partida desde su receta no hay menu que validar: los ajustes vienen ya
-  // resueltos dentro de la propia receta.
+  // partida desde su semilla no hay menu que validar: los ajustes vienen ya
+  // resueltos dentro de la propia semilla.
   let chosen: RandomizerOption[] = [];
   if (!request.settingsBase64 && !request.settingsString) {
     const ids = request.options ?? [];
@@ -632,7 +632,7 @@ const handleRandomize = async (req: IncomingMessage, res: ServerResponse): Promi
         sendJson(res, 400, {
           error: 'ajustes-invalidos',
           message:
-            'Esa receta no la entiende tu version del randomizer, asi que no puedo rehacer la partida.',
+            'Esa semilla no la entiende tu version del randomizer, asi que no puedo rehacer la partida.',
           detalle: (rehecho.stderr || rehecho.stdout).slice(-1500),
         });
         return;
@@ -681,7 +681,7 @@ const handleRandomize = async (req: IncomingMessage, res: ServerResponse): Promi
     // Con jjs se aleatoriza con una semilla que elegimos nosotros, y esa copia
     // se puede rehacer mas tarde sin guardarla. Sin jjs solo queda su linea de
     // ordenes, que escoge la semilla ella y no deja repetirla: esa partida
-    // nace sin receta, y la interfaz lo dice.
+    // nace sin semilla, y la interfaz lo dice.
     const semilla = request.seed ?? pickSeed();
     let ajustesUsados: string | null = null;
     let execution: Awaited<ReturnType<typeof run>>;

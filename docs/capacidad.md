@@ -329,7 +329,7 @@ mando, y no se queda.
    esperando antes que ti: unos 2 minutos".
 2. **Ajustes en cache.** De 4,4 s a 2,8 s por peticion. Que el orden en que se
    marcan las opciones no cambia el resultado no se supuso: se comprobo, porque
-   la cadena de ajustes es media receta.
+   la cadena de ajustes es media semilla.
 3. **Compresion fuera del bucle de eventos.** No da capacidad, da que el servicio
    responda mientras trabaja. Sin esto la cola no se podria consultar.
 4. **`-Xmx` de 4096M a 1024M.** El pico real medido son 143 MB. El techo de 4 GB

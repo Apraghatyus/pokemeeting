@@ -105,7 +105,7 @@ check(`las ${CUANTAS} acaban con su copia`, acabaron.every(Boolean),
 const semillas = await Promise.all(
   pestanas.map((p) =>
     p
-      .locator('.receta code, .semilla, [data-semilla]')
+      .locator('.semilla code, .semilla, [data-semilla]')
       .first()
       .textContent()
       .catch(() => null),

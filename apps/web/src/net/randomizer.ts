@@ -99,7 +99,7 @@ export type RandomizeSummary = {
 
 export type RandomizeResult = {
   rom: Uint8Array;
-  /** Semilla con la que se genero. Es media receta para rehacerla. */
+  /** Semilla con la que se genero. Es media semilla para rehacerla. */
   seed: string | null;
   /** La otra media: los ajustes exactos, en el formato del randomizer. */
   ajustes: string | null;

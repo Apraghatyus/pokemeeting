@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import type { EmulatorState } from '../core/useEmulator';
 
 type Props = {
@@ -10,7 +10,6 @@ type Props = {
   onDownloadSave: () => void;
   onExportState: () => void;
   onImportSave: (file: File) => void;
-  onToggleFastForward: () => void;
 };
 
 const SLOT = 1;
@@ -24,9 +23,9 @@ export const Toolbar = ({
   onDownloadSave,
   onExportState,
   onImportSave,
-  onToggleFastForward,
 }: Props) => {
   const saveInputRef = useRef<HTMLInputElement | null>(null);
+  const [confirmando, setConfirmando] = useState(false);
   const playing = state.status === 'running' || state.status === 'paused';
 
   return (
@@ -34,23 +33,31 @@ export const Toolbar = ({
       <button type="button" disabled={!playing} onClick={onTogglePause}>
         {state.status === 'paused' ? 'Reanudar' : 'Pausa'}
       </button>
-      <button type="button" disabled={!playing} onClick={onReset}>
-        Reiniciar
-      </button>
-
-      {/* Conmutador, no "mientras lo mantengas": se enciende y se deja puesto.
-          Lo que se adelanta son dialogos largos y rutas ya sabidas, y tener el
-          dedo ocupado todo ese rato choca con jugar. La tecla es el espacio. */}
+      {/* Reiniciar arranca la ROM desde cero, asi que se pierde todo lo jugado
+          desde el ultimo guardado DENTRO del juego. Por eso pregunta: es un
+          clic de mas la primera vez y una partida salvada cada vez que se roza
+          sin querer. */}
       <button
         type="button"
         disabled={!playing}
-        className={state.fastForward ? 'is-active' : undefined}
-        aria-pressed={state.fastForward}
-        onClick={onToggleFastForward}
-        title="Espacio"
+        className={confirmando ? 'is-active' : undefined}
+        onClick={() => {
+          if (!confirmando) {
+            setConfirmando(true);
+            return;
+          }
+          setConfirmando(false);
+          onReset();
+        }}
+        onBlur={() => setConfirmando(false)}
+        title="Vuelve a la pantalla de inicio del juego"
       >
-        {state.fastForward ? 'Avance rapido: ON' : 'Avance rapido'}
+        {confirmando ? '¿Seguro? Se pierde lo no guardado' : 'Reiniciar partida'}
       </button>
+
+      {/* El avance rapido ya no esta aqui: se enciende con el espacio y, en
+          movil, con su boton del mando. Tenerlo ademas en el menu obligaba a
+          abrirlo en mitad de la partida para algo que se usa sobre la marcha. */}
 
       <span className="toolbar__sep" />
 
@@ -64,7 +71,7 @@ export const Toolbar = ({
       <span className="toolbar__sep" />
 
       <button type="button" disabled={!playing} onClick={onDownloadSave}>
-        Exportar .sav
+        Exportar partida
       </button>
       {/* El estado sirve aunque no se haya guardado dentro del juego: captura
           la memoria tal y como esta ahora mismo. */}
@@ -72,7 +79,7 @@ export const Toolbar = ({
         Exportar estado
       </button>
       <button type="button" disabled={!playing} onClick={() => saveInputRef.current?.click()}>
-        Importar .sav
+        Importar partida
       </button>
       <input
         ref={saveInputRef}

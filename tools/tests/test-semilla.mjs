@@ -47,15 +47,15 @@ const check = (n, ok, d = '') => { console.log(`${ok ? 'OK   ' : 'FALLO'} ${n}${
 const primera = await pedir({ options: OPCIONES });
 check('una aleatorizacion nueva trae semilla', primera.seed !== null, `semilla ${primera.seed}`);
 check('y se marca como reproducible', primera.reproducible === '1');
-check('y trae la receta de ajustes', (primera.ajustes?.length ?? 0) > 10, primera.ajustes?.slice(0, 24) + '...');
+check('y trae la semilla de ajustes', (primera.ajustes?.length ?? 0) > 10, primera.ajustes?.slice(0, 24) + '...');
 
 const repetida = await pedir({ options: OPCIONES, seed: primera.seed });
 check('repetirla con su semilla da la MISMA ROM', repetida.hash === primera.hash,
   `${primera.hash} vs ${repetida.hash}`);
 
-const porReceta = await pedir({ settingsString: primera.ajustes, seed: primera.seed });
-check('y rehacerla desde la receta tambien', porReceta.hash === primera.hash,
-  `${primera.hash} vs ${porReceta.hash}`);
+const porsemilla = await pedir({ settingsString: primera.ajustes, seed: primera.seed });
+check('y rehacerla desde la semilla tambien', porsemilla.hash === primera.hash,
+  `${primera.hash} vs ${porsemilla.hash}`);
 
 const otra = await pedir({ options: OPCIONES });
 check('sin semilla sale otra distinta', otra.hash !== primera.hash);

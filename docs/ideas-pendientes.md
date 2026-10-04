@@ -27,7 +27,7 @@ imposibles, y resultaron no serlo. Vale la pena recordar por qué.
   o sea que la red iba bien y faltaba la mitad de los fotogramas. Ahora llegan
   55,3. Lo vigila `npm run test:fluidez`.
 - **Llevarse la partida a otro aparato.** El `.sav` no bastaba porque no dice en
-  qué mundo estás; ahora se descarga un fichero con el guardado y la receta.
+  qué mundo estás; ahora se descarga un fichero con el guardado y la semilla.
 
 ---
 
