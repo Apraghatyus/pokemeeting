@@ -3,6 +3,10 @@ import type { MgbaModule } from '../core/mgbaCore';
 
 type Props = {
   coreRef: RefObject<MgbaModule | null>;
+  /** Si el avance rapido esta puesto, para que el boton lo refleje. */
+  avanceRapido: boolean;
+  /** Lo enciende y lo apaga. En el movil no hay teclado donde pulsar espacio. */
+  onAvanceRapido: () => void;
 };
 
 /** Entradas del GBA tal y como las nombra mGBA. */
@@ -15,7 +19,7 @@ type GbaInput = 'Up' | 'Down' | 'Left' | 'Right' | 'A' | 'B' | 'L' | 'R' | 'Star
  * simular teclas: SDL solo escucha teclado fisico y un evento de teclado
  * sintetico no lo activaria.
  */
-export const TouchControls = ({ coreRef }: Props) => {
+export const TouchControls = ({ coreRef, avanceRapido, onAvanceRapido }: Props) => {
   // Que hay pulsado ahora mismo, para no repetir ordenes al nucleo y para
   // poder soltarlo todo si un gesto se cancela.
   const held = useRef(new Set<GbaInput>());
@@ -75,6 +79,19 @@ export const TouchControls = ({ coreRef }: Props) => {
       <div className="pad__menu">
         <TouchButton input="Select" label="Select" onChange={setButton} active={visible} className="btn--small" />
         <TouchButton input="Start" label="Start" onChange={setButton} active={visible} className="btn--small" />
+        {/* No es una entrada del GBA, asi que no pasa por el nucleo como boton:
+            cambia la velocidad. Y es conmutador, porque en una pantalla tactil
+            mantener un boton pulsado deja un dedo menos para jugar. */}
+        <button
+          type="button"
+          className={`btn btn--small btn--rapido${avanceRapido ? ' is-active' : ''}`}
+          aria-pressed={avanceRapido}
+          aria-label={avanceRapido ? 'Quitar avance rapido' : 'Avance rapido'}
+          title="Avance rapido"
+          onClick={onAvanceRapido}
+        >
+          ⏩
+        </button>
       </div>
     </div>
   );

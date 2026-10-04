@@ -11,6 +11,13 @@ export type RandomizerOption = {
   description: string;
   /** En que generaciones existe lo que cambia. Gen 2 no tiene habilidades. */
   generaciones: number[];
+  /**
+   * Opciones con las que esta no puede ir a la vez.
+   *
+   * Son las que escriben en el mismo ajuste del randomizer: marcarlas juntas no
+   * da error, solo hace que gane una sin que nadie sepa cual.
+   */
+  chocaCon?: string[];
 };
 
 export type RandomizerHealth = {

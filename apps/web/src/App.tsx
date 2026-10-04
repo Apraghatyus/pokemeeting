@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RomFingerprint } from '@emupoke/protocol';
-import { DEFAULT_KEY_BINDINGS } from './core/mgbaCore';
+import { useTeclas, BOTONES, nombreVisible } from './core/useTeclas';
 import { useEmulator } from './core/useEmulator';
 import { useKeyboardOwnership } from './core/useKeyboardOwnership';
 import { useSession } from './net/useSession';
@@ -24,6 +24,10 @@ import { VoiceBar } from './ui/VoiceBar';
 export const App = () => {
   const emulator = useEmulator();
   const { state } = emulator;
+
+  // El mapa de teclas se guarda y se le aplica al nucleo en cuanto existe. Hay
+  // que reaplicarlo al cargar cada ROM, porque el nucleo vuelve a las de fabrica.
+  const teclas = useTeclas(emulator.coreRef, state.status === 'running' || state.status === 'paused');
   const hasRom = state.header !== null && state.platform !== null;
 
   // Los nombres de especie salen de TU ROM, y sirven tanto para tu equipo como
@@ -44,6 +48,27 @@ export const App = () => {
     emulator.coreRef,
     roomOpen || menuOpen || randomizerOpen,
   );
+
+  // Espacio enciende y apaga el avance rapido, como en casi cualquier emulador.
+  // Es conmutador y no "mientras lo mantengas": lo que se adelanta de verdad son
+  // dialogos largos y rutas ya conocidas, y tener el pulgar ocupado todo ese rato
+  // es justo cuando hacen falta las otras teclas.
+  useEffect(() => {
+    const alPulsar = (evento: KeyboardEvent) => {
+      if (evento.code !== 'Space') return;
+      // Si el teclado es de la interfaz, el espacio es para pulsar botones.
+      if (keyboardOwner === 'interfaz') return;
+      const donde = evento.target as HTMLElement | null;
+      if (donde?.closest('input, textarea, button, select, a')) return;
+
+      // El navegador usa el espacio para bajar la pagina; aqui no.
+      evento.preventDefault();
+      emulator.toggleFastForward();
+    };
+
+    globalThis.addEventListener('keydown', alPulsar);
+    return () => globalThis.removeEventListener('keydown', alPulsar);
+  }, [keyboardOwner, emulator]);
 
   // Al cargar una ROM se pregunta como quiere jugarse, antes de empezar:
   // aleatorizar despues de jugar un rato significa perder la partida. No se
@@ -181,11 +206,34 @@ export const App = () => {
         </div>
 
 
-        {mando.visible && hasRom && <TouchControls coreRef={emulator.coreRef} />}
+        {mando.visible && hasRom && (
+          <TouchControls
+            coreRef={emulator.coreRef}
+            avanceRapido={state.fastForward}
+            onAvanceRapido={emulator.toggleFastForward}
+          />
+        )}
 
         {state.error && (
           <p className="alert" role="alert">
             {state.error}
+          </p>
+        )}
+
+        {/* Un aviso no es un fallo: el juego sigue corriendo por debajo y se
+            puede cerrar. Lleva boton porque antes no habia forma de quitarlo. */}
+        {state.aviso && (
+          <p className="aviso" role="status">
+            <span>{state.aviso}</span>
+            <button
+              type="button"
+              className="aviso__cerrar"
+              onClick={emulator.descartarAviso}
+              aria-label="Cerrar aviso"
+              title="Cerrar aviso"
+            >
+              ×
+            </button>
           </p>
         )}
 
@@ -210,7 +258,7 @@ export const App = () => {
               onDownloadSave={emulator.downloadSave}
               onExportState={emulator.exportState}
               onImportSave={emulator.importSave}
-              onFastForward={emulator.setFastForward}
+              onToggleFastForward={emulator.toggleFastForward}
             />
             {state.lastSaveAt && (
               <p className="note">
@@ -271,14 +319,46 @@ export const App = () => {
 
           <section className="panel">
             <h2>Controles</h2>
-            <dl className="kv">
-              {DEFAULT_KEY_BINDINGS.map(([key, input]) => (
-                <div className="kv__row" key={input}>
-                  <dt>{input}</dt>
-                  <dd className="mono">{key}</dd>
+            <dl className="kv kv--teclas">
+              {BOTONES.map(({ entrada, etiqueta }) => (
+                <div className="kv__row" key={entrada}>
+                  <dt>{etiqueta}</dt>
+                  <dd>
+                    <button
+                      type="button"
+                      className={`tecla${teclas.esperando === entrada ? ' tecla--esperando' : ''}`}
+                      onClick={() =>
+                        teclas.esperando === entrada ? teclas.cancelar() : teclas.pedir(entrada)
+                      }
+                    >
+                      {teclas.esperando === entrada
+                        ? 'pulsa una tecla...'
+                        : (teclas.mapa[entrada] ? nombreVisible(teclas.mapa[entrada]!) : 'sin asignar')}
+                    </button>
+                  </dd>
                 </div>
               ))}
+              <div className="kv__row">
+                <dt>Avance rapido</dt>
+                <dd>
+                  <span className="tecla tecla--fija">Espacio</span>
+                </dd>
+              </div>
             </dl>
+
+            {teclas.problema && <p className="warn">{teclas.problema}</p>}
+
+            <div className="modal__acciones">
+              <button type="button" onClick={teclas.restaurar}>
+                Volver a las teclas de siempre
+              </button>
+            </div>
+
+            <p className="hint">
+              Pulsa un boton y despues la tecla que quieras. Se guarda por posicion en el teclado,
+              no por la letra, asi que el mando sigue donde lo dejaste aunque cambies de
+              distribucion. Escape cancela.
+            </p>
             <p className="hint">
               Mientras escribes en un campo, el juego suelta el teclado y lo recupera al salir.
             </p>

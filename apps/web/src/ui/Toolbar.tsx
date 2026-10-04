@@ -10,7 +10,7 @@ type Props = {
   onDownloadSave: () => void;
   onExportState: () => void;
   onImportSave: (file: File) => void;
-  onFastForward: (enabled: boolean) => void;
+  onToggleFastForward: () => void;
 };
 
 const SLOT = 1;
@@ -24,7 +24,7 @@ export const Toolbar = ({
   onDownloadSave,
   onExportState,
   onImportSave,
-  onFastForward,
+  onToggleFastForward,
 }: Props) => {
   const saveInputRef = useRef<HTMLInputElement | null>(null);
   const playing = state.status === 'running' || state.status === 'paused';
@@ -38,16 +38,18 @@ export const Toolbar = ({
         Reiniciar
       </button>
 
-      {/* Avance rapido mientras se mantiene pulsado, como en mGBA de escritorio. */}
+      {/* Conmutador, no "mientras lo mantengas": se enciende y se deja puesto.
+          Lo que se adelanta son dialogos largos y rutas ya sabidas, y tener el
+          dedo ocupado todo ese rato choca con jugar. La tecla es el espacio. */}
       <button
         type="button"
         disabled={!playing}
         className={state.fastForward ? 'is-active' : undefined}
-        onPointerDown={() => onFastForward(true)}
-        onPointerUp={() => onFastForward(false)}
-        onPointerLeave={() => onFastForward(false)}
+        aria-pressed={state.fastForward}
+        onClick={onToggleFastForward}
+        title="Espacio"
       >
-        Avance rapido
+        {state.fastForward ? 'Avance rapido: ON' : 'Avance rapido'}
       </button>
 
       <span className="toolbar__sep" />

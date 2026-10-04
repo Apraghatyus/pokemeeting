@@ -89,6 +89,29 @@ const buscarEn = (estado: Uint8Array, cual: Region): Equipo | null => {
 };
 
 /**
+ * Lee el equipo en una direccion concreta, si de verdad hay uno ahi.
+ *
+ * Devuelve null en cuanto el primer bloque no cuadra, asi que sirve para
+ * confirmar una direccion documentada sin fiarse de ella.
+ */
+const leerEn = (estado: Uint8Array, direccion: number, cual: Region): Equipo | null => {
+  const memoria = region(estado, cual);
+  const base = DIRECCION_BASE[cual];
+  const inicio = direccion - base;
+  if (inicio < 0 || inicio + TAMANO_EN_EQUIPO > memoria.length) return null;
+
+  const ranuras: RanuraEquipo[] = [];
+  for (let i = 0; i < TAMANO_EQUIPO; i += 1) {
+    const off = inicio + i * TAMANO_EN_EQUIPO;
+    const bloque = memoria.slice(off, off + TAMANO_EN_EQUIPO);
+    if (bloque.length < TAMANO_EN_EQUIPO || !pareceValido(bloque)) break;
+    ranuras.push({ indice: i, direccion: base + off, pokemon: leerPokemon(bloque), bloque });
+  }
+
+  return ranuras.length > 0 ? { direccion, region: cual, ranuras } : null;
+};
+
+/**
  * Busca el equipo en la memoria.
  *
  * El filtro es el checksum del propio Pokemon: la probabilidad de que cien
@@ -96,11 +119,37 @@ const buscarEn = (estado: Uint8Array, cual: Region): Equipo | null => {
  * sobre memoria real de una partida sin Pokemon, donde no encuentra nada, y
  * sobre una con equipo, donde lo encuentra en la direccion documentada.
  *
+ * **Con el codigo del juego se mira primero su direccion documentada**, y eso
+ * no es una optimizacion: es lo que arregla el fallo de que durante un combate
+ * apareciera en el panel el Pokemon contra el que estabas peleando.
+ *
+ * El motivo es que el equipo rival vive en memoria con exactamente la misma
+ * forma que el tuyo, asi que por forma no se distinguen. El barrido elegia el
+ * grupo mas largo de bloques seguidos, y contra un entrenador con mas Pokemon
+ * que tu ese grupo es el **suyo**. Un entrenador con dos te robaba el panel si
+ * tu llevabas uno. La direccion documentada si los distingue, porque es la del
+ * jugador y de nadie mas.
+ *
+ * El barrido sigue estando detras, para los hacks que mueven el equipo y para
+ * cuando no se sabe de que juego es.
+ *
  * Sin decirle region mira EWRAM y IWRAM y se queda con el equipo mas largo,
  * porque los cinco juegos de tercera generacion no lo guardan en el mismo
  * sitio: Rubi y Zafiro usan IWRAM y los otros tres EWRAM.
  */
-export const localizarEquipo = (estado: Uint8Array, cual?: Region): Equipo | null => {
+export const localizarEquipo = (
+  estado: Uint8Array,
+  cual?: Region,
+  codigoJuego?: string,
+): Equipo | null => {
+  const conocida = codigoJuego
+    ? DIRECCIONES_CONOCIDAS[codigoJuego.slice(0, 3).toUpperCase()]
+    : undefined;
+  if (conocida && (!cual || cual === conocida.region)) {
+    const anclado = leerEn(estado, conocida.equipo, conocida.region);
+    if (anclado) return anclado;
+  }
+
   const donde = cual ? [cual] : REGIONES_CON_EQUIPO;
   let mejor: Equipo | null = null;
   for (const region of donde) {

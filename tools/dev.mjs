@@ -17,6 +17,18 @@ import { connect } from 'node:net';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+/**
+ * Con --tunel, la web arranca aceptando hosts de fuera y al final se abre el
+ * enlace publico.
+ *
+ * La web tiene que arrancar distinta; no vale abrir el tunel sobre la de
+ * siempre. Vite responde 403 a cualquier Host que no conozca, asi que el enlace
+ * se abriria perfectamente y el visitante se encontraria "Blocked request". Por
+ * eso esto es una bandera del arranque y no un comando que se pueda lanzar
+ * despues sobre lo que ya hubiera.
+ */
+const CON_TUNEL = process.argv.includes('--tunel');
+
 const SERVICIOS = [
   {
     nombre: 'salas',
@@ -36,7 +48,7 @@ const SERVICIOS = [
   },
   {
     nombre: 'web   ',
-    comando: ['run', 'dev'],
+    comando: ['run', CON_TUNEL ? 'dev:tunnel' : 'dev'],
     puerto: 5173,
     color: '\u001b[35m',
     salud: 'http://localhost:5173/',
@@ -170,4 +182,12 @@ if (fallo) {
   }
   console.log('\n  Abre \u001b[4mhttp://localhost:5173\u001b[0m y a jugar.');
   console.log('  Para parar todo: Ctrl+C\n');
+
+  // El tunel va al final a proposito: necesita la web ya levantada y en modo
+  // tunel, asi que su propia comprobacion no puede fallar por llegar temprano.
+  if (CON_TUNEL) {
+    const tunel = spawn('npm', ['run', 'tunnel'], { shell: true, stdio: 'inherit' });
+    hijos.push(tunel);
+    tunel.on('exit', () => pararTodo());
+  }
 }

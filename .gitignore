@@ -10,6 +10,7 @@
 roms/
 saves/
 Emupoke.bat
+Emupoke-pruebas.bat
 
 # Dependencias y build
 node_modules/
@@ -48,3 +49,11 @@ tools/cloudflared.exe
 
 # El nucleo de DS lo baja tools/nds/preparar.mjs: es de otra gente y pesa 7 MB.
 tools/nds/nucleo/
+
+# Certificados de Tailscale: `tailscale cert` los escribe en la carpeta desde la
+# que se llama, y uno de los dos es una CLAVE PRIVADA. El Funnel no los
+# necesita -Tailscale los gestiona por dentro-, asi que si aparecen aqui es por
+# accidente y no deben acabar en un commit.
+*.crt
+*.key
+*.pem
