@@ -3,6 +3,10 @@
 Lo que falta, ordenado por lo que aporta frente a lo que cuesta. Cada entrada
 dice también qué la bloquea, que suele ser lo que de verdad decide el orden.
 
+Las ideas sueltas también se apuntan aquí aunque nadie las vaya a hacer mañana:
+cuando llega el momento, lo caro no es escribir el código sino volver a averiguar
+qué se sabía y qué había que decidir antes de empezar.
+
 ---
 
 ## Lo que ya dejó de estar pendiente
@@ -28,19 +32,50 @@ imposibles, y resultaron no serlo. Vale la pena recordar por qué.
   55,3. Lo vigila `npm run test:fluidez`.
 - **Llevarse la partida a otro aparato.** El `.sav` no bastaba porque no dice en
   qué mundo estás; ahora se descarga un fichero con el guardado y la semilla.
+- **Diseño para pantallas pequeñas.** Hecho: una pantalla a la vez y se cambia
+  deslizando, el equipo en una tira horizontal, la barra encogida mientras se
+  juega y el mando repartido a los lados al girar el teléfono. Medido, que es
+  como se encontró el fallo: tumbado la partida se quedaba en 104 píxeles de
+  293 porque el ancho se calculaba restando un hueco para la barra y el equipo
+  que ahí no existen. Lo vigila `npm run test:movil:mando`.
+- **El equipo rival en el panel.** Durante un combate salía el Pokémon del
+  contrario. Su equipo ocupa memoria con la misma forma que el tuyo, así que el
+  localizador elegía el grupo más largo de bloques seguidos, y contra un
+  entrenador con más Pokémon ese grupo es el suyo. Ahora se ancla en la
+  dirección documentada del equipo del jugador. `npm run test:equipo:rival`.
+- **Pantalla completa.** En móvil dejaba el juego sin botones, porque se pedía
+  sobre la pantalla sola y el navegador solo pinta ese elemento; en escritorio
+  se quedaba en negro, porque la mesa se ajustaba a su contenido y el contenido
+  se medía contra la mesa. Ahora se pide sobre un marco que lleva partida,
+  mando y equipo.
+- **Cuánto consume y qué hace falta para 1000 jugadores.** Medido pieza por
+  pieza. Ver [capacidad.md](capacidad.md).
+- **La cola del aleatorizador.** No había ningún límite de copias simultáneas,
+  que es lo que separa "los que sobran esperan" de "se cae para todos". Con la
+  cola, los ajustes en caché y la compresión fuera del bucle de eventos, medido
+  A/B en la misma máquina: de 0,48 a 0,78 copias por segundo.
 
 ---
 
-## Diseño para pantallas pequeñas
+## Los otros menús
 
-**Lo siguiente.** Los paneles de equipo están pensados para una pantalla ancha:
-en el móvil bajan como lista, pero los tamaños siguen siendo los de escritorio y
-no quedan cómodos.
+**Lo siguiente.** El de ajustes ya se repasó: reiniciar avisa de lo que se
+pierde, exportar e importar dejaron de hablar de extensiones, el avance rápido
+salió de ahí porque se usa sobre la marcha, y se puede copiar la semilla en
+cualquier momento. Los otros dos no se han tocado.
 
-Está pendiente un diseño propio para móvil, que vendrá de fuera. Lo que hay que
-tener claro al adaptarlo: las seis ranuras reservadas tienen sentido en una
-columna alta y ninguno en una lista, y el sprite a 80 píxeles se come la
-pantalla cuando el ancho son 390.
+**El del aleatorizador.** Es el más largo de todos: catorce opciones con su
+explicación, la lista de partidas guardadas y el sitio donde pegar una semilla.
+En escritorio se lee bien; en un teléfono es un rollo de desplazamiento y no
+está claro qué hay que marcar para empezar.
+
+**Los menús en móvil.** Medido en un Pixel 5: el de ajustes son 1590 píxeles de
+contenido en una ventana de 727, o sea que hay que bajar 897 para llegar al
+final, más de una pantalla entera. Y sus 22 botones miden todos menos de 44
+píxeles de alto, que es el mínimo que se suele dar por cómodo para el dedo.
+
+Lo que hay que decidir antes de tocarlos: si en móvil conviene partirlos en
+pestañas o en secciones plegadas, porque alargarlos más no arregla nada.
 
 ---
 
@@ -91,6 +126,66 @@ interfaz ni la red.
 Pequeño y se nota. La ventana del compañero dice "Tu compañero" porque no
 sabemos cómo se llama. Basta con pedirlo al entrar en la sala y mandarlo por el
 canal que ya existe.
+
+---
+
+## Mapa de dónde has capturado
+
+En un Soul Link solo se captura una vez por zona, y hoy eso se lleva de memoria
+o en un papel aparte. La idea es marcarlo en un mapa: dónde cayó cada Pokémon y
+qué rutas te quedan.
+
+**Y lo bueno es que el dato ya lo tenemos.** No hay que apuntarlo a mano ni
+adivinarlo: cada Pokémon lleva dentro el sitio donde lo capturaste. Está en la
+subestructura `M` de sus cien bytes, que el lector ya localiza -de ahí sale la
+bandera de huevo, que vive cuatro bytes más allá-. Son dos campos: el lugar y la
+información de origen (nivel al que lo encontraste, juego y bola).
+
+Así que esto es bastante menos trabajo de lo que parece. Lo que falta:
+
+- **Traducir el número de lugar a un nombre.** La tabla está en la ROM, igual
+  que los nombres de especie, y se encuentra de la misma forma.
+- **Dibujar el mapa.** Aquí sí hay decisión: un mapa de verdad de Kanto pide una
+  imagen y las coordenadas de cada zona, mientras que una lista de rutas con su
+  Pokémon al lado da casi la misma información por mucho menos.
+- **Que valga para los dos.** Por el canal de datos ya viaja el equipo; mandar
+  también el lugar es un campo más en el mismo mensaje. Ahí es donde se vuelve
+  útil de verdad: ver de un vistazo qué rutas ha gastado cada uno.
+
+Ojo con una cosa: el lugar lo lleva el Pokémon, así que un Pokémon que se muere
+se lleva el dato con él. Si el mapa tiene que recordar rutas gastadas aunque la
+pareja haya caído, hay que guardarlo por nuestra cuenta según se vea.
+
+---
+
+## Estadísticas y perfiles
+
+La idea es tener un sitio con el historial: cuántas partidas aleatorizadas has
+jugado, cuántas terminaste y cuántas se fueron al traste, y poder ordenarlas por
+el tipo de aleatorización.
+
+**Lo que hay que saber antes de empezar es que esto cambia el proyecto de
+categoría.** Hoy el servidor no guarda absolutamente nada: ni partidas, ni
+guardados, ni ROMs, ni quién eres. Esa es la razón de que no haya base de datos,
+ni copias de seguridad, ni nada que respaldar, y también parte de por qué la
+línea legal está limpia. Unos perfiles con historial significan cuentas, datos
+personales y una base de datos de verdad.
+
+Hay un punto intermedio que vale la pena considerar antes: **el historial vive
+en tu navegador**, sin cuenta y sin servidor. Da estadísticas de tus propias
+partidas y las categorías por tipo de aleatorización, que es la mayor parte de
+lo que se quiere, y no cambia nada de lo de arriba. Lo que no da es comparar con
+tu compañera ni recuperar el historial desde otro aparato.
+
+La otra pregunta, y no es menor: **qué cuenta como victoria y como derrota**. En
+una partida aleatorizada no hay un final claro: ¿la Liga?, ¿quedarse sin equipo?,
+¿abandonar? Sin decidir eso, el porcentaje no significa nada. Conviene fijarlo
+antes de guardar el primer dato, porque cambiarlo después invalida el historial
+entero.
+
+Las partidas guardadas ya llevan parte de lo que haría falta -semilla, ajustes,
+qué se aleatorizó y cuándo se jugó-, así que las categorías por tipo de
+aleatorización salen casi solas de lo que ya se guarda.
 
 ---
 
@@ -206,7 +301,12 @@ Ciudad Celeste, ven" sin escribirlo. No toca la ROM.
   partidas dejan de poderse rehacer. Con una JRE nueva habría que portar el
   formato del fichero de ajustes.
 - **Las salas viven en memoria.** Si se reinicia el servidor de salas,
-  desaparecen y no hay reconexión posible; hay que crear una nueva.
+  desaparecen y no hay reconexión posible; hay que crear una nueva. Con dos
+  jugadores es una molestia; con quinientas parejas serían quinientas partidas
+  cortadas de golpe, así que sube de prioridad en cuanto esto crezca.
+- **El mapa de depuración del núcleo se sube a producción.** Son 448 KB de
+  `mgba.wasm.map` que solo pide el navegador con las herramientas abiertas.
+  No hace daño, pero no pinta nada en el servidor.
 - **Sin límite de espacio visible.** Se guardan hasta tres partidas de 16 MB,
   pero no se muestra cuánto ocupa ni se avisa si el navegador se queda sin
   sitio.
