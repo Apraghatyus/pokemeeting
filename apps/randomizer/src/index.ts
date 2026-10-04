@@ -37,6 +37,8 @@ import { buildFromStringScript, buildRandomizeScript } from './semilla.ts';
 import { Abandonada, Cola, ColaLlena } from './cola.ts';
 
 const PORT = Number(process.env['PORT'] ?? 8788);
+// Solo local por defecto. En Docker se abre a la red interna con HOST=0.0.0.0.
+const HOST = process.env['HOST'] ?? '127.0.0.1';
 
 /** Donde buscamos el jar si no se indica otra cosa con UPR_JAR. */
 const DEFAULT_JAR = resolve(import.meta.dirname, '../../../tools/randomizer/PokeRandoZX.jar');
@@ -825,8 +827,8 @@ const server = createServer((req, res) => {
 
 // Solo 127.0.0.1: este servicio maneja la ROM del jugador y no tiene por que
 // ser alcanzable desde la red.
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`servicio de aleatorizacion escuchando en 127.0.0.1:${PORT}`);
+server.listen(PORT, HOST, () => {
+  console.log(`servicio de aleatorizacion escuchando en ${HOST}:${PORT}`);
   console.log(
     `hasta ${CONCURRENCIA} a la vez, ${MAX_EN_COLA} en cola, ${JVM_MEMORIA} por JVM`,
   );

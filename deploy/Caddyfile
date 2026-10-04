@@ -1,0 +1,39 @@
+# Detras de Cloudflare Tunnel (o NPM): el HTTPS lo pone quien esta delante.
+{
+	auto_https off
+	admin off
+}
+
+:80 {
+	encode gzip
+
+	# Sin estas dos el nucleo del emulador arranca y falla en silencio.
+	header {
+		Cross-Origin-Opener-Policy same-origin
+		Cross-Origin-Embedder-Policy require-corp
+	}
+
+	handle /signaling* {
+		uri strip_prefix /signaling
+		reverse_proxy {$SERVIDOR:emupoke-servidor}:8787
+	}
+
+	handle /randomizer* {
+		request_body {
+			max_size 64MB
+		}
+		uri strip_prefix /randomizer
+		reverse_proxy {$SERVIDOR:emupoke-servidor}:8788 {
+			transport http {
+				read_timeout 300s
+				write_timeout 300s
+			}
+		}
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

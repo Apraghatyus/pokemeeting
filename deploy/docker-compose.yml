@@ -1,0 +1,58 @@
+# Produccion en el homelab: ~/homelab/emupoke/
+# Publico por Cloudflare Tunnel: hostname -> http://emupoke-web:80
+# Local por Tailscale en :${EMUPOKE_PORT} (sin HTTPS el emulador no arranca: usar el tunel o NPM).
+name: emupoke
+
+services:
+  servidor:
+    build:
+      context: ${EMUPOKE_REPO:-..}
+      dockerfile: deploy/Dockerfile
+      target: servidor
+    image: emupoke-servidor:latest
+    container_name: emupoke-servidor
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      RANDOMIZER_CONCURRENCIA: "2"
+      RANDOMIZER_MAX_COLA: "50"
+      RANDOMIZER_XMX: "768M"
+    healthcheck:
+      test: ["CMD", "node", "-e", "Promise.all([8787,8788].map(p=>fetch('http://127.0.0.1:'+p+'/health').then(r=>{if(!r.ok)throw r.status}))).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+    networks: [interna]
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "2.0"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+
+  web:
+    build:
+      context: ${EMUPOKE_REPO:-..}
+      dockerfile: deploy/Dockerfile
+      target: web
+    image: emupoke-web:latest
+    container_name: emupoke-web
+    restart: unless-stopped
+    ports:
+      - "${EMUPOKE_PORT:-8790}:80"
+    depends_on:
+      - servidor
+    networks: [interna, cloudflared-net]
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.50"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+
+networks:
+  interna:
+  cloudflared-net:
+    external: true
