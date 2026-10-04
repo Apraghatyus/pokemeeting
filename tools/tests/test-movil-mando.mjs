@@ -93,8 +93,56 @@ await movil.waitForTimeout(1200);
 check('y se puede pulsar un boton estando en pantalla completa',
   Buffer.compare(antes, await movil.locator('canvas').screenshot()) !== 0);
 
+// El equipo tiene que seguir viendose: en un Soul Link es lo que se consulta
+// entre combate y combate, y salir de pantalla completa para mirarlo rompe la
+// partida mas de lo que arregla ganar unos pixeles.
+const equipoEnCompleta = await movil.evaluate(() => {
+  const eq = document.querySelector('.equipo');
+  if (!eq) return { hay: false };
+  const c = eq.getBoundingClientRect();
+  return {
+    hay: true,
+    alto: Math.round(c.height),
+    dentro: document.fullscreenElement?.contains(eq) ?? false,
+  };
+});
+check('en pantalla completa el equipo sigue a la vista',
+  equipoEnCompleta.hay && equipoEnCompleta.alto > 0 && equipoEnCompleta.dentro,
+  equipoEnCompleta.hay ? `${equipoEnCompleta.alto}px de alto` : 'no esta');
+
 await movil.locator('.pantalla__boton--completa').click();
 await movil.waitForTimeout(600);
+
+// --------------------------------------------- la ficha, con un Pokemon
+// Se inyecta el mismo marcado que produce EquipoPanel: lo que se comprueba son
+// las reglas de estilo, y con el equipo vacio no se veria ninguna.
+const ficha = await movil.evaluate(() => {
+  const lista = document.querySelector('.equipo__lista');
+  if (!lista) return null;
+  lista.innerHTML = `<li class="ficha">
+    <span class="ficha__sprite ficha__sprite--imagen"></span>
+    <span class="ficha__datos">
+      <strong class="ficha__nombre">ZAPDOS</strong>
+      <span class="ficha__linea"><span class="ficha__nivel">Nv.5</span></span>
+      <span class="ficha__linea"><span class="tipo">ELECTRICO</span><span class="tipo">VOLADOR</span></span>
+    </span></li>`;
+  const chips = [...lista.querySelectorAll('.tipo')];
+  const nivel = lista.querySelector('.ficha__nivel').getBoundingClientRect();
+  const pad = document.querySelector('.pad').getBoundingClientRect();
+  return {
+    visibles: chips.filter((c) => getComputedStyle(c).display !== 'none').length,
+    // Si el tipo esta a la altura del nivel, no le cuesta alto a la ficha.
+    alLado: Math.abs(chips[0].getBoundingClientRect().top - nivel.top) < 14,
+    padAbajo: Math.round(pad.bottom),
+    ventana: innerHeight,
+  };
+});
+
+check('se ven los dos tipos del Pokemon', ficha?.visibles === 2, `${ficha?.visibles} de 2`);
+check('y van al lado del nivel, sin gastar otra linea', ficha?.alLado);
+check('con un Pokemon en el equipo, el mando sigue cabiendo',
+  ficha !== null && ficha.padAbajo <= ficha.ventana,
+  `acaba en ${ficha?.padAbajo} de ${ficha?.ventana}`);
 
 // ------------------------------------------------------------ horizontal
 const tumbado = await abrir({ ...devices['Pixel 5 landscape'] });
@@ -125,6 +173,14 @@ check('la cruceta queda a la izquierda', medidas.dpad.x < medidas.ventana.w * 0.
   `x=${medidas.dpad.x}`);
 check('y A y B a la derecha', medidas.cara.x > medidas.ventana.w * 0.6,
   `x=${medidas.cara.x}`);
+const centrado = await tumbado.evaluate(() => {
+  const p = document.querySelector('.pantalla--grande').getBoundingClientRect();
+  return { izq: Math.round(p.x), der: Math.round(innerWidth - p.right) };
+});
+check('la partida queda centrada, no pegada a un lado',
+  Math.abs(centrado.izq - centrado.der) <= 4,
+  `${centrado.izq}px a la izquierda, ${centrado.der}px a la derecha`);
+
 check('los dos abajo, donde caen los pulgares',
   medidas.dpad.y > medidas.ventana.h * 0.3 && medidas.cara.y > medidas.ventana.h * 0.3,
   `cruceta y=${medidas.dpad.y}, cara y=${medidas.cara.y}`);

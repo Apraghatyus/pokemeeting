@@ -218,21 +218,20 @@ body {
 /* ---------- pantalla completa ---------- */
 
 /*
- * En pantalla completa manda la partida y el mando; lo demas sobra.
+ * En pantalla completa manda la partida, pero el equipo se queda.
  *
- * Los equipos se esconden a proposito: en un movil, dejarlos obligaria a
- * repartir el alto entre tres cosas y ninguna quedaria usable. Se vuelven a ver
- * al salir.
+ * Primero se escondia para dejarle todo el alto al mando. Jugando se vio que
+ * no: en un Soul Link el equipo es justo lo que se mira entre combate y
+ * combate, y tener que salir de pantalla completa para consultarlo rompe la
+ * partida mas de lo que la arregla ganar unos pixeles.
+ *
+ * Lo que si desaparece es la barra de arriba, que no esta dentro de este marco.
  */
 .juego:fullscreen {
   background: var(--bg);
   padding: 8px;
   gap: 8px;
   justify-content: center;
-}
-
-.juego:fullscreen .equipo {
-  display: none;
 }
 
 .juego:fullscreen .mesa {
@@ -2313,8 +2312,13 @@ details.partidas[open] > summary::before {
   }
 
   .app--jugando .app__main {
-    padding: 8px 10px;
-    gap: 8px;
+    padding: 6px 10px;
+    gap: 6px;
+  }
+
+  .app--jugando .mesa,
+  .app--jugando .mesa--solo {
+    gap: 6px;
   }
 
   /* --- el equipo, mas bajo --- */
@@ -2325,8 +2329,8 @@ details.partidas[open] > summary::before {
   .app--jugando .equipo__sprite,
   .app--jugando .ficha__sprite,
   .app--jugando .ficha__sprite--imagen {
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
   }
 
   .app--jugando .equipo__lista .ficha {
@@ -2344,10 +2348,56 @@ details.partidas[open] > summary::before {
     gap: 4px;
   }
 
-  /* El tipo es lo primero que sobra cuando falta sitio: se adivina por el
-     Pokemon y ocupa una linea entera. */
-  .app--jugando .equipo__lista .ficha .tipo {
-    display: none;
+  /* El tipo NO sobra: en un Soul Link es justo lo que se mira para decidir.
+     Se quito por espacio y fue un error.
+     *
+     * Vuelve sin gastar alto: en vez de su propia linea debajo del nivel, se
+     * pone AL LADO. El nivel ocupa poco y queda hueco de sobra en esa fila, asi
+     * que el tipo entra gratis. Las dos lineas se vuelven dos columnas. */
+  .app--jugando .equipo__lista .ficha__datos {
+    display: grid;
+    grid-template-columns: auto auto;
+    justify-content: center;
+    align-items: center;
+    column-gap: 5px;
+    row-gap: 0;
+  }
+
+  .app--jugando .equipo__lista .ficha__nombre {
+    grid-column: 1 / -1;
+  }
+
+  .app--jugando .equipo__lista .ficha__linea {
+    margin: 0;
+  }
+
+  /* La ficha se ensancha para que los DOS tipos quepan en la misma linea que el
+     nivel. Medido: con 104 pixeles el segundo tipo bajaba a otra fila y la ficha
+     se iba a 94 de alto, justo lo que hacia que el mando asomara por abajo.
+     Ensanchar no cuesta nada, porque la tira se desplaza a lo ancho y lo que
+     escasea es el alto. */
+  .app--jugando .equipo__lista .ficha {
+    width: 118px;
+    padding: 2px 3px;
+  }
+
+  .app--jugando .equipo__lista .tipo {
+    font-size: 8px;
+    padding: 1px 4px;
+    letter-spacing: 0;
+  }
+
+  /* Y los dos tipos se ven, que es de lo que iba esto. Si no caben de lado, el
+     segundo baja: solo le pasa a los de tipo doble y son once pixeles. */
+  .app--jugando .equipo__lista .ficha__linea + .ficha__linea {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    justify-content: center;
+  }
+
+  .app--jugando .equipo__lista .ficha__linea + .ficha__linea .tipo:nth-child(2) {
+    display: inline-block;
   }
 }
 
@@ -2404,6 +2454,15 @@ details.partidas[open] > summary::before {
     max-height: 100dvh;
   }
 
+  /* Centrada. En horizontal la partida es 3:2 y la pantalla del telefono mucho
+     mas alargada, asi que sobra ancho a los lados por fuerza. Pegada a la
+     izquierda ese sobrante se amontonaba todo a la derecha y quedaba un hueco
+     negro enorme; repartido a los dos lados, los botones caen simetricos y la
+     partida queda donde miras. */
+  .app--jugando .pantallas > .pantalla--grande {
+    margin-inline: auto;
+  }
+
   /* Y que la mesa pueda darle ese alto, en vez de encogerse al contenido. */
   .app--jugando .mesa,
   .app--jugando .mesa--solo {
@@ -2442,5 +2501,44 @@ details.partidas[open] > summary::before {
   .app--jugando .pad__menu {
     bottom: 8px;
     gap: 10px;
+  }
+
+  /* El equipo, flotando sobre la banda negra en vez de robarle alto a la
+     partida. Tumbado el alto es lo unico que escasea -hay menos de 300
+     pixeles-, asi que ponerlo en fila debajo dejaria la partida a la mitad.
+     Arriba del todo hay sitio porque la partida es 3:2 y la pantalla mas
+     alargada. */
+  .app--jugando .equipo {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 6;
+    max-width: 62vw;
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 0 0 10px 10px;
+    padding: 2px 8px 3px;
+    pointer-events: auto;
+  }
+
+  /* Solo los sprites: el nombre y el nivel no caben y el dibujo basta para ver
+     de un vistazo quien sigue en pie. */
+  .app--jugando .equipo .equipo__titulo,
+  .app--jugando .equipo .ficha__datos,
+  .app--jugando .equipo .equipo__cambiar {
+    display: none;
+  }
+
+  .app--jugando .equipo .equipo__lista .ficha {
+    width: auto;
+    padding: 0 2px;
+  }
+
+  .app--jugando .equipo .equipo__sprite,
+  .app--jugando .equipo .ficha__sprite,
+  .app--jugando .equipo .ficha__sprite--imagen {
+    width: 30px;
+    height: 30px;
   }
 }
