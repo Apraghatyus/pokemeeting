@@ -125,7 +125,7 @@ export const App = () => {
   // El reto se acaba cuando cae el equipo entero. No lo dice el juego -ahi
   // pierdes, vuelves al Centro Pokemon y sigues-: es la regla de la Nuzlocke,
   // asi que se aplica aqui.
-  const fin = useFinDePartida(miEquipo.equipo, state.romName);
+  const fin = useFinDePartida(miEquipo.equipo, state.romName, miEquipo.derrota);
 
   // Mandarle el equipo al companero. Se hace desde un solo sitio y no al
   // leerlo, para que tambien salga cuando abre el canal: quien ya estaba

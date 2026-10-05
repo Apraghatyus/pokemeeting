@@ -56,7 +56,8 @@ const provocarFin = async () => {
   await page.evaluate((nombre) => {
     localStorage.setItem(
       `emupoke.fin.${nombre}`,
-      JSON.stringify({ vistos: [111, 222], terminada: true, continuada: false }),
+      // Un solo Pokemon: es el caso que fallaba, cuando la regla exigia dos.
+      JSON.stringify({ vistos: [111], terminada: true, continuada: false }),
     );
   }, romName);
   await cargar();

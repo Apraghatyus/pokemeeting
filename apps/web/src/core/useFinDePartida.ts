@@ -13,19 +13,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EquipoResumen } from '@emupoke/protocol';
 
-/**
- * Cuántos Pokémon distintos hay que haber tenido para que la regla se active.
- *
- * Dos, y no uno, por el combate del laboratorio: el primero del juego es un
- * tutorial contra tu rival en el que solo tienes al inicial, y perderlo ahí no
- * acaba con nada. Exigiendo dos, ese combate queda fuera por construcción, sin
- * tener que reconocerlo ni saber en qué mapa estás.
- *
- * El precio es el caso raro de quien se deje debilitar al inicial antes de
- * capturar nada: ahí no saltaría. En una Nuzlocke se captura en la primera ruta,
- * así que es un hueco estrecho, y prefiero un hueco a un cartel falso.
- */
-const MINIMO_PARA_CONTAR = 2;
+// Aquí hubo una regla que exigía haber tenido DOS Pokémon distintos, para que
+// el combate del laboratorio -donde solo tienes al inicial- quedara fuera por
+// construcción.
+//
+// Estaba mal, y lo demostró el primero que lo jugó: salió con su inicial a
+// buscar el segundo, se lo debilitaron antes de capturar nada, y el cartel no
+// apareció. Perder antes de la primera captura no es un caso raro: es de las
+// formas más normales de que se acabe una Nuzlocke.
+//
+// Así que la regla es la simple: si lo que tienes está debilitado, se acabó.
+// El combate del laboratorio puede dar un cartel de más, y para eso está la ✕,
+// que lo cierra sin dar nada por terminado. Un cartel de más se quita con un
+// clic; un final que no se reconoce deja la partida contando como viva.
 
 export type FinDePartida = {
   /** Si hay que enseñar el cartel ahora mismo. */
@@ -98,6 +98,15 @@ const equipoCaido = (equipo: EquipoResumen | null): boolean => {
 export const useFinDePartida = (
   equipo: EquipoResumen | null,
   partida: string | null,
+  /**
+   * Si el juego esta diciendo que has perdido.
+   *
+   * Es la señal buena, y la del equipo se queda como respaldo: al perder, el
+   * Centro Pokemon te cura, asi que "todos a cero" dura unos segundos y entre
+   * dos lecturas se puede escapar. El mensaje, en cambio, lo dice el juego en
+   * el momento exacto.
+   */
+  derrota = false,
 ): FinDePartida => {
   const [estado, setEstado] = useState<Guardado>(VACIO);
   const [equipoFinal, setEquipoFinal] = useState<EquipoResumen | null>(null);
@@ -131,9 +140,7 @@ export const useFinDePartida = (
       const siguiente: Guardado = {
         ...previo,
         vistos: [...vistos],
-        terminada:
-          previo.terminada ||
-          (vistos.size >= MINIMO_PARA_CONTAR && equipoCaido(equipo)),
+        terminada: previo.terminada || derrota || equipoCaido(equipo),
       };
 
       // Guardar el equipo del momento exacto: despues el jugador revive a
@@ -142,7 +149,7 @@ export const useFinDePartida = (
 
       return siguiente;
     });
-  }, [equipo, partida]);
+  }, [equipo, partida, derrota]);
 
   // Se guarda aqui y no dentro del updater: un updater tiene que ser puro, y
   // guardando desde fuera no hay forma de escribir un estado a medias.

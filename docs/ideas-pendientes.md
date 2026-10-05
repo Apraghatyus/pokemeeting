@@ -134,6 +134,20 @@ causa no era la que parecía. Guardar el porqué ahorra volver a investigarlo.
   se probaba lo tocaba. La ñ real es 0x29 y la Ñ 0x14, comprobadas buscando
   "pequeño" y "SEÑOR" en la ROM espanola. Lo vigila `npm run test:texto`, que
   recorre los dos abecedarios enteros en vez de mirar letras sueltas.
+- **El fin de partida no saltaba con un solo Pokemon.** La regla exigia haber
+  tenido DOS Pokemon distintos, para que el combate del laboratorio quedara
+  fuera por construccion. Estaba mal, y lo demostro el primero que lo jugo: salio
+  con su inicial a buscar el segundo, se lo debilitaron antes de capturar nada, y
+  el cartel no aparecio. Perder antes de la primera captura no es un caso raro,
+  es de las formas mas normales de que se acabe una Nuzlocke.
+- **Reconocer la derrota por lo que dice el juego.** Mejor señal que mirar la
+  vida: al perder, el Centro Pokemon te cura, asi que "todos a cero" dura unos
+  segundos y entre dos lecturas se puede escapar. El mensaje "<nombre> fue
+  corriendo a un CENTRO PKMN" lo dice el juego en el momento exacto, y se puede
+  leer porque lleva tu nombre dentro: para sustituirlo, el juego tiene que armar
+  la frase en memoria en vez de pintarla desde la ROM. El ancla elegida
+  -"corriendo a un"- aparece **una sola vez** en los dieciseis megas de la ROM.
+  `npm run test:derrota`
 - **El panel se barajaba solo, y quien pelea.** Eran dos pendientes y resultaron
   ser uno. El panel no leia mal: tercera generacion **intercambia de verdad las
   ranuras del equipo** cuando sacas otro Pokemon, asi que el que entra pasa a ser

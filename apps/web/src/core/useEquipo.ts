@@ -15,7 +15,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EquipoResumen } from '@emupoke/protocol';
-import { mismoEquipo, releerEquipo, resumirEquipo } from '@emupoke/pokemon';
+import { enDerrota, mismoEquipo, releerEquipo, resumirEquipo } from '@emupoke/pokemon';
 import type { MgbaModule } from './mgbaCore';
 import type { Especies } from './useEspecies';
 
@@ -36,6 +36,15 @@ const sinExtension = (nombre: string): string => nombre.replace(/\.[^.]+$/, '');
 export type EstadoEquipo = {
   /** El equipo, o null si todavia no se ha podido leer. */
   equipo: EquipoResumen | null;
+  /**
+   * Si el juego esta enseñando el mensaje de haber perdido.
+   *
+   * Sale del mismo estado que el equipo, asi que no cuesta otra lectura. Es
+   * mejor señal que mirar la vida: al perder, el Centro Pokemon te cura, y la
+   * ventana de "todos a cero" dura unos segundos y se puede escapar entre dos
+   * lecturas.
+   */
+  derrota: boolean;
   /**
    * Si este juego permite leer el equipo.
    *
@@ -60,6 +69,7 @@ export const useEquipo = (
 ): EstadoEquipo => {
   const [equipo, setEquipo] = useState<EquipoResumen | null>(null);
   const [disponible, setDisponible] = useState(true);
+  const [derrota, setDerrota] = useState(false);
 
   const direccionRef = useRef<number | null>(null);
   const juegoRef = useRef<string>('');
@@ -114,6 +124,9 @@ export const useEquipo = (
         };
       }
 
+      // Se mira en el mismo estado que acabamos de leer.
+      setDerrota(enDerrota(estado));
+
       setDisponible(true);
       if (mismoEquipo(ultimoRef.current, leido)) return;
 
@@ -135,6 +148,7 @@ export const useEquipo = (
     ultimoRef.current = null;
     setEquipo(null);
     setDisponible(true);
+    setDerrota(false);
 
     if (!jugando) return;
 
@@ -148,5 +162,5 @@ export const useEquipo = (
     };
   }, [jugando, romName, mirar]);
 
-  return { equipo, disponible };
+  return { equipo, disponible, derrota };
 };
