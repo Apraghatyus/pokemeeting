@@ -61,7 +61,7 @@ await page.waitForSelector('.modal__title:text-is("Partida aleatorizada")', { ti
 const hayDescarga = await page.getByRole('button', { name: /Descargar la ROM/ }).count();
 check('ya no ofrece descargar la ROM', hayDescarga === 0);
 
-const semilla = (await page.locator('output.semilla').textContent())?.trim() ?? '';
+const semilla = (await page.locator('.hecha__codigo').textContent())?.trim() ?? '';
 check('da una semilla para rehacerla', semilla.startsWith('EMUPOKE1.'), semilla.slice(0, 32) + '...');
 
 await page.getByRole('button', { name: 'Empezar a jugar' }).click();
@@ -102,8 +102,11 @@ await esperarZona();
 await page.setInputFiles('input[type=file][accept*=".gba"]', ROM);
 await page.waitForSelector('.hueco--partida', { timeout: 20_000 });
 const perdida = page.locator('.hueco__abrir').first();
-check('sin su copia, la partida avisa de que hay que rehacerla',
-  ((await perdida.textContent()) ?? '').includes('hay que rehacerla'));
+// El aviso salio de la linea -era jerga nuestra y asustaba sin aportar, porque
+// al pulsar se rehace sola- y vive en el titulo emergente.
+check('sin su copia, se explica al pasar por encima que se volvera a generar',
+  ((await perdida.getAttribute('title')) ?? '').includes('vuelve a generar'),
+  (await perdida.getAttribute('title')) ?? 'sin titulo');
 
 await perdida.click();
 await page.waitForTimeout(6000);

@@ -38,6 +38,29 @@ export type PartidaGuardada = {
   crc32: string | null;
   /** Apartados que se aleatorizaron. */
   cambiado: string[];
+  /**
+   * Como la llama el jugador.
+   *
+   * Es null en las partidas creadas antes de que se pudiera nombrarlas, y
+   * entonces se cae a la lista de lo que se aleatorizo. Esa lista servia de
+   * nombre y no lo era: todas las partidas acababan llamandose parecido
+   * ("Pokemon iniciales, Equipos de los entrenadores...") y recortadas, asi que
+   * distinguir dos de la misma ROM era imposible.
+   */
+  nombre: string | null;
+  /**
+   * De que juego es, para enseñarlo en la lista.
+   *
+   * El cupo de partidas es de tres EN TOTAL y lo comparten todos los juegos,
+   * asi que en la lista conviven partidas de Rojo Fuego con otras de Cristal.
+   * Sin decir cual es cual, dos partidas con el mismo nombre no se distinguen.
+   *
+   * Es null en las guardadas antes de que esto existiera, y entonces se cae al
+   * nombre del fichero, que es lo unico que habia.
+   */
+  juego: string | null;
+  /** Segunda o tercera. Acompaña al nombre del juego. */
+  generacion: number | null;
 };
 
 /**
@@ -108,6 +131,32 @@ export const registrar = (partida: Omit<PartidaGuardada, 'id' | 'creada' | 'juga
   escribirTodas([...leerTodas(), nueva]);
   return nueva;
 };
+
+/** Le cambia el nombre. Vacio vuelve a dejarla sin nombre propio. */
+export const renombrar = (id: string, nombre: string): void => {
+  const limpio = nombre.trim().slice(0, 40);
+  escribirTodas(
+    leerTodas().map((p) => (p.id === id ? { ...p, nombre: limpio === '' ? null : limpio } : p)),
+  );
+};
+
+/**
+ * Como se llama una partida en pantalla.
+ *
+ * Con nombre propio, el suyo. Sin el -las de antes de que esto existiera-, lo
+ * que se aleatorizo, que es lo unico que habia.
+ */
+export const nombreDePartida = (partida: PartidaGuardada): string =>
+  partida.nombre ?? resumirCambios(partida.cambiado);
+
+/**
+ * De que juego es, en palabras.
+ *
+ * Con el dato guardado, su nombre. Sin el -las partidas de antes-, el del
+ * fichero sin la extension, que al menos lo deja reconocer.
+ */
+export const juegoDePartida = (partida: PartidaGuardada): string =>
+  partida.juego ?? partida.baseNombre.replace(/\.[^.]+$/, '');
 
 /** Marca una partida como jugada ahora, para que suba en la lista. */
 export const tocar = (id: string): void => {

@@ -165,14 +165,31 @@ const terminado = await modal
 check('la aleatorizacion termina', terminado);
 
 const texto = (await modal.textContent()) ?? '';
-check('se dice que se aleatorizaron los Pokemon salvajes', /Pokemon salvajes/.test(texto));
+// Sin distinguir mayusculas: la lista se escribe en minusculas dentro de la
+// frase, y lo que importa es que el apartado se nombre, no como se escriba.
+check('se dice que se aleatorizaron los Pokemon salvajes', /pokemon salvajes/i.test(texto));
 check(
   'y tambien los objetos del mapa, que el registro no menciona',
-  /Objetos del mapa/.test(texto),
-  /Ha cambiado: ([^.]+)/.exec(texto)?.[1] ?? texto.slice(0, 120),
+  /objetos del mapa/i.test(texto),
+  /Ha cambiado: ([^.]+)/i.exec(texto)?.[1] ?? texto.slice(0, 120),
 );
-check('se nombran los nuevos iniciales', /Iniciales/.test(texto),
-  /Iniciales\s*(.+?)semilla/.exec(texto.replace(/\s+/g, ' '))?.[1]?.trim() ?? '');
+
+// Los iniciales ya NO se enseñan aqui, y es a proposito: descubrirlos es parte
+// de la gracia de aleatorizar y verlos antes de empezar es un spoiler servido.
+//
+// Se busca su FORMA y no la palabra "iniciales", que ahora aparece en la lista
+// de lo que cambio: lo que se enseñaba eran tres nombres en mayusculas
+// separados por barras, y eso no lo produce ninguna otra parte de la pantalla.
+check('no se spoilean los iniciales',
+  !/[A-Z]{3,}\s*\/\s*[A-Z]{3,}/.test(texto),
+  /[A-Z]{3,}\s*\/\s*[A-Z]{3,}/.exec(texto)?.[0] ?? 'ninguno a la vista');
+
+// A cambio, la partida nace con nombre y se puede cambiar.
+const campoNombre = modal.locator('.hecha__nombre input');
+check('la partida nace con un nombre', ((await campoNombre.inputValue()) ?? '').length > 0,
+  await campoNombre.inputValue());
+await campoNombre.fill('Mi Soul Link');
+await page.waitForTimeout(300);
 // Antes aqui se comprobaba un "Semilla usada: N" suelto. Ahora la semilla va
 // dentro de la semilla, que es lo unico que sirve para rehacer la partida: una
 // semilla sin sus ajustes no reconstruye nada.
@@ -202,6 +219,20 @@ await page.locator('.iconbutton--opciones').click();
 await page.locator('.boton-ancho', { hasText: 'Opciones' }).click();
 const modal2 = page.locator('dialog.modal[open]');
 await modal2.locator('.interruptor').first().waitFor({ timeout: 25_000 });
+// El nombre que se le puso tiene que ser el que la identifica en la lista:
+// antes todas se llamaban por lo que se aleatorizo, asi que dos partidas de la
+// misma ROM salian con el mismo texto recortado y no habia forma de saber cual
+// era cual. Y cada una dice de que juego es, porque el cupo lo comparten todos.
+const enLaLista = await modal.evaluate(() => ({
+  nombres: [...document.querySelectorAll('.hueco__nombre')].map((e) => e.textContent?.trim()),
+  juegos: [...document.querySelectorAll('.hueco__juego')].map((e) => e.textContent?.trim()),
+}));
+check('la lista la llama por el nombre que le pusiste',
+  enLaLista.nombres.includes('Mi Soul Link'), enLaLista.nombres.join(' | '));
+check('y dice de que juego es',
+  enLaLista.juegos.length > 0 && enLaLista.juegos.every((j) => j && j.length > 0),
+  enLaLista.juegos.join(' | '));
+
 // Ya no se descarta nada: la partida anterior aparece en la lista para volver
 // a ella, y aleatorizar crea otra aparte.
 check(
