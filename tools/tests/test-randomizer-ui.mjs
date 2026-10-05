@@ -98,6 +98,29 @@ const forma = await modal.evaluate(() => ({
 }));
 check('el menu va en dos columnas', forma.columnas === 2, `${forma.columnas}`);
 check('se ven los huecos que quedan libres', forma.libres === 3, `${forma.libres}`);
+
+// La cuenta tiene que cuadrar a la vista: el tope es de tres EN TOTAL y lo
+// comparten todas las ROMs, asi que si una partida de otro juego ocupa un hueco
+// hay que verla. Si no, el contador dice 1/3 y debajo solo hay dos huecos:
+// parece que falte uno.
+const cuadra = await modal.evaluate(() => {
+  const texto = document.querySelector('.cuenta')?.textContent?.trim() ?? '';
+  const [usadas, tope] = texto.split('/').map(Number);
+  return {
+    texto,
+    tope,
+    // Todo lo que ocupa o puede ocupar un hueco, se llame como se llame.
+    dibujados: document.querySelectorAll('.hueco').length,
+    ocupados: document.querySelectorAll('.hueco--partida, .hueco--ajena').length,
+    usadas,
+  };
+});
+check('el contador y los huecos dibujados dicen lo mismo',
+  cuadra.dibujados === cuadra.tope,
+  `${cuadra.texto} y ${cuadra.dibujados} huecos`);
+check('y los ocupados son los que dice el contador',
+  cuadra.ocupados === cuadra.usadas,
+  `${cuadra.ocupados} ocupados, el contador dice ${cuadra.usadas}`);
 check('las opciones son interruptores', forma.palancas === 15, `${forma.palancas}`);
 check('las dos salidas van en el pie', forma.pie);
 check('y en escritorio cabe sin desplazar', forma.bajar === 0, `${forma.bajar}px por bajar`);
@@ -107,7 +130,15 @@ check('el menu ofrece las opciones', total >= 7, `${total} opciones`);
 const marcadasPorDefecto = await modal.locator('.interruptor input:checked').count();
 check('vienen marcadas las habituales', marcadasPorDefecto >= 3, `${marcadasPorDefecto} marcadas`);
 
-await modal.getByRole('button', { name: 'Desmarcar' }).click();
+// Se apagan una a una: ya no hay boton de desmarcar todas. Se pulsa siempre el
+// PRIMERO que siga encendido y se vuelve a mirar, porque al apagarlo deja de
+// estar en la lista y los indices se mueven bajo los pies. Y se pulsa la
+// etiqueta, que la casilla va oculta detras de la palanca.
+for (let vuelta = 0; vuelta < 20; vuelta += 1) {
+  const encendidos = modal.locator('.interruptor.is-on');
+  if ((await encendidos.count()) === 0) break;
+  await encendidos.first().click();
+}
 const tras = await modal.locator('.interruptor input:checked').count();
 check('se pueden desmarcar todas', tras === 0);
 

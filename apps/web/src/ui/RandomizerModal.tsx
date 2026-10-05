@@ -500,8 +500,7 @@ export const RandomizerModal = ({
         progress.fase === 'hecho' ? null : (
           <>
             <span className="aleatorizar__nota">
-              Cada jugador ajusta su propio randomizer. Aleatorizar de nuevo no toca las partidas
-              que ya tienes.
+              Creditos al Universal Pokémon Randomizer ZX
             </span>
             <span className="aleatorizar__acciones">
               <button type="button" onClick={onClose}>
@@ -661,6 +660,48 @@ export const RandomizerModal = ({
                       );
                     })}
 
+                    {/* Siempre, no solo con el cupo lleno.
+                        *
+                        * El tope es de tres EN TOTAL y lo comparten todas las ROMs, asi
+                        * que una partida de otro juego ocupa uno de estos huecos. Sin
+                        * enseñarla, el contador decia 1/3 y debajo habia dos huecos
+                        * libres y nada mas: parecia que faltara uno. Viendola cuadra la
+                        * cuenta, y ademas se puede hacer sitio antes de chocarse con el
+                        * limite en vez de descubrirlo al intentar crear. */}
+                    {otras.length > 0 && (
+                      <>
+                        <p className="huecos__otras">De otras ROMs</p>
+                        {otras.map((partida) => (
+                          <div className="hueco hueco--ajena" key={partida.id}>
+                            <span className="hueco__abrir">
+                              <span className="hueco__nombre">
+                                {partida.baseNombre.replace(/\.gba$/i, '')}
+                              </span>
+                              <span className="hueco__datos">
+                                <span>{resumirCambios(partida.cambiado)}</span>
+                                <span>{cuando(partida.creada)}</span>
+                              </span>
+                            </span>
+                            <div className="hueco__acciones">
+                              <button
+                                type="button"
+                                className="hueco__accion hueco__accion--borrar"
+                                title="Borrar esta partida"
+                                aria-label={`Borrar la partida de ${partida.baseNombre}`}
+                                onClick={() => {
+                                  onBorrar(partida.fichero);
+                                  olvidar(partida.id);
+                                  releer();
+                                }}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    )}
+
                     {/* Los huecos libres se enseñan en vez de esconderlos: ver
                         cuantas caben todavia es lo que evita la sorpresa de
                         "no puedes, estan llenas" cuando ya habias elegido. */}
@@ -678,46 +719,6 @@ export const RandomizerModal = ({
                     ))}
                   </div>
 
-                  <p className="hint">
-                    Crear usa las opciones que tengas marcadas a la derecha. Aleatorizar de nuevo
-                    crea otra partida aparte: ninguna se pierde.
-                  </p>
-
-                  {/* Con el cupo lleno hay que poder hacer hueco desde aqui,
-                      incluso si lo ocupan partidas de otro juego. */}
-                  {lleno && otras.length > 0 && (
-                    <>
-                      <p className="huecos__otras">De otras ROMs</p>
-                      {otras.map((partida) => (
-                        <div className="hueco hueco--ajena" key={partida.id}>
-                          <span className="hueco__abrir">
-                            <span className="hueco__nombre">
-                              {partida.baseNombre.replace(/\.gba$/i, '')}
-                            </span>
-                            <span className="hueco__datos">
-                              <span>{resumirCambios(partida.cambiado)}</span>
-                              <span>{cuando(partida.creada)}</span>
-                            </span>
-                          </span>
-                          <div className="hueco__acciones">
-                            <button
-                              type="button"
-                              className="hueco__accion hueco__accion--borrar"
-                              title="Borrar esta partida"
-                              aria-label={`Borrar la partida de ${partida.baseNombre}`}
-                              onClick={() => {
-                                onBorrar(partida.fichero);
-                                olvidar(partida.id);
-                                releer();
-                              }}
-                            >
-                              ×
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </>
-                  )}
                 </section>
 
                 {/* La vuelta de la semilla: alguien que juega desde otro
@@ -806,28 +807,6 @@ export const RandomizerModal = ({
                     ))}
                   </div>
 
-                  <div className="modal__acciones">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        // Marcar todas no puede meter dos que choquen: se queda
-                        // la primera de cada grupo.
-                        const todas = new Set<string>();
-                        for (const o of options) {
-                          const choca =
-                            o.chocaCon?.some((otra) => todas.has(otra)) ||
-                            options.some((x) => todas.has(x.id) && x.chocaCon?.includes(o.id));
-                          if (!choca) todas.add(o.id);
-                        }
-                        setSelected(todas);
-                      }}
-                    >
-                      Marcar todo
-                    </button>
-                    <button type="button" onClick={() => setSelected(new Set())}>
-                      Desmarcar
-                    </button>
-                  </div>
                 </section>
               </div>
             </div>
