@@ -6,6 +6,7 @@ import { useKeyboardOwnership } from './core/useKeyboardOwnership';
 import { useSession } from './net/useSession';
 import { useEquipo } from './core/useEquipo';
 import { useFinDePartida } from './core/useFinDePartida';
+import { useEquipoOrdenado } from './core/ordenEstable';
 import { useEsEstrecha } from './core/useEsEstrecha';
 import { useEspecies } from './core/useEspecies';
 import { useMandoTactil } from './core/useMandoTactil';
@@ -112,6 +113,15 @@ export const App = () => {
     especies,
   );
 
+  // El panel no sigue el orden de la memoria: el juego sube al que sale a pelear
+  // a la primera ranura, asi que mirarla barajaba el panel en mitad de un
+  // combate. Se recuerda el orden en que aparecieron y se enseña asi.
+  //
+  // A cambio, esa misma ranura 0 dice quien esta al frente: durante un combate,
+  // el que esta ahi es el que pelea.
+  const equipoMio = useEquipoOrdenado(miEquipo.equipo);
+  const equipoSuyo = useEquipoOrdenado(session.state.equipoCompanero);
+
   // El reto se acaba cuando cae el equipo entero. No lo dice el juego -ahi
   // pierdes, vuelves al Centro Pokemon y sigues-: es la regla de la Nuzlocke,
   // asi que se aplica aqui.
@@ -168,7 +178,8 @@ export const App = () => {
           <EquipoPanel
             titulo={unoSolo && verSuEquipo ? 'Equipo de tu companero' : 'Tu equipo'}
             lado={unoSolo && verSuEquipo ? 'companero' : 'propio'}
-            equipo={unoSolo && verSuEquipo ? session.state.equipoCompanero : miEquipo.equipo}
+            equipo={unoSolo && verSuEquipo ? equipoSuyo.equipo : equipoMio.equipo}
+            activo={unoSolo && verSuEquipo ? equipoSuyo.alFrente : equipoMio.alFrente}
             especies={especies}
             caidosDelOtro={unoSolo && verSuEquipo ? caidosMios : caidosSuyos}
             onCambiar={unoSolo ? () => setVerSuEquipo((v) => !v) : undefined}
@@ -214,7 +225,8 @@ export const App = () => {
             <EquipoPanel
               titulo="Equipo de tu companero"
               lado="companero"
-              equipo={session.state.equipoCompanero}
+              equipo={equipoSuyo.equipo}
+              activo={equipoSuyo.alFrente}
               especies={especies}
               caidosDelOtro={caidosMios}
               motivo=""

@@ -134,6 +134,14 @@ causa no era la que parecía. Guardar el porqué ahorra volver a investigarlo.
   se probaba lo tocaba. La ñ real es 0x29 y la Ñ 0x14, comprobadas buscando
   "pequeño" y "SEÑOR" en la ROM espanola. Lo vigila `npm run test:texto`, que
   recorre los dos abecedarios enteros en vez de mirar letras sueltas.
+- **El panel se barajaba solo, y quien pelea.** Eran dos pendientes y resultaron
+  ser uno. El panel no leia mal: tercera generacion **intercambia de verdad las
+  ranuras del equipo** cuando sacas otro Pokemon, asi que el que entra pasa a ser
+  el primero. Se arregla recordando el orden en que aparecieron, identificados
+  por personalidad. Y de ahi cae gratis lo otro: si el que pelea esta siempre en
+  la ranura 0, iluminar esa ranura es iluminar al que pelea, **sin tener que
+  detectar el combate**, que es lo que bloqueaba esto desde el principio.
+  `npm run test:orden`
 - **La cola del aleatorizador.** No había ningún límite de copias simultáneas,
   que es lo que separa "los que sobran esperan" de "se cae para todos". Con la
   cola, los ajustes en caché y la compresión fuera del bucle de eventos, medido
@@ -189,7 +197,7 @@ pestañas o en secciones plegadas, porque alargarlos más no arregla nada.
 
 ---
 
-## Cuál está combatiendo
+## Saber que hay un combate en marcha
 
 Se intentó y se tumbó, que es más útil que no haberlo intentado: el juego copia
 al Pokémon que sale a su estructura de combate, así que su personalidad aparece
@@ -198,71 +206,29 @@ dos veces en memoria y parecía bastar con buscarla.
 No basta. **Esa copia sigue ahí después del combate**, así que decía que el
 Bulbasaur seguía peleando mientras el jugador caminaba por el mapa.
 
-Lo que falta es saber si hay un combate en marcha. Se encuentra comparando dos
-partidas de la misma sesión, una en mitad de una pelea y otra caminando, y
-mirando qué cambia: es el método con el que se encontró todo lo demás. Hace
-falta que alguien exporte esos dos estados.
+**Lo que lo bloqueaba ya no lo bloquea.** Iluminar al que pelea está hecho sin
+esto: como el juego sube al que sale a la ranura 0, basta con iluminar esa
+ranura. Así que esta entrada deja de ser urgente y pasa a ser lo que falta para
+lo demás.
 
-El estilo para iluminar la ficha ya está puesto, esperando el dato.
+Para qué sigue haciendo falta:
 
----
+- **La pantalla de fin de partida**, para distinguir "se te cayó el equipo" de
+  "estás a mitad de un combate y te quedan tres en la caja".
+- **Las medallas y la Liga**, que son banderas del mismo sitio.
+- Dejar de decir "al frente" y poder decir "peleando" sin mentir el resto del
+  tiempo.
 
-## El panel se reordena solo en combate
+Se encuentra comparando dos estados de la misma partida, uno en mitad de una
+pelea y otro caminando, y mirando qué cambia: es el método con el que se
+encontró todo lo demás.
 
-Se ve jugando: cambias de Pokémon en mitad de un combate y el panel de la
-izquierda se baraja. Lo que estaba el primero baja, el que sacaste sube.
-
-**El panel no se lo inventa: está leyendo lo que hay.** Tercera generación
-intercambia de verdad las ranuras del equipo cuando sacas otro Pokémon, así que
-en memoria el que está peleando pasa a ser el primero. Mirando la memoria, el
-panel acierta; mirando la pantalla, parece un error.
-
-Lo que se quiere es lo contrario: **que el orden sea el que tú pusiste** y solo
-cambie cuando lo cambias tú desde el menú del juego.
-
-Para eso hace falta algo que distinga a cada Pokémon de su ranura, y ya existe:
-la **personalidad**, los cuatro bytes que lo identifican y que no cambian nunca.
-Ya se lee y ya viaja en el resumen. Con ella se puede recordar el orden en que
-aparecieron la primera vez y colocarlos siempre así, en vez de por la ranura.
-
-Dos cosas que decidir al hacerlo:
-
-- **Cuándo sí hay que reordenar.** Si el jugador los recoloca de verdad desde el
-  menú, el panel tiene que seguirle. Distinguir eso de un cambio de combate no es
-  evidente: las dos cosas se ven igual en memoria. Una salida es reordenar solo
-  cuando el cambio persista fuera de un combate.
-- **Qué pasa con uno nuevo.** Al capturar, entra en la primera ranura libre; ahí
-  sí hay que colocarlo donde diga la ranura.
-
----
-
-## Iluminar al que está peleando
-
-Que la ficha del que está en combate se note: un borde o un resplandor azul por
-debajo de la tarjeta. Si sacas a otro a mitad del combate, el resplandor se mueve
-con él.
-
-**El estilo ya está puesto**, esperando el dato, desde que se intentó la primera
-vez. Lo que falta es saber quién está peleando, y eso se intentó y se tumbó: el
-juego copia al Pokémon que sale a su estructura de combate, así que su
-personalidad aparece dos veces en memoria y parecía bastar con buscarla. No
-basta, porque **esa copia sigue ahí después del combate** y entonces decía que
-el Bulbasaur seguía peleando mientras el jugador caminaba por el mapa. Está
-contado más arriba, en "Cuál está combatiendo".
-
-Pero ahora hay una pista que antes no se tenía, y viene del problema de la
-entrada anterior: **el juego sube al que está peleando a la primera ranura**. O
-sea que durante un combate "el primero del equipo en memoria" y "el que está
-peleando" son el mismo, y eso no hay que buscarlo: ya se lee.
-
-Lo que sigue faltando es lo mismo de siempre: **saber que hay un combate en
-marcha**. Sin eso, el primero del equipo es simplemente el primero. Se encuentra
-comparando dos estados de la misma partida, uno en mitad de una pelea y otro
-caminando, y mirando qué cambia; hace falta que alguien exporte esos dos
-estados.
-
-Las dos entradas se arreglan con el mismo dato, así que conviene hacerlas a la
-vez.
+**Se intentó automatizarlo y no salió**, y queda apuntado para no repetirlo: se
+puede meter un guardado y atravesar la intro a base de pulsar A, pero llegar a
+un combate pide navegar por el mapa, y eso desde una prueba es demasiado frágil.
+El guardado que había era de una partida recién empezada, sin equipo. Lo que
+hace falta es que alguien exporte los dos estados **desde una partida de
+verdad**, con el botón de "Exportar estado" que ya está en los ajustes.
 
 ---
 
