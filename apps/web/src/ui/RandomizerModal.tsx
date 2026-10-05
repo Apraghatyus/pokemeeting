@@ -10,13 +10,11 @@ import {
 import {
   cuando,
   MAX_PARTIDAS,
-  juegoDePartida,
-  nombreDePartida,
   nombreParaNueva,
   olvidar,
-  renombrar,
   partidasDe,
   registrar,
+  resumirCambios,
   sePuedeRehacer,
   tocar,
   todasLasPartidas,
@@ -62,9 +60,6 @@ type Progress =
       fase: 'hecho';
       seed: string | null;
       fileName: string;
-      /** Para poder ponerle nombre desde la pantalla de resultado. */
-      partidaId: string;
-      nombre: string;
       summary: RandomizeSummary;
       /** Como rehacer esta copia, o null si no se va a poder. */
       semilla: string | null;
@@ -240,10 +235,7 @@ export const RandomizerModal = ({
       const fileName = nombreParaNueva(base.fileName);
       const generada = crc32(result.rom);
       await onRandomized(result.rom, fileName);
-      // Un nombre de salida que ya distinga una partida de otra de la misma
-      // ROM. El jugador lo cambia en la pantalla siguiente si quiere.
-      const nombrePorDefecto = `Partida ${partidasDe(base.crc32).length + 1}`;
-      const registrada = registrar({
+      registrar({
         fichero: fileName,
         baseNombre: base.fileName,
         baseCrc32: base.crc32,
@@ -251,16 +243,11 @@ export const RandomizerModal = ({
         ajustes: result.ajustes,
         crc32: generada,
         cambiado: result.summary.changed,
-        nombre: nombrePorDefecto,
-        juego: juego?.label ?? null,
-        generacion: juego?.generacion ?? null,
       });
       setProgress({
         fase: 'hecho',
         seed: result.seed,
         fileName,
-        partidaId: registrada.id,
-        nombre: nombrePorDefecto,
         summary: result.summary,
         // La semilla solo tiene sentido si de verdad se puede rehacer con ella.
         semilla:
@@ -380,9 +367,6 @@ export const RandomizerModal = ({
         ajustes: traida.semilla.ajustes,
         crc32: traida.semilla.crc32,
         cambiado: result.summary.changed,
-        nombre: null,
-        juego: juego?.label ?? null,
-        generacion: juego?.generacion ?? null,
       });
       onClose();
     } catch (error) {
@@ -443,9 +427,6 @@ export const RandomizerModal = ({
         ajustes: semilla.ajustes,
         crc32: generada,
         cambiado: result.summary.changed,
-        nombre: null,
-        juego: juego?.label ?? null,
-        generacion: juego?.generacion ?? null,
       });
       onClose();
     } catch (error) {
@@ -519,7 +500,8 @@ export const RandomizerModal = ({
         progress.fase === 'hecho' ? null : (
           <>
             <span className="aleatorizar__nota">
-              Creditos al Universal Pokémon Randomizer ZX
+              Creditos al 
+              Universal Pokémon Randomizer ZX
             </span>
             <span className="aleatorizar__acciones">
               <button type="button" onClick={onClose}>
@@ -613,50 +595,19 @@ export const RandomizerModal = ({
                     </div>
                   </div>
 
-                  {/* Una sola lista con TODAS las partidas, sean del juego que
-                      sean.
-                      *
-                      * El cupo de tres lo comparten todos los juegos, asi que
-                      * separarlas en "las de esta ROM" y "las de otras" partia
-                      * en dos algo que es una sola cosa: tus tres partidas. Y
-                      * dejaba la cuenta sin cuadrar, porque las de otros juegos
-                      * solo salian con el cupo lleno.
-                      *
-                      * Cada una dice de que juego es, que es lo que las
-                      * distingue cuando conviven una de Rojo Fuego y otra de
-                      * Cristal. */}
                   <div className="huecos">
-                    {[...partidas, ...otras].map((partida) => {
-                      const mia = partida.baseCrc32 === (baseRom.current?.crc32 ?? '');
+                    {partidas.map((partida) => {
                       const aqui = existeGuardada(partida.fichero);
                       const rehacible = sePuedeRehacer(partida);
-                      // Solo se puede entrar en una partida del juego que esta
-                      // cargado: para las demas haria falta su ROM.
-                      const sePuedeAbrir = mia && (aqui || rehacible);
-
                       return (
-                        <div
-                          className={`hueco hueco--partida${mia ? '' : ' hueco--ajena'}`}
-                          key={partida.id}
-                        >
+                        <div className="hueco hueco--partida" key={partida.id}>
                           <button
                             type="button"
                             className="hueco__abrir"
-                            disabled={!sePuedeAbrir}
-                            // Lo de "hay que rehacerla" no se enseña en la
-                            // linea: es jerga nuestra y asustaba sin aportar,
-                            // porque al pulsar se rehace sola. Se queda aqui,
-                            // para quien pase el raton y se pregunte por que
-                            // esta tarda mas.
-                            title={
-                              !mia
-                                ? `Para jugarla, carga ${juegoDePartida(partida)} desde "Cambiar ROM"`
-                                : aqui
-                                  ? undefined
-                                  : rehacible
-                                    ? 'Su copia ya no esta en este navegador: al abrirla se vuelve a generar desde su semilla.'
-                                    : 'Su copia ya no esta y no tiene semilla, asi que no se puede recuperar.'
-                            }
+                            // Una partida cuya copia ya no esta y que tampoco se
+                            // sabe rehacer no lleva a ningun sitio: se deja a la
+                            // vista para poder borrarla, pero sin abrirla.
+                            disabled={!aqui && !rehacible}
                             onClick={() => {
                               if (aqui) {
                                 tocar(partida.id);
@@ -666,34 +617,37 @@ export const RandomizerModal = ({
                               }
                             }}
                           >
-                            <span className="hueco__nombre">{nombreDePartida(partida)}</span>
+                            <span className="hueco__nombre">{resumirCambios(partida.cambiado)}</span>
                             <span className="hueco__datos">
-                              <span className="hueco__juego">{juegoDePartida(partida)}</span>
+                              {partida.semilla && (
+                                <span className="hueco__semilla">
+                                  semilla {partida.semilla.slice(-6)}
+                                </span>
+                              )}
                               <span>{cuando(partida.creada)}</span>
+                              {!aqui && <span>{rehacible ? 'hay que rehacerla' : 'ya no esta'}</span>}
                             </span>
                           </button>
 
                           <div className="hueco__acciones">
-                            {mia && <BotonSemilla partida={partida} />}
-                            {mia && (
-                              <button
-                                type="button"
-                                className="hueco__accion"
-                                onClick={() => exportarPartida(partida)}
-                                title={
-                                  'Descargar esta partida entera: el guardado y la semilla.\n' +
-                                  'Es lo que te llevas a otro aparato para seguir ahi.'
-                                }
-                                aria-label="Descargar esta partida para otro aparato"
-                              >
-                                ⤓
-                              </button>
-                            )}
+                            <BotonSemilla partida={partida} />
+                            <button
+                              type="button"
+                              className="hueco__accion"
+                              onClick={() => exportarPartida(partida)}
+                              title={
+                                'Descargar esta partida entera: el guardado y la semilla.\n' +
+                                'Es lo que te llevas a otro dispositivo.'
+                              }
+                              aria-label="Descargar esta partida para otro dispositivo"
+                            >
+                              ⤓
+                            </button>
                             <button
                               type="button"
                               className="hueco__accion hueco__accion--borrar"
                               title="Borrar esta partida"
-                              aria-label={`Borrar ${nombreDePartida(partida)}`}
+                              aria-label={`Borrar la partida de ${cuando(partida.creada)}`}
                               onClick={() => {
                                 onBorrar(partida.fichero);
                                 olvidar(partida.id);
@@ -724,6 +678,46 @@ export const RandomizerModal = ({
                     ))}
                   </div>
 
+                  <p className="hint">
+                    Crear usa las opciones que tengas marcadas a la derecha. Aleatorizar de nuevo
+                    crea otra partida aparte: ninguna se pierde.
+                  </p>
+
+                  {/* Con el cupo lleno hay que poder hacer hueco desde aqui,
+                      incluso si lo ocupan partidas de otro juego. */}
+                  {lleno && otras.length > 0 && (
+                    <>
+                      <p className="huecos__otras">De otras ROMs</p>
+                      {otras.map((partida) => (
+                        <div className="hueco hueco--ajena" key={partida.id}>
+                          <span className="hueco__abrir">
+                            <span className="hueco__nombre">
+                              {partida.baseNombre.replace(/\.gba$/i, '')}
+                            </span>
+                            <span className="hueco__datos">
+                              <span>{resumirCambios(partida.cambiado)}</span>
+                              <span>{cuando(partida.creada)}</span>
+                            </span>
+                          </span>
+                          <div className="hueco__acciones">
+                            <button
+                              type="button"
+                              className="hueco__accion hueco__accion--borrar"
+                              title="Borrar esta partida"
+                              aria-label={`Borrar la partida de ${partida.baseNombre}`}
+                              onClick={() => {
+                                onBorrar(partida.fichero);
+                                olvidar(partida.id);
+                                releer();
+                              }}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  )}
                 </section>
 
                 {/* La vuelta de la semilla: alguien que juega desde otro
@@ -812,13 +806,31 @@ export const RandomizerModal = ({
                     ))}
                   </div>
 
+                  <div className="modal__acciones">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Marcar todas no puede meter dos que choquen: se queda
+                        // la primera de cada grupo.
+                        const todas = new Set<string>();
+                        for (const o of options) {
+                          const choca =
+                            o.chocaCon?.some((otra) => todas.has(otra)) ||
+                            options.some((x) => todas.has(x.id) && x.chocaCon?.includes(o.id));
+                          if (!choca) todas.add(o.id);
+                        }
+                        setSelected(todas);
+                      }}
+                    >
+                      Marcar todo
+                    </button>
+                    <button type="button" onClick={() => setSelected(new Set())}>
+                      Desmarcar
+                    </button>
+                  </div>
                 </section>
               </div>
             </div>
-          )}
-
-          {yaAleatorizada && partidas.length === 0 && (
-            <p className="hint">Ya estas jugando una copia aleatorizada.</p>
           )}
         </div>
       )}
@@ -868,18 +880,6 @@ const BotonSemilla = ({ partida }: { partida: PartidaGuardada }) => {
   );
 };
 
-/**
- * Lo que se ve cuando la copia ya esta hecha.
- *
- * Aqui solo caben dos cosas: ponerle nombre -que es lo que la distinguira
- * despues entre las otras dos- y llevarse la semilla.
- *
- * Lo que ya NO sale, y es deliberado: los iniciales que toco. Era un spoiler
- * servido en bandeja justo antes de empezar a jugar, y descubrirlos es parte de
- * la gracia de aleatorizar. Tampoco salen los tres parrafos que explicaban que
- * es una semilla: quien la necesita la copia, y quien no, no tiene por que
- * leerlos cada vez que crea una partida.
- */
 const Resultado = ({
   progress,
   onClose,
@@ -887,7 +887,6 @@ const Resultado = ({
   progress: Extract<Progress, { fase: 'hecho' }>;
   onClose: () => void;
 }) => {
-  const [nombre, setNombre] = useState(progress.nombre);
   const [copiada, setCopiada] = useState<'no' | 'si' | 'fallo'>('no');
 
   const copiar = async () => {
@@ -897,38 +896,20 @@ const Resultado = ({
       setCopiada('si');
       setTimeout(() => setCopiada('no'), 2200);
     } catch {
-      // El portapapeles puede estar denegado: queda el boton de descargarla.
+      // El portapapeles puede estar denegado. La semilla sigue a la vista.
       setCopiada('fallo');
     }
   };
 
-  // Se guarda segun se escribe. Un boton de "guardar nombre" seria un paso mas
-  // para algo que no puede fallar.
-  const cambiarNombre = (valor: string) => {
-    setNombre(valor);
-    renombrar(progress.partidaId, valor);
-  };
-
   return (
-    <div className="hecha">
-      <label className="hecha__nombre">
-        <span>Como quieres llamarla</span>
-        <input
-          value={nombre}
-          maxLength={40}
-          onChange={(event) => cambiarNombre(event.target.value)}
-          placeholder="Partida 1"
-          aria-label="Nombre de la partida"
-        />
-      </label>
-
+    <>
       {/* Unos ajustes que no tocan nada producen una ROM aparentemente normal.
           Decir que ha cambiado evita descubrirlo tras media hora jugando. */}
       {progress.summary.changed.length === 0 ? (
         <p className="warn">La ROM se genero, pero no se cambio nada.</p>
       ) : (
-        <p className="hecha__cambios">
-          Ha cambiado: {progress.summary.changed.join(', ').toLowerCase()}.
+        <p className="note">
+          Ha cambiado: <strong>{progress.summary.changed.join(', ')}</strong>.
         </p>
       )}
 
@@ -939,14 +920,28 @@ const Resultado = ({
         </p>
       )}
 
-      {progress.semilla ? (
-        <div className="hecha__semilla">
-          <span className="hecha__etiqueta">Semilla</span>
-          <code className="mono hecha__codigo">{progress.semilla}</code>
-          <button type="button" onClick={() => void copiar()}>
-            {copiada === 'si' ? 'Copiada' : 'Copiar'}
-          </button>
+      {progress.summary.starters.length > 0 && (
+        <div className="invite">
+          <span className="invite__label">Iniciales</span>
+          <strong>{progress.summary.starters.join('  /  ')}</strong>
         </div>
+      )}
+
+      {progress.semilla ? (
+        <>
+          <label className="field">
+            semilla de esta partida
+            <output className="field__value mono semilla">{progress.semilla}</output>
+          </label>
+          <button type="button" className="button--wide" onClick={() => void copiar()}>
+            {copiada === 'si' ? 'semilla copiada' : 'Copiar la semilla'}
+          </button>
+          <p className="hint">
+            {copiada === 'fallo'
+              ? 'El navegador no ha dejado copiar. Puedes leerla de arriba.'
+              : 'Tu partida se queda guardada en este navegador, asi que normalmente no te hara falta. Guarda la semilla por si juegas desde otro ordenador o pierdes los datos: con ella y tu ROM original se vuelve a generar este mismo mundo, identico. Tambien puedes darsela a tu companero para que juegue el mismo.'}
+          </p>
+        </>
       ) : (
         <p className="warn">
           Esta copia no se va a poder rehacer{progress.seed ? ` (semilla ${progress.seed})` : ''}.
@@ -954,15 +949,11 @@ const Resultado = ({
         </p>
       )}
 
-      {copiada === 'fallo' && (
-        <p className="hint">El navegador no ha dejado copiar. Puedes seleccionarla a mano.</p>
-      )}
-
       <div className="modal__acciones">
         <button type="button" className="button--primary button--wide" onClick={onClose}>
           Empezar a jugar
         </button>
       </div>
-    </div>
+    </>
   );
 };

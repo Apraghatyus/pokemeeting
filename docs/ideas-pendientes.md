@@ -50,6 +50,13 @@ imposibles, y resultaron no serlo. Vale la pena recordar por qué.
   mando y equipo.
 - **Cuánto consume y qué hace falta para 1000 jugadores.** Medido pieza por
   pieza. Ver [capacidad.md](capacidad.md).
+- **La ñ se comia la s.** La tabla de caracteres tenia la 'ñ' en 0xe7, que es la
+  's' -0xd5 es la 'a', mas dieciocho-, asi que todo mote con 's' salia con 'ñ':
+  un Pokemon llamado "Huesitos" aparecia como "Hueñitoñ". Lo que lo escondia es
+  que los nombres de especie de la ROM van en mayusculas, asi que nada de lo que
+  se probaba lo tocaba. La ñ real es 0x29 y la Ñ 0x14, comprobadas buscando
+  "pequeño" y "SEÑOR" en la ROM espanola. Lo vigila `npm run test:texto`, que
+  recorre los dos abecedarios enteros en vez de mirar letras sueltas.
 - **La cola del aleatorizador.** No había ningún límite de copias simultáneas,
   que es lo que separa "los que sobran esperan" de "se cae para todos". Con la
   cola, los ajustes en caché y la compresión fuera del bucle de eventos, medido
@@ -94,6 +101,65 @@ mirando qué cambia: es el método con el que se encontró todo lo demás. Hace
 falta que alguien exporte esos dos estados.
 
 El estilo para iluminar la ficha ya está puesto, esperando el dato.
+
+---
+
+## El panel se reordena solo en combate
+
+Se ve jugando: cambias de Pokémon en mitad de un combate y el panel de la
+izquierda se baraja. Lo que estaba el primero baja, el que sacaste sube.
+
+**El panel no se lo inventa: está leyendo lo que hay.** Tercera generación
+intercambia de verdad las ranuras del equipo cuando sacas otro Pokémon, así que
+en memoria el que está peleando pasa a ser el primero. Mirando la memoria, el
+panel acierta; mirando la pantalla, parece un error.
+
+Lo que se quiere es lo contrario: **que el orden sea el que tú pusiste** y solo
+cambie cuando lo cambias tú desde el menú del juego.
+
+Para eso hace falta algo que distinga a cada Pokémon de su ranura, y ya existe:
+la **personalidad**, los cuatro bytes que lo identifican y que no cambian nunca.
+Ya se lee y ya viaja en el resumen. Con ella se puede recordar el orden en que
+aparecieron la primera vez y colocarlos siempre así, en vez de por la ranura.
+
+Dos cosas que decidir al hacerlo:
+
+- **Cuándo sí hay que reordenar.** Si el jugador los recoloca de verdad desde el
+  menú, el panel tiene que seguirle. Distinguir eso de un cambio de combate no es
+  evidente: las dos cosas se ven igual en memoria. Una salida es reordenar solo
+  cuando el cambio persista fuera de un combate.
+- **Qué pasa con uno nuevo.** Al capturar, entra en la primera ranura libre; ahí
+  sí hay que colocarlo donde diga la ranura.
+
+---
+
+## Iluminar al que está peleando
+
+Que la ficha del que está en combate se note: un borde o un resplandor azul por
+debajo de la tarjeta. Si sacas a otro a mitad del combate, el resplandor se mueve
+con él.
+
+**El estilo ya está puesto**, esperando el dato, desde que se intentó la primera
+vez. Lo que falta es saber quién está peleando, y eso se intentó y se tumbó: el
+juego copia al Pokémon que sale a su estructura de combate, así que su
+personalidad aparece dos veces en memoria y parecía bastar con buscarla. No
+basta, porque **esa copia sigue ahí después del combate** y entonces decía que
+el Bulbasaur seguía peleando mientras el jugador caminaba por el mapa. Está
+contado más arriba, en "Cuál está combatiendo".
+
+Pero ahora hay una pista que antes no se tenía, y viene del problema de la
+entrada anterior: **el juego sube al que está peleando a la primera ranura**. O
+sea que durante un combate "el primero del equipo en memoria" y "el que está
+peleando" son el mismo, y eso no hay que buscarlo: ya se lee.
+
+Lo que sigue faltando es lo mismo de siempre: **saber que hay un combate en
+marcha**. Sin eso, el primero del equipo es simplemente el primero. Se encuentra
+comparando dos estados de la misma partida, uno en mitad de una pelea y otro
+caminando, y mirando qué cambia; hace falta que alguien exporte esos dos
+estados.
+
+Las dos entradas se arreglan con el mismo dato, así que conviene hacerlas a la
+vez.
 
 ---
 

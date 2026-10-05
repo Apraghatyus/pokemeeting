@@ -40,7 +40,15 @@ const sueltos: Record<number, string> = {
   0xb8: ',',
   0xb9: '×',
   0xba: '/',
-  0xe7: 'ñ', // en la tabla latina la ñ ocupa su propio hueco
+  // La ñ y la Ñ, comprobadas contra la ROM espanola: se busco "peque?o" y
+  // "SE?OR" con el hueco en blanco y salieron estos dos, 40 y 6 veces.
+  //
+  // Aqui habia un 0xe7 puesto a 'ñ', y 0xe7 es la 's': es 0xd5 ('a') mas
+  // dieciocho. O sea que pisaba una letra del tramo de minusculas y toda 's'
+  // salia como 'ñ'. Se vio jugando, con un Pokemon llamado "Huesitos" que en el
+  // panel aparecia como "Hueñitoñ".
+  0x29: 'ñ',
+  0x14: 'Ñ',
   0x2d: '&',
   0x2e: '+',
   0x35: '=',
@@ -81,8 +89,14 @@ export const pareceNombre = (bytes: Uint8Array): boolean => {
   for (const byte of bytes) {
     if (byte === FIN) break;
     // Mayusculas, minusculas, digitos, espacio y los signos mas comunes.
+    //
+    // Las vocales acentuadas y la ñ viven por debajo de 0xa1, asi que tambien
+    // cuentan: si no, un mote perfectamente normal en espanol -"Ñoño"- se daria
+    // por basura.
     const valido =
-      (byte >= 0xa1 && byte <= 0xee) || byte === ESPACIO || byte === 0x2d || byte === 0x2e;
+      (byte >= 0xa1 && byte <= 0xee) ||
+      byte === ESPACIO ||
+      tabla.has(byte);
     if (!valido) return false;
     letras += 1;
   }

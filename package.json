@@ -54,6 +54,7 @@
     "test:soullink": "npx tsx tools/tests/test-soullink.mjs",
     "test:paneles": "node tools/tests/test-paneles.mjs",
     "test:resumen": "npx tsx tools/tests/test-resumen.mjs",
+    "test:texto": "npx tsx tools/tests/test-texto.mjs",
     "test:gbc": "node tools/tests/test-gbc.mjs",
     "test:cabeceras": "npx tsx tools/tests/test-cabeceras.mjs",
     "test:juegos": "node tools/tests/test-juegos-soportados.mjs",
