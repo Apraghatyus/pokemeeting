@@ -158,6 +158,53 @@ pareja haya caído, hay que guardarlo por nuestra cuenta según se vea.
 
 ---
 
+## Pantalla de fin de partida
+
+Cuando se te cae el equipo entero, un modal que cierre la historia: hasta dónde
+llegaste, qué medallas sacaste y, si llegaste a la Liga, en qué combate se acabó.
+Las medallas conseguidas a color y las que faltaron en gris o con el borde
+punteado, para que se vea de un vistazo lo que quedó por hacer.
+
+Y dos salidas: **seguir jugando** o **reiniciar**.
+
+**La mitad ya está al alcance.** El estado de cada Pokémon se lee en cada
+vistazo, debilitado incluido: de ahí sale la lógica del Soul Link. Saber que han
+caído los seis es mirar lo que ya se mira.
+
+Lo que falta es lo otro:
+
+- **Las medallas.** Son banderas en la memoria del juego, así que se leen igual
+  que el equipo, pero hay que encontrar dónde. El método es el que ya funcionó
+  dos veces: dos estados de la misma partida, uno antes y otro después de ganar
+  un gimnasio, y mirar qué bit cambió.
+- **La Liga.** Igual, pero más fino: hay que distinguir "estoy en el Alto Mando"
+  de "voy por el segundo". Probablemente sea un contador y no una bandera.
+
+**Dos trampas que conviene ver antes de empezar**, porque las dos dan un fin de
+partida falso:
+
+1. **Las cajas no se leen.** Hoy solo se mira el equipo de seis. En una Nuzlocke
+   lo normal es mandar los caídos a la caja, así que el equipo vacío o debilitado
+   sí marca el final; pero quien guarde Pokémon sanos en la caja vería "fin de
+   partida" teniendo con qué seguir.
+2. **El juego no se acaba cuando te caes.** Pierdes y vuelves al Centro Pokémon,
+   así que el final no lo decide el juego: lo decide la regla del reto. Esto no
+   es leer un dato, es aplicar una norma, y conviene que el modal lo diga en vez
+   de dar por hecho que la partida murió.
+
+### Seguir jugando no cuenta
+
+Esto enlaza con las estadísticas, y es la parte que hay que decidir **antes** de
+guardar el primer dato: si se puede continuar después de perder, lo que venga
+después no puede contar para el historial. Si no, el porcentaje de victorias no
+mide nada: bastaría con seguir hasta ganar.
+
+O sea que la partida queda marcada en el momento en que se cae el equipo, y
+seguir jugando es jugar, no competir. Decirlo en el propio modal evita la
+discusión después.
+
+---
+
 ## Estadísticas y perfiles
 
 La idea es tener un sitio con el historial: cuántas partidas aleatorizadas has
@@ -183,9 +230,36 @@ una partida aleatorizada no hay un final claro: ¿la Liga?, ¿quedarse sin equip
 antes de guardar el primer dato, porque cambiarlo después invalida el historial
 entero.
 
-Las partidas guardadas ya llevan parte de lo que haría falta -semilla, ajustes,
-qué se aleatorizó y cuándo se jugó-, así que las categorías por tipo de
-aleatorización salen casi solas de lo que ya se guarda.
+Esa pregunta es la misma que plantea la pantalla de fin de partida, un poco más
+arriba, y las dos se contestan a la vez: ahí se decide también que seguir
+jugando después de caer no cuente.
+
+Las partidas guardadas ya llevan parte de lo que haría falta -nombre, semilla,
+ajustes, de qué juego es, qué se aleatorizó y cuándo se jugó-, así que las
+categorías por tipo de aleatorización salen casi solas de lo que ya se guarda.
+
+### El panel
+
+La idea es un sitio con el resumen de tu perfil: porcentaje de victorias,
+cuántas aleatorizadas has terminado, cuántas se te cayeron, con qué juegos
+juegas más y qué opciones sueles marcar.
+
+Casi todo eso sale de dos datos por partida -**cómo acabó** y **cuándo**- más lo
+que ya se guarda. O sea que lo caro no es el panel: es acordar qué se apunta, y
+apuntarlo desde el principio. Un historial al que le falta el primer año no se
+puede reconstruir.
+
+Tres cosas que conviene fijar antes de dibujar nada:
+
+- **Qué cuenta como terminada.** Está arriba y es la decisión que lo gobierna
+  todo.
+- **Qué pasa con las que siguen abiertas.** Una partida a medias no es ni
+  victoria ni derrota, pero si no se cuenta de alguna forma el porcentaje sale
+  siempre favorable: solo se cierran las que acaban bien o las que se caen del
+  todo, y abandonar no deja rastro.
+- **Si el porcentaje se enseña con pocas partidas.** Con tres jugadas, un 33% no
+  dice nada y parece que sí. Suele ser mejor enseñar el número crudo hasta tener
+  unas cuantas.
 
 ---
 
