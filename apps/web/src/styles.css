@@ -614,6 +614,15 @@ body {
    `display: none` del propio navegador, y poner aqui `display: flex` lo pisaba.
    El menu quedaba dibujado SIEMPRE, tapando la pagina entera sin que nadie lo
    hubiera abierto. */
+.modal[open]:has(.aleatorizar) {
+  width: min(960px, calc(100vw - 32px));
+  max-height: min(94vh, 880px);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
 .modal[open]:has(.ajustes) {
   width: min(940px, calc(100vw - 32px));
   /* 94 y no 92: con 92 faltaban cuatro pixeles para que todo entrara sin
@@ -628,7 +637,8 @@ body {
 
 /* Una sola fila: icono, titulos y cerrar. La linea de abajo la separa del
    contenido, que antes la ponia el margen del subtitulo. */
-.modal[open]:has(.ajustes) .modal__head {
+.modal[open]:has(.ajustes) .modal__head,
+.modal[open]:has(.aleatorizar) .modal__head {
   flex: none;
   padding: 13px 24px;
   margin: 0;
@@ -637,7 +647,8 @@ body {
 
 /* El cuerpo es lo unico que se desplaza: la cabecera y el pie se quedan
    quietos, que si no se pierde de vista donde estas. */
-.modal[open]:has(.ajustes) .modal__body {
+.modal[open]:has(.ajustes) .modal__body,
+.modal[open]:has(.aleatorizar) .modal__body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -3197,4 +3208,391 @@ details.partidas[open] > summary::before {
   .modal__pie {
     padding: 7px 16px;
   }
+}
+
+/* ---------- menu del randomizer ---------- */
+
+/*
+ * Mismo reparto que el de ajustes y por el mismo motivo: a la izquierda lo que
+ * YA tienes -tus partidas, una semilla que traes- y a la derecha lo que vas a
+ * cambiar. Aqui la derecha es la ancha porque son quince opciones.
+ */
+.aleatorizar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.aleatorizar__avisos:empty {
+  display: none;
+}
+
+.aleatorizar__avisos {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.aleatorizar__rejilla {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 14px;
+  align-items: start;
+}
+
+@media (max-width: 840px) {
+  .aleatorizar__rejilla {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* El pie lleva la nota a la izquierda y los dos botones a la derecha, que son
+   la decision que se toma al salir de aqui. */
+.aleatorizar__nota {
+  font-size: 9.5px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 1.4;
+  max-width: 44ch;
+}
+
+.aleatorizar__acciones {
+  display: flex;
+  gap: 9px;
+  flex: none;
+}
+
+.aleatorizar__acciones button {
+  padding: 10px 18px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.cuenta {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+/* ---------- tus partidas ---------- */
+
+.huecos {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.hueco {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 11px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  background: var(--bg-panel);
+  min-width: 0;
+}
+
+.hueco__abrir {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.hueco__abrir:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.hueco__nombre {
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hueco__datos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 9.5px;
+  color: var(--muted);
+}
+
+/* La semilla en color: es el unico dato de la fila que el jugador puede
+   necesitar leer y copiar a mano. */
+.hueco__semilla {
+  color: var(--accent);
+}
+
+.hueco__acciones {
+  display: flex;
+  gap: 5px;
+  flex: none;
+}
+
+.hueco__accion,
+.hueco .partida__semilla {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-raised);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.hueco__accion:hover,
+.hueco .partida__semilla:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.hueco__accion--borrar:hover {
+  border-color: var(--rojo);
+  color: var(--rojo);
+}
+
+/* Un hueco libre se ve como lo que es: sitio donde todavia cabe algo. De ahi
+   el borde discontinuo, que lo distingue de las partidas de verdad sin tener
+   que etiquetarlo. */
+.hueco--libre {
+  justify-content: center;
+  gap: 8px;
+  padding: 13px 11px;
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.hueco--libre:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.hueco--libre:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.hueco--ajena {
+  opacity: 0.75;
+}
+
+.huecos__otras {
+  margin: 12px 0 7px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ---------- traer una semilla ---------- */
+
+.semilla-fila {
+  display: flex;
+  gap: 8px;
+}
+
+.semilla-fila__campo {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.semilla-fila__campo:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.semilla-fila button {
+  flex: none;
+  padding: 0 16px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* ---------- las opciones ---------- */
+
+/*
+ * Interruptores y no casillas: son quince y van en dos columnas, y a ese
+ * tamano una casilla marcada se distingue mal de una sin marcar de un vistazo.
+ * El interruptor se lee encendido o apagado desde lejos.
+ */
+.interruptores {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 20px;
+}
+
+@media (max-width: 560px) {
+  .interruptores {
+    grid-template-columns: 1fr;
+  }
+}
+
+.interruptor {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 7px 2px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+  min-width: 0;
+}
+
+/* La casilla de verdad sigue ahi, solo que invisible: es la que da el teclado,
+   el foco y la semantica. La palanca es su dibujo. */
+.interruptor input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.interruptor__texto {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.interruptor__nombre {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.interruptor.is-on .interruptor__nombre {
+  color: var(--text);
+}
+
+.interruptor__nota {
+  margin-top: 1px;
+  font-size: 9.5px;
+  color: var(--muted);
+  opacity: 0.8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.interruptor__palanca {
+  position: relative;
+  flex: none;
+  width: 32px;
+  height: 18px;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  background: var(--bg-panel);
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.interruptor__palanca::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: left 160ms ease, background 160ms ease;
+}
+
+.interruptor.is-on .interruptor__palanca {
+  background: rgba(255, 203, 5, 0.22);
+  border-color: var(--accent);
+}
+
+.interruptor.is-on .interruptor__palanca::after {
+  left: 16px;
+  background: var(--accent);
+}
+
+/* El foco del teclado tiene que verse: la casilla esta escondida, asi que lo
+   lleva la palanca. */
+.interruptor input:focus-visible + .interruptor__palanca,
+.interruptor:focus-within .interruptor__palanca {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .interruptor__palanca,
+  .interruptor__palanca::after {
+    transition: none;
+  }
+}
+
+/* El selector de fichero dentro de la tarjeta: el boton nativo desentonaba
+   entre interruptores y huecos con borde discontinuo. */
+.tarjeta .partida__traer {
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+}
+
+.tarjeta .partida__traer input[type='file'] {
+  font-size: 11px;
+}
+
+.tarjeta .partida__traer input[type='file']::file-selector-button {
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.tarjeta .partida__traer input[type='file']::file-selector-button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }

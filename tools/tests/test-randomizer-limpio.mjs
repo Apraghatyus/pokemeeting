@@ -41,7 +41,7 @@ page.on('pageerror', (e) => {
 const aleatorizar = async () => {
   await page.setInputFiles('input[type=file][accept*=".gba"]', ROM);
   const modal = page.locator('dialog.modal[open]');
-  await modal.locator('.opcion').first().waitFor({ timeout: 30_000 });
+  await modal.locator('.interruptor').first().waitFor({ timeout: 30_000 });
   await modal.getByRole('button', { name: 'Aleatorizar y jugar' }).click();
   await modal.locator('.modal__title', { hasText: 'Partida aleatorizada' }).waitFor({
     timeout: 300_000,
@@ -100,9 +100,9 @@ check(
 // Al volver a cargar la misma ROM debe ofrecerse la partida anterior.
 await page.setInputFiles('input[type=file][accept*=".gba"]', ROM);
 const modal = page.locator('dialog.modal[open]');
-await modal.locator('.opcion').first().waitFor({ timeout: 30_000 });
-check('se ofrece la partida guardada de esta ROM', (await modal.locator('.partida').count()) === 1,
-  `${await modal.locator('.partida').count()} en la lista`);
+await modal.locator('.interruptor').first().waitFor({ timeout: 30_000 });
+check('se ofrece la partida guardada de esta ROM', (await modal.locator('.hueco--partida').count()) === 1,
+  `${await modal.locator('.hueco--partida').count()} en la lista`);
 
 // Generamos una segunda, que no debe pisar a la primera.
 await modal.getByRole('button', { name: 'Aleatorizar y jugar' }).click();
@@ -145,16 +145,16 @@ check('la copia nueva no hereda el guardado de la anterior', !nuevaLimpia.hereda
 
 // --- volver a la partida vieja desde la lista ---
 await page.locator('.iconbutton--opciones').click();
-await page.getByRole('button', { name: 'Cargar otra ROM' }).click();
+await page.getByRole('button', { name: 'Cambiar ROM' }).click();
 await page.locator('.dropzone').waitFor({ timeout: 10_000 });
 await page.setInputFiles('input[type=file][accept*=".gba"]', ROM);
 const modal3 = page.locator('dialog.modal[open]');
-await modal3.locator('.partida').first().waitFor({ timeout: 30_000 });
-check('ahora hay dos partidas en la lista', (await modal3.locator('.partida').count()) === 2,
-  `${await modal3.locator('.partida').count()} en la lista`);
+await modal3.locator('.hueco--partida').first().waitFor({ timeout: 30_000 });
+check('ahora hay dos partidas en la lista', (await modal3.locator('.hueco--partida').count()) === 2,
+  `${await modal3.locator('.hueco--partida').count()} en la lista`);
 
 // La ultima de la lista es la mas antigua: la primera que creamos.
-await modal3.locator('.partida__abrir').last().click();
+await modal3.locator('.hueco__abrir').last().click();
 await page.waitForTimeout(3000);
 const recuperada = await page.evaluate(() => globalThis.mGBAModule?.gameName?.split('/').pop() ?? null);
 check('se puede continuar una partida guardada', recuperada !== null && /aleatoria/.test(recuperada),
@@ -165,11 +165,11 @@ check('se puede continuar una partida guardada', recuperada !== null && /aleator
 // Cada copia es una ROM entera en el almacenamiento del navegador, asi que no
 // pueden acumularse sin limite.
 await page.locator('.iconbutton--opciones').click();
-await page.getByRole('button', { name: 'Cargar otra ROM' }).click();
+await page.getByRole('button', { name: 'Cambiar ROM' }).click();
 await page.locator('.dropzone').waitFor({ timeout: 10_000 });
 await page.setInputFiles('input[type=file][accept*=".gba"]', ROM);
 const modalTope = page.locator('dialog.modal[open]');
-await modalTope.locator('.opcion').first().waitFor({ timeout: 30_000 });
+await modalTope.locator('.interruptor').first().waitFor({ timeout: 30_000 });
 
 // Van dos: generamos la tercera y el boton debe quedar bloqueado.
 await modalTope.getByRole('button', { name: 'Aleatorizar y jugar' }).click();
@@ -178,11 +178,11 @@ await modalTope.getByRole('button', { name: 'Empezar a jugar' }).click();
 await page.waitForTimeout(2000);
 
 await page.locator('.iconbutton--opciones').click();
-await page.getByRole('button', { name: 'Cargar otra ROM' }).click();
+await page.getByRole('button', { name: 'Cambiar ROM' }).click();
 await page.locator('.dropzone').waitFor({ timeout: 10_000 });
 await page.setInputFiles('input[type=file][accept*=".gba"]', ROM);
 const modalLleno = page.locator('dialog.modal[open]');
-await modalLleno.locator('.opcion').first().waitFor({ timeout: 30_000 });
+await modalLleno.locator('.interruptor').first().waitFor({ timeout: 30_000 });
 
 check('con tres partidas ya no deja crear otra',
   await modalLleno.getByRole('button', { name: /Aleatorizar y jugar/ }).isDisabled());
@@ -194,17 +194,17 @@ check('y explica por que',
 await page.keyboard.press('Escape');
 await page.waitForTimeout(400);
 await page.locator('.iconbutton--opciones').click();
-await page.getByRole('button', { name: 'Cargar otra ROM' }).click();
+await page.getByRole('button', { name: 'Cambiar ROM' }).click();
 await page.locator('.dropzone').waitFor({ timeout: 10_000 });
 await page.setInputFiles('input[type=file][accept*=".gba"]', ROM);
 const modal4 = page.locator('dialog.modal[open]');
-await modal4.locator('.partida').first().waitFor({ timeout: 30_000 });
-const antesDeBorrar = await modal4.locator('.partida').count();
-await modal4.locator('.partida__borrar').first().click();
+await modal4.locator('.hueco--partida').first().waitFor({ timeout: 30_000 });
+const antesDeBorrar = await modal4.locator('.hueco--partida').count();
+await modal4.locator('.hueco__accion--borrar').first().click();
 await page.waitForTimeout(500);
 check('borrar quita la partida de la lista',
-  (await modal4.locator('.partida').count()) === antesDeBorrar - 1,
-  `${antesDeBorrar} -> ${await modal4.locator('.partida').count()}`);
+  (await modal4.locator('.hueco--partida').count()) === antesDeBorrar - 1,
+  `${antesDeBorrar} -> ${await modal4.locator('.hueco--partida').count()}`);
 check('y vuelve a dejar crear una nueva',
   !(await modal4.getByRole('button', { name: /Aleatorizar y jugar/ }).isDisabled()));
 

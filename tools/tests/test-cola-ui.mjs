@@ -51,7 +51,7 @@ const abrir = async () => {
     timeout: 30_000,
   });
   await page.setInputFiles('input[type=file][accept*=".gba"]', ROM);
-  await page.waitForSelector('text=Como quieres jugar', { timeout: 20_000 });
+  await page.waitForSelector('.aleatorizar', { timeout: 20_000 });
   return page;
 };
 
@@ -90,7 +90,7 @@ if (aviso) {
 const acabaron = await Promise.all(
   pestanas.map((p, i) =>
     p
-      .waitForSelector('text=Partida aleatorizada', { timeout: 300_000 })
+      .waitForSelector('.modal__title:text-is("Partida aleatorizada")', { timeout: 300_000 })
       .then(() => true)
       .catch(() => {
         console.log(`   (la pestana ${i} no llego a terminar)`);

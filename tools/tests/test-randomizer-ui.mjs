@@ -48,12 +48,17 @@ const abrir = async () => {
 
 // --- 1. jugar tal cual ---
 const vanilla = await abrir();
+// Al cargar una ROM se abre solo el menu del randomizer. Se comprueba por el
+// contenido y no por el titulo: lo que importa es que ofrezca las dos salidas
+// -jugar tal cual o aleatorizar-, no como se llame la ventana.
 const preguntaVanilla = await vanilla
-  .locator('.modal__title', { hasText: 'Como quieres jugar' })
+  .locator('.aleatorizar')
   .waitFor({ timeout: 20_000 })
   .then(() => true)
   .catch(() => false);
-check('al cargar la ROM pregunta como jugar', preguntaVanilla);
+check('al cargar la ROM se ofrece aleatorizar', preguntaVanilla);
+check('y se puede jugar tal cual sin aleatorizar nada',
+  (await vanilla.getByRole('button', { name: 'Jugar tal cual' }).count()) === 1);
 
 await vanilla.getByRole('button', { name: 'Jugar tal cual' }).click();
 await vanilla.waitForTimeout(5000);
@@ -75,16 +80,35 @@ await vanilla.close();
 const page = await abrir();
 // Hay mas de un dialogo en la pagina (sala, aleatorizacion): se acota al abierto.
 const modal = page.locator('dialog.modal[open]');
-await modal.locator('.opcion').first().waitFor({ timeout: 20_000 });
+await modal.locator('.interruptor').first().waitFor({ timeout: 20_000 });
 
-const total = await modal.locator('.opcion').count();
+const total = await modal.locator('.interruptor').count();
+// --- la forma: dos columnas, interruptores y huecos ---
+const forma = await modal.evaluate(() => ({
+  columnas: getComputedStyle(document.querySelector('.aleatorizar__rejilla'))
+    .gridTemplateColumns.split(' ').length,
+  libres: document.querySelectorAll('.hueco--libre').length,
+  palancas: document.querySelectorAll('.interruptor__palanca').length,
+  pie: document.querySelector('.modal__pie') !== null,
+  // Lo que de verdad hay que comprobar de un modal nuevo: que entra entero.
+  bajar: (() => {
+    const c = document.querySelector('.modal[open] .modal__body');
+    return Math.max(0, c.scrollHeight - c.clientHeight);
+  })(),
+}));
+check('el menu va en dos columnas', forma.columnas === 2, `${forma.columnas}`);
+check('se ven los huecos que quedan libres', forma.libres === 3, `${forma.libres}`);
+check('las opciones son interruptores', forma.palancas === 15, `${forma.palancas}`);
+check('las dos salidas van en el pie', forma.pie);
+check('y en escritorio cabe sin desplazar', forma.bajar === 0, `${forma.bajar}px por bajar`);
+
 check('el menu ofrece las opciones', total >= 7, `${total} opciones`);
 
-const marcadasPorDefecto = await modal.locator('.opcion input:checked').count();
+const marcadasPorDefecto = await modal.locator('.interruptor input:checked').count();
 check('vienen marcadas las habituales', marcadasPorDefecto >= 3, `${marcadasPorDefecto} marcadas`);
 
 await modal.getByRole('button', { name: 'Desmarcar' }).click();
-const tras = await modal.locator('.opcion input:checked').count();
+const tras = await modal.locator('.interruptor input:checked').count();
 check('se pueden desmarcar todas', tras === 0);
 
 const botonAleatorizar = modal.getByRole('button', { name: /Aleatorizar y jugar/ });
@@ -93,7 +117,9 @@ check('sin nada marcado no se puede aleatorizar', await botonAleatorizar.isDisab
 // Marcamos tres concretas, incluyendo una que el registro del randomizer no
 // menciona (objetos del mapa): comprobar que aun asi se informa de ella.
 for (const etiqueta of ['Pokemon salvajes', 'Pokemon iniciales', 'Objetos del mapa']) {
-  await modal.locator('.opcion', { hasText: etiqueta }).locator('input').check();
+  // Se pulsa la etiqueta, no la casilla: la casilla va oculta detras de la
+  // palanca -es la que da teclado y semantica- y no se puede pulsar.
+  await modal.locator('.interruptor', { hasText: etiqueta }).click();
 }
 const antes = await page.locator('canvas').screenshot();
 
@@ -142,15 +168,15 @@ check('el emulador sigue dibujando con la ROM nueva', Buffer.compare(antes, desp
 
 // --- aleatorizar otra vez debe partir de la ROM original, no de la generada ---
 await page.locator('.iconbutton--opciones').click();
-await page.getByRole('button', { name: 'Abrir opciones' }).click();
+await page.locator('.boton-ancho', { hasText: 'Opciones' }).click();
 const modal2 = page.locator('dialog.modal[open]');
-await modal2.locator('.opcion').first().waitFor({ timeout: 25_000 });
+await modal2.locator('.interruptor').first().waitFor({ timeout: 25_000 });
 // Ya no se descarta nada: la partida anterior aparece en la lista para volver
 // a ella, y aleatorizar crea otra aparte.
 check(
   'ofrece volver a la partida ya creada',
-  (await modal2.locator('.partida').count()) >= 1,
-  `${await modal2.locator('.partida').count()} en la lista`,
+  (await modal2.locator('.hueco--partida').count()) >= 1,
+  `${await modal2.locator('.hueco--partida').count()} en la lista`,
 );
 await modal2.getByRole('button', { name: /Aleatorizar y jugar/ }).click();
 await modal2
@@ -181,7 +207,7 @@ check('cada aleatorizacion conserva su propia copia', ficheros.length === 3,
 
 // --- y se puede cambiar de ROM sin recargar ---
 await page.locator('.iconbutton--opciones').click();
-await page.getByRole('button', { name: 'Cargar otra ROM' }).click();
+await page.getByRole('button', { name: 'Cambiar ROM' }).click();
 const vuelveLaZona = await page
   .locator('.dropzone')
   .waitFor({ timeout: 10_000 })

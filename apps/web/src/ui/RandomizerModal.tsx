@@ -490,284 +490,360 @@ export const RandomizerModal = ({
       open={open}
       onClose={onClose}
       icon="✦"
-      title={progress.fase === 'hecho' ? 'Partida aleatorizada' : 'Como quieres jugar'}
+      title={progress.fase === 'hecho' ? 'Partida aleatorizada' : 'Randomizer'}
       subtitle={
         progress.fase === 'hecho'
           ? 'Ya esta corriendo tu copia aleatorizada.'
-          : 'Puedes jugar la ROM tal cual, o aleatorizarla a tu gusto.'
+          : 'Semillas · Opciones · Partida'
+      }
+      pie={
+        progress.fase === 'hecho' ? null : (
+          <>
+            <span className="aleatorizar__nota">
+              Cada jugador ajusta su propio randomizer. Aleatorizar de nuevo no toca las partidas
+              que ya tienes.
+            </span>
+            <span className="aleatorizar__acciones">
+              <button type="button" onClick={onClose}>
+                Jugar tal cual
+              </button>
+              <button
+                type="button"
+                className="button--primary"
+                disabled={!canRandomize}
+                onClick={() => void run()}
+              >
+                {progress.fase === 'trabajando' ? 'Aleatorizando...' : 'Aleatorizar y jugar'}
+              </button>
+            </span>
+          </>
+        )
       }
     >
       {progress.fase === 'hecho' ? (
         <Resultado progress={progress} onClose={onClose} />
       ) : (
-        <>
-          {status.estado === 'comprobando' && <p className="hint">Buscando el servicio...</p>}
+        <div className="aleatorizar">
+          {/* Lo que impide o condiciona aleatorizar va arriba del todo y a lo
+              ancho: son cosas que hay que leer ANTES de ponerse a marcar
+              opciones, no al lado de ellas. */}
+          <div className="aleatorizar__avisos">
+            {status.estado === 'comprobando' && <p className="hint">Buscando el servicio...</p>}
 
-          {status.estado === 'apagado' && (
-            <p className="hint">
-              El servicio de aleatorizacion no esta corriendo, asi que solo puedes jugar la ROM tal
-              cual. Arrancalo con <code className="mono">npm run dev:all</code>.
-            </p>
-          )}
+            {status.estado === 'apagado' && (
+              <p className="hint">
+                El servicio de aleatorizacion no esta corriendo, asi que solo puedes jugar la ROM
+                tal cual. Arrancalo con <code className="mono">npm run dev:all</code>.
+              </p>
+            )}
 
-          {status.estado === 'incompleto' && <p className="warn">{status.motivo}</p>}
+            {status.estado === 'incompleto' && <p className="warn">{status.motivo}</p>}
 
-          {status.estado === 'listo' && !supported && (
-            <p className="warn">
-              La aleatorizacion esta disponible para Oro, Plata y Cristal, y para Rubi, Zafiro,
-              Esmeralda, Rojo Fuego y Verde Hoja. Tu ROM es "
-              {gameCode}".
-            </p>
-          )}
+            {status.estado === 'listo' && !supported && (
+              <p className="warn">
+                La aleatorizacion esta disponible para Oro, Plata y Cristal, y para Rubi, Zafiro,
+                Esmeralda, Rojo Fuego y Verde Hoja. Tu ROM es "{gameCode}".
+              </p>
+            )}
+
+            {/* La promesa de que la ROM no se mueve solo es cierta en local.
+                Entrando por un enlace compartido viaja al ordenador de quien lo
+                abrio, y eso se dice antes de aleatorizar, no despues. */}
+            {status.estado === 'listo' && supported && randomizerIsRemote() && (
+              <p className="warn">
+                Para aleatorizar, tu ROM se enviara al ordenador de quien abrio esta partida,
+                donde se procesa y se borra al terminar. Si prefieres que no salga de tu equipo,
+                juega tal cual.
+              </p>
+            )}
+
+            {/* Rojo Fuego y Verde Hoja se han arrancado y jugado de verdad; los
+                otros tres comparten la misma estructura y el randomizer los
+                acepta, pero nadie los ha probado aqui todavia. Decirlo cuesta
+                una linea y evita que alguien pierda una tarde sin saber si el
+                raro es el juego o es el. */}
+            {status.estado === 'listo' && supported && sinProbar && (
+              <p className="hint">
+                De {sinProbar} todavia no hemos comprobado una partida entera por aqui. Deberia
+                funcionar igual: si algo sale raro, es util saberlo.
+              </p>
+            )}
+
+            {lleno && (
+              <p className="warn">
+                Tienes {guardadas} partidas guardadas, el maximo. Cada una es una ROM entera
+                ocupando sitio en el navegador: borra alguna para crear otra.
+              </p>
+            )}
+
+            {progress.fase === 'error' && <p className="alert">{progress.message}</p>}
+
+            {/* Solo sale si de verdad hay cola. Jugando solo no hay nada que
+                contar y un mensaje de espera sobraria. */}
+            {progress.fase === 'trabajando' && progress.cola && (
+              <p className="hint" role="status">
+                {textoDeEspera(progress.cola)}
+              </p>
+            )}
+          </div>
 
           {status.estado === 'listo' && supported && (
-            <>
-              {/* La promesa de que la ROM no se mueve solo es cierta en local.
-                  Entrando por un enlace compartido viaja al ordenador de quien
-                  lo abrio, y eso se dice antes de aleatorizar, no despues. */}
-              {randomizerIsRemote() ? (
-                <p className="warn">
-                  Para aleatorizar, tu ROM se enviara al ordenador de quien abrio esta partida,
-                  donde se procesa y se borra al terminar. Si prefieres que no salga de tu equipo,
-                  juega tal cual.
-                </p>
-              ) : (
-                <p className="hint">
-                  Se aleatoriza tu propia copia en este ordenador. La ROM no sale de aqui.
-                </p>
-              )}
-
-              {/* Rojo Fuego y Verde Hoja se han arrancado y jugado de verdad;
-                  los otros tres comparten la misma estructura y el randomizer
-                  los acepta, pero nadie los ha probado aqui todavia. Decirlo
-                  cuesta una linea y evita que alguien pierda una tarde sin
-                  saber si el raro es el juego o es el. */}
-              {sinProbar && (
-                <p className="hint">
-                  De {sinProbar} todavia no hemos comprobado una partida entera por aqui. Deberia
-                  funcionar igual: si algo sale raro, es util saberlo.
-                </p>
-              )}
-
-              {partidas.length > 0 && (
-                <div className="partidas">
-                  <p className="partidas__titulo">Partidas guardadas de esta ROM</p>
-                  {partidas.map((partida) => {
-                    const aqui = existeGuardada(partida.fichero);
-                    const rehacible = sePuedeRehacer(partida);
-                    return (
-                      <div className="partida" key={partida.id}>
-                        <button
-                          type="button"
-                          className="partida__abrir"
-                          // Una partida cuya copia ya no esta y que tampoco se
-                          // sabe rehacer no lleva a ningun sitio: se deja a la
-                          // vista para poder borrarla, pero sin abrirla.
-                          disabled={!aqui && !rehacible}
-                          onClick={() => {
-                            if (aqui) {
-                              tocar(partida.id);
-                              void onContinuar(partida.fichero).then(onClose);
-                            } else {
-                              void rehacer(partida);
-                            }
-                          }}
-                        >
-                          <strong>{resumirCambios(partida.cambiado)}</strong>
-                          <em>
-                            {cuando(partida.creada)}
-                            {partida.semilla ? ` · semilla ${partida.semilla.slice(-6)}` : ''}
-                            {aqui ? '' : rehacible ? ' · hay que rehacerla' : ' · ya no esta'}
-                          </em>
-                        </button>
-                        <button
-                          type="button"
-                          className="partida__semilla"
-                          onClick={() => exportarPartida(partida)}
-                          title={
-                            'Descargar esta partida entera: el guardado y la semilla.\n' +
-                            'Es lo que te llevas a otro aparato para seguir ahi.'
-                          }
-                          aria-label="Descargar esta partida para otro aparato"
-                        >
-                          ⤓
-                        </button>
-                        <BotonSemilla partida={partida} />
-                        <button
-                          type="button"
-                          className="partida__borrar"
-                          title="Borrar esta partida"
-                          aria-label={`Borrar la partida de ${cuando(partida.creada)}`}
-                          onClick={() => {
-                            onBorrar(partida.fichero);
-                            olvidar(partida.id);
-                            releer();
-                          }}
-                        >
-                          x
-                        </button>
-                      </div>
-                    );
-                  })}
-                  <p className="hint">
-                    Aleatorizar de nuevo crea otra partida aparte. Ninguna se pierde.
-                  </p>
-                </div>
-              )}
-
-
-              {/* Con el cupo lleno hay que poder hacer hueco desde aqui, incluso
-                  si lo ocupan partidas de otro juego. */}
-              {lleno && otras.length > 0 && (
-                <div className="partidas">
-                  <p className="partidas__titulo">De otras ROMs</p>
-                  {otras.map((partida) => (
-                    <div className="partida" key={partida.id}>
-                      <span className="partida__ajena">
-                        <strong>{partida.baseNombre.replace(/\.gba$/i, '')}</strong>
-                        <em>
-                          {resumirCambios(partida.cambiado)} · {cuando(partida.creada)}
-                        </em>
+            <div className="aleatorizar__rejilla">
+              {/* --------- tus partidas y la semilla --------- */}
+              <div className="ajustes__columna">
+                <section className="tarjeta">
+                  <div className="tarjeta__titulo">
+                    <span className="tarjeta__marca tarjeta__marca--azul" />
+                    <h2>Tus partidas</h2>
+                    <div className="tarjeta__accion">
+                      <span className="cuenta">
+                        {guardadas}/{MAX_PARTIDAS}
                       </span>
-                      <button
-                        type="button"
-                        className="partida__borrar"
-                        title="Borrar esta partida"
-                        aria-label={`Borrar la partida de ${partida.baseNombre}`}
-                        onClick={() => {
-                          onBorrar(partida.fichero);
-                          olvidar(partida.id);
-                          releer();
-                        }}
-                      >
-                        x
-                      </button>
                     </div>
-                  ))}
-                </div>
-              )}
+                  </div>
 
-              {/* La vuelta de la semilla: alguien que juega desde otro ordenador,
-                  o que perdio los datos del navegador, trae su linea de texto y
-                  su ROM original y recupera el mismo mundo exacto. */}
-              <details className="partidas">
-                <summary className="partidas__titulo">Tengo una semilla</summary>
-                <textarea
-                  className="field__value mono semilla-pegada"
-                  rows={2}
-                  value={semillaPegada}
-                  placeholder="EMUPOKE1..."
-                  onChange={(event) => setSemillaPegada(event.target.value)}
-                  aria-label="semilla de una partida"
-                />
-                <button
-                  type="button"
-                  className="button--wide"
-                  disabled={semillaPegada.trim() === '' || lleno || progress.fase === 'trabajando'}
-                  onClick={() => void desdeSemilla()}
-                >
-                  Rehacer esa partida
-                </button>
-                <p className="hint">
-                  Hace falta la misma ROM original con la que se creo. La semilla sola no sirve de
-                  nada: no lleva el juego dentro.
-                </p>
+                  <div className="huecos">
+                    {partidas.map((partida) => {
+                      const aqui = existeGuardada(partida.fichero);
+                      const rehacible = sePuedeRehacer(partida);
+                      return (
+                        <div className="hueco hueco--partida" key={partida.id}>
+                          <button
+                            type="button"
+                            className="hueco__abrir"
+                            // Una partida cuya copia ya no esta y que tampoco se
+                            // sabe rehacer no lleva a ningun sitio: se deja a la
+                            // vista para poder borrarla, pero sin abrirla.
+                            disabled={!aqui && !rehacible}
+                            onClick={() => {
+                              if (aqui) {
+                                tocar(partida.id);
+                                void onContinuar(partida.fichero).then(onClose);
+                              } else {
+                                void rehacer(partida);
+                              }
+                            }}
+                          >
+                            <span className="hueco__nombre">{resumirCambios(partida.cambiado)}</span>
+                            <span className="hueco__datos">
+                              {partida.semilla && (
+                                <span className="hueco__semilla">
+                                  semilla {partida.semilla.slice(-6)}
+                                </span>
+                              )}
+                              <span>{cuando(partida.creada)}</span>
+                              {!aqui && <span>{rehacible ? 'hay que rehacerla' : 'ya no esta'}</span>}
+                            </span>
+                          </button>
 
-                {/* Lo mismo pero con el fichero entero, que ademas trae el
-                    guardado: es lo que se lleva uno al movil para seguir ahi. */}
-                <label className="partida__traer">
-                  <span>O trae tu partida de otro aparato</span>
-                  <input
-                    type="file"
-                    accept=".emupoke"
-                    disabled={lleno || progress.fase === 'trabajando'}
-                    onChange={(event) => {
-                      const fichero = event.target.files?.[0];
-                      // Se limpia para que elegir el mismo fichero dos veces
-                      // seguidas vuelva a disparar el cambio.
-                      event.target.value = '';
-                      if (fichero) void abrirPartidaDeFichero(fichero);
-                    }}
-                  />
-                </label>
-              </details>
+                          <div className="hueco__acciones">
+                            <BotonSemilla partida={partida} />
+                            <button
+                              type="button"
+                              className="hueco__accion"
+                              onClick={() => exportarPartida(partida)}
+                              title={
+                                'Descargar esta partida entera: el guardado y la semilla.\n' +
+                                'Es lo que te llevas a otro aparato para seguir ahi.'
+                              }
+                              aria-label="Descargar esta partida para otro aparato"
+                            >
+                              ⤓
+                            </button>
+                            <button
+                              type="button"
+                              className="hueco__accion hueco__accion--borrar"
+                              title="Borrar esta partida"
+                              aria-label={`Borrar la partida de ${cuando(partida.creada)}`}
+                              onClick={() => {
+                                onBorrar(partida.fichero);
+                                olvidar(partida.id);
+                                releer();
+                              }}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
 
-              {lleno && (
-                <p className="warn">
-                  Tienes {guardadas} partidas guardadas, el maximo. Cada una es una ROM entera
-                  ocupando sitio en el navegador: borra alguna para crear otra.
-                </p>
-              )}
+                    {/* Los huecos libres se enseñan en vez de esconderlos: ver
+                        cuantas caben todavia es lo que evita la sorpresa de
+                        "no puedes, estan llenas" cuando ya habias elegido. */}
+                    {Array.from({ length: Math.max(0, MAX_PARTIDAS - guardadas) }, (_, i) => (
+                      <button
+                        key={`libre-${i}`}
+                        type="button"
+                        className="hueco hueco--libre"
+                        disabled={!canRandomize}
+                        onClick={() => void run()}
+                        title="Aleatoriza con las opciones marcadas y guarda la partida aqui"
+                      >
+                        + Crear partida
+                      </button>
+                    ))}
+                  </div>
 
-              {yaAleatorizada && partidas.length === 0 && (
-                <p className="hint">Ya estas jugando una copia aleatorizada.</p>
-              )}
+                  <p className="hint">
+                    Crear usa las opciones que tengas marcadas a la derecha. Aleatorizar de nuevo
+                    crea otra partida aparte: ninguna se pierde.
+                  </p>
 
-              <div className="opciones">
-                {options.map((option) => (
-                  <label className="opcion" key={option.id}>
+                  {/* Con el cupo lleno hay que poder hacer hueco desde aqui,
+                      incluso si lo ocupan partidas de otro juego. */}
+                  {lleno && otras.length > 0 && (
+                    <>
+                      <p className="huecos__otras">De otras ROMs</p>
+                      {otras.map((partida) => (
+                        <div className="hueco hueco--ajena" key={partida.id}>
+                          <span className="hueco__abrir">
+                            <span className="hueco__nombre">
+                              {partida.baseNombre.replace(/\.gba$/i, '')}
+                            </span>
+                            <span className="hueco__datos">
+                              <span>{resumirCambios(partida.cambiado)}</span>
+                              <span>{cuando(partida.creada)}</span>
+                            </span>
+                          </span>
+                          <div className="hueco__acciones">
+                            <button
+                              type="button"
+                              className="hueco__accion hueco__accion--borrar"
+                              title="Borrar esta partida"
+                              aria-label={`Borrar la partida de ${partida.baseNombre}`}
+                              onClick={() => {
+                                onBorrar(partida.fichero);
+                                olvidar(partida.id);
+                                releer();
+                              }}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </section>
+
+                {/* La vuelta de la semilla: alguien que juega desde otro
+                    ordenador, o que perdio los datos del navegador, trae su
+                    linea de texto y su ROM original y recupera el mismo mundo. */}
+                <section className="tarjeta">
+                  <div className="tarjeta__titulo">
+                    <span className="tarjeta__marca tarjeta__marca--azul" />
+                    <h2>Tengo una semilla</h2>
+                  </div>
+
+                  <div className="semilla-fila">
                     <input
-                      type="checkbox"
-                      checked={selected.has(option.id)}
-                      onChange={() => toggle(option.id)}
+                      className="semilla-fila__campo mono"
+                      value={semillaPegada}
+                      placeholder="EMUPOKE1..."
+                      onChange={(event) => setSemillaPegada(event.target.value)}
+                      aria-label="Semilla de una partida"
                     />
-                    <span>
-                      <strong>{option.label}</strong>
-                      <em>{option.description}</em>
-                    </span>
+                    <button
+                      type="button"
+                      disabled={
+                        semillaPegada.trim() === '' || lleno || progress.fase === 'trabajando'
+                      }
+                      onClick={() => void desdeSemilla()}
+                    >
+                      Usar
+                    </button>
+                  </div>
+
+                  <p className="hint">
+                    Hace falta la misma ROM original con la que se creo. La semilla sola no sirve
+                    de nada: no lleva el juego dentro.
+                  </p>
+
+                  {/* Lo mismo pero con el fichero entero, que ademas trae el
+                      guardado: es lo que se lleva uno al movil para seguir ahi. */}
+                  <label className="partida__traer">
+                    <span>O trae tu partida de otro aparato</span>
+                    <input
+                      type="file"
+                      accept=".emupoke"
+                      disabled={lleno || progress.fase === 'trabajando'}
+                      onChange={(event) => {
+                        const fichero = event.target.files?.[0];
+                        // Se limpia para que elegir el mismo fichero dos veces
+                        // seguidas vuelva a disparar el cambio.
+                        event.target.value = '';
+                        if (fichero) void abrirPartidaDeFichero(fichero);
+                      }}
+                    />
                   </label>
-                ))}
+                </section>
               </div>
 
-              <div className="opciones__acciones">
-                <button
-                  type="button"
-                  onClick={() => {
-                    // Marcar todas no puede meter dos que choquen: se queda la
-                    // primera de cada grupo.
-                    const todas = new Set<string>();
-                    for (const o of options) {
-                      const choca =
-                        o.chocaCon?.some((otra) => todas.has(otra)) ||
-                        options.some((x) => todas.has(x.id) && x.chocaCon?.includes(o.id));
-                      if (!choca) todas.add(o.id);
-                    }
-                    setSelected(todas);
-                  }}
-                >
-                  Marcar todo
-                </button>
-                <button type="button" onClick={() => setSelected(new Set())}>
-                  Desmarcar
-                </button>
+              {/* --------- que se aleatoriza --------- */}
+              <div className="ajustes__columna">
+                <section className="tarjeta">
+                  <div className="tarjeta__titulo">
+                    <span className="tarjeta__marca" />
+                    <h2>Opciones</h2>
+                    <div className="tarjeta__accion">
+                      <span className="cuenta">
+                        {selected.size} {selected.size === 1 ? 'activa' : 'activas'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="interruptores">
+                    {options.map((option) => (
+                      <label
+                        className={`interruptor${selected.has(option.id) ? ' is-on' : ''}`}
+                        key={option.id}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selected.has(option.id)}
+                          onChange={() => toggle(option.id)}
+                        />
+                        <span className="interruptor__texto">
+                          <span className="interruptor__nombre">{option.label}</span>
+                          <span className="interruptor__nota">{option.description}</span>
+                        </span>
+                        <span className="interruptor__palanca" aria-hidden="true" />
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="modal__acciones">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Marcar todas no puede meter dos que choquen: se queda
+                        // la primera de cada grupo.
+                        const todas = new Set<string>();
+                        for (const o of options) {
+                          const choca =
+                            o.chocaCon?.some((otra) => todas.has(otra)) ||
+                            options.some((x) => todas.has(x.id) && x.chocaCon?.includes(o.id));
+                          if (!choca) todas.add(o.id);
+                        }
+                        setSelected(todas);
+                      }}
+                    >
+                      Marcar todo
+                    </button>
+                    <button type="button" onClick={() => setSelected(new Set())}>
+                      Desmarcar
+                    </button>
+                  </div>
+                </section>
               </div>
-            </>
+            </div>
           )}
 
-          {progress.fase === 'error' && <p className="alert">{progress.message}</p>}
-
-          {/* Solo sale si de verdad hay cola. Jugando solo no hay nada que
-              contar y un mensaje de espera sobraria. */}
-          {progress.fase === 'trabajando' && progress.cola && (
-            <p className="hint" role="status">
-              {textoDeEspera(progress.cola)}
-            </p>
+          {yaAleatorizada && partidas.length === 0 && (
+            <p className="hint">Ya estas jugando una copia aleatorizada.</p>
           )}
-
-          <div className="modal__acciones">
-            <button type="button" className="button--wide" onClick={onClose}>
-              Jugar tal cual
-            </button>
-            <button
-              type="button"
-              className="button--primary button--wide"
-              disabled={!canRandomize}
-              onClick={() => void run()}
-            >
-              {progress.fase === 'trabajando' ? 'Aleatorizando...' : 'Aleatorizar y jugar'}
-            </button>
-          </div>
-        </>
+        </div>
       )}
     </Modal>
   );

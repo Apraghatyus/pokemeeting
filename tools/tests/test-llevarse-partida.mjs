@@ -53,7 +53,7 @@ const abrir = async () => {
 const primero = await abrir();
 await primero.setInputFiles('input[type=file][accept*=".gba"]', ROM);
 await primero.getByRole('button', { name: 'Aleatorizar y jugar' }).click({ timeout: 20_000 });
-await primero.waitForSelector('text=Partida aleatorizada', { timeout: 300_000 });
+await primero.waitForSelector('.modal__title:text-is("Partida aleatorizada")', { timeout: 300_000 });
 await primero.getByRole('button', { name: 'Empezar a jugar' }).click();
 await primero.waitForTimeout(5000);
 
@@ -78,11 +78,11 @@ await primero.evaluate(
 
 // --- se descarga la partida ---
 await primero.locator('.iconbutton--opciones').click();
-await primero.getByRole('button', { name: 'Abrir opciones' }).click();
-await primero.waitForSelector('.partida', { timeout: 20_000 });
+await primero.locator('.boton-ancho', { hasText: 'Opciones' }).click();
+await primero.waitForSelector('.hueco--partida', { timeout: 20_000 });
 
 const descarga = primero.waitForEvent('download', { timeout: 30_000 });
-await primero.locator('.partida').first().getByRole('button', { name: /Descargar esta partida/ }).click();
+await primero.locator('.hueco--partida').first().getByRole('button', { name: /Descargar esta partida/ }).click();
 const fichero = await descarga;
 const destino = join(tmpdir(), fichero.suggestedFilename());
 await fichero.saveAs(destino);
@@ -109,8 +109,7 @@ const crcCopia = await primero.evaluate(() => {
 // ---------------------------------------------------------------- aparato 2
 const segundo = await abrir();
 await segundo.setInputFiles('input[type=file][accept*=".gba"]', ROM);
-await segundo.waitForSelector('text=Como quieres jugar', { timeout: 20_000 });
-await segundo.locator('details.partidas > summary').click();
+await segundo.waitForSelector('.aleatorizar', { timeout: 20_000 });
 await segundo.setInputFiles('.partida__traer input[type=file]', destino);
 
 // Rehacer la copia tarda: hay que aleatorizar los dieciseis megas otra vez.

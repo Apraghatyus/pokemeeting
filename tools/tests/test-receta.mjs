@@ -56,7 +56,7 @@ await esperarZona();
 // --- 1. aleatorizar ---
 await page.setInputFiles('input[type=file][accept*=".gba"]', ROM);
 await page.getByRole('button', { name: 'Aleatorizar y jugar' }).click({ timeout: 20_000 });
-await page.waitForSelector('text=Partida aleatorizada', { timeout: 300_000 });
+await page.waitForSelector('.modal__title:text-is("Partida aleatorizada")', { timeout: 300_000 });
 
 const hayDescarga = await page.getByRole('button', { name: /Descargar la ROM/ }).count();
 check('ya no ofrece descargar la ROM', hayDescarga === 0);
@@ -73,8 +73,8 @@ check('y la partida aleatorizada esta corriendo', original.nombre.includes('-ale
 await page.reload({ waitUntil: 'load' });
 await esperarZona();
 await page.setInputFiles('input[type=file][accept*=".gba"]', ROM);
-await page.waitForSelector('text=Partidas guardadas de esta ROM', { timeout: 20_000 });
-const guardada = page.locator('.partida__abrir').first();
+await page.waitForSelector('.hueco--partida', { timeout: 20_000 });
+const guardada = page.locator('.hueco__abrir').first();
 check('la partida sigue ahi al volver', (await guardada.count()) === 1);
 check('y no dice que haya que rehacerla',
   !((await guardada.textContent()) ?? '').includes('rehacerla'));
@@ -100,8 +100,8 @@ check('la copia se borra del navegador', borrada);
 await page.reload({ waitUntil: 'load' });
 await esperarZona();
 await page.setInputFiles('input[type=file][accept*=".gba"]', ROM);
-await page.waitForSelector('text=Partidas guardadas de esta ROM', { timeout: 20_000 });
-const perdida = page.locator('.partida__abrir').first();
+await page.waitForSelector('.hueco--partida', { timeout: 20_000 });
+const perdida = page.locator('.hueco__abrir').first();
 check('sin su copia, la partida avisa de que hay que rehacerla',
   ((await perdida.textContent()) ?? '').includes('hay que rehacerla'));
 
