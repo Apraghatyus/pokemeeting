@@ -55,6 +55,8 @@
     "test:paneles": "node tools/tests/test-paneles.mjs",
     "test:resumen": "npx tsx tools/tests/test-resumen.mjs",
     "test:texto": "npx tsx tools/tests/test-texto.mjs",
+    "test:fin": "npx tsx tools/tests/test-fin-partida.mjs",
+    "test:fin:ui": "node tools/tests/test-fin-ui.mjs",
     "test:gbc": "node tools/tests/test-gbc.mjs",
     "test:cabeceras": "npx tsx tools/tests/test-cabeceras.mjs",
     "test:juegos": "node tools/tests/test-juegos-soportados.mjs",

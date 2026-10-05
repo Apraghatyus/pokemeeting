@@ -5,14 +5,16 @@ import { useEmulator } from './core/useEmulator';
 import { useKeyboardOwnership } from './core/useKeyboardOwnership';
 import { useSession } from './net/useSession';
 import { useEquipo } from './core/useEquipo';
+import { useFinDePartida } from './core/useFinDePartida';
 import { useEsEstrecha } from './core/useEsEstrecha';
 import { useEspecies } from './core/useEspecies';
 import { useMandoTactil } from './core/useMandoTactil';
 import { codificarSemilla } from './core/semilla';
-import { sePuedeRehacer, todasLasPartidas } from './core/partidas';
+import { nombreDePartida, sePuedeRehacer, todasLasPartidas } from './core/partidas';
 import { motesDebilitados } from '@emupoke/pokemon';
 import { EquipoPanel } from './ui/EquipoPanel';
 import { AjustesModal } from './ui/AjustesModal';
+import { FinModal } from './ui/FinModal';
 import { RandomizerModal } from './ui/RandomizerModal';
 import { RomDropZone, RoomDropZoneHint } from './ui/RomDropZone';
 import { RoomModal } from './ui/RoomModal';
@@ -109,6 +111,11 @@ export const App = () => {
     state.romName,
     especies,
   );
+
+  // El reto se acaba cuando cae el equipo entero. No lo dice el juego -ahi
+  // pierdes, vuelves al Centro Pokemon y sigues-: es la regla de la Nuzlocke,
+  // asi que se aplica aqui.
+  const fin = useFinDePartida(miEquipo.equipo, state.romName);
 
   // Mandarle el equipo al companero. Se hace desde un solo sitio y no al
   // leerlo, para que tambien salga cuando abre el canal: quien ya estaba
@@ -251,6 +258,19 @@ export const App = () => {
         {/* Todos los ajustes viven en un modal y no en un cajon lateral: el
             cajon empujaba la partida a un lado cada vez que se abria, y aqui
             lo que no puede moverse es justo la pantalla del juego. */}
+        <FinModal
+          open={fin.terminada}
+          equipo={fin.equipoFinal}
+          especies={especies}
+          nombrePartida={nombreDeLaPartidaEnCurso(state.header?.crc32 ?? null)}
+          onContinuar={fin.continuar}
+          onDescartar={fin.descartar}
+          onReiniciar={() => {
+            fin.continuar();
+            emulator.reset();
+          }}
+        />
+
         <AjustesModal
           open={menuOpen}
           onClose={() => setMenuOpen(false)}
@@ -311,6 +331,18 @@ export const App = () => {
  * partida con su copia. Si no es una copia aleatorizada, o es de las antiguas
  * que nacieron sin semilla, no hay nada que copiar y el boton no sale.
  */
+/**
+ * Como se llama la partida que corre ahora, si es una aleatorizada con nombre.
+ *
+ * Se busca por el CRC de la ROM cargada, que es lo que une una partida con su
+ * copia. Jugando una ROM tal cual no hay partida que nombrar, y devuelve null.
+ */
+const nombreDeLaPartidaEnCurso = (crc32: string | null): string | null => {
+  if (!crc32) return null;
+  const partida = todasLasPartidas().find((p) => p.crc32 === crc32);
+  return partida ? nombreDePartida(partida) : null;
+};
+
 const CopiarSemilla = ({ crc32 }: { crc32: string | null }) => {
   const [copiada, setCopiada] = useState(false);
 

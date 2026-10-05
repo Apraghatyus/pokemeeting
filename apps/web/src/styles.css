@@ -3695,3 +3695,72 @@ details.partidas[open] > summary::before {
 .hueco--ajena .hueco__abrir {
   cursor: default;
 }
+
+/* ---------- fin de partida ---------- */
+
+.fin {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.fin__resumen {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.fin__resumen strong {
+  color: var(--text);
+}
+
+.fin__equipo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fin__equipo li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.fin__equipo li:last-child {
+  border-bottom: 0;
+}
+
+.fin__mote {
+  font-size: 12.5px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fin__nivel {
+  flex: none;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* Reiniciar primero y seguir despues, en ese orden y no al reves: lo que cierra
+   el reto es empezar de nuevo, y seguir jugando es la excepcion. */
+.fin__salidas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+@media (max-width: 560px) {
+  .fin__salidas {
+    grid-template-columns: 1fr;
+  }
+}
