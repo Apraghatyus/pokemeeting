@@ -549,14 +549,7 @@ export const RandomizerModal = ({
             {/* La promesa de que la ROM no se mueve solo es cierta en local.
                 Entrando por un enlace compartido viaja al ordenador de quien lo
                 abrio, y eso se dice antes de aleatorizar, no despues. */}
-            {status.estado === 'listo' && supported && randomizerIsRemote() && (
-              <p className="warn">
-                Para aleatorizar, tu ROM se enviara al ordenador de quien abrio esta partida,
-                donde se procesa y se borra al terminar. Si prefieres que no salga de tu equipo,
-                juega tal cual.
-              </p>
-            )}
-
+            {status.estado === 'listo' && supported && randomizerIsRemote()}
             {/* Rojo Fuego y Verde Hoja se han arrancado y jugado de verdad; los
                 otros tres comparten la misma estructura y el randomizer los
                 acepta, pero nadie los ha probado aqui todavia. Decirlo cuesta
