@@ -1,18 +1,95 @@
-# Ideas pendientes
+# Estado del proyecto y lo que falta
 
-Lo que falta, ordenado por lo que aporta frente a lo que cuesta. Cada entrada
-dice también qué la bloquea, que suele ser lo que de verdad decide el orden.
+Este fichero se escribe para que **leyéndolo solo** se sepa en qué punto está
+esto: qué funciona ya, qué está a medias y qué ni se ha empezado. Si vienes de
+nuevo o vuelves después de un tiempo, empieza aquí y no por el código.
 
-Las ideas sueltas también se apuntan aquí aunque nadie las vaya a hacer mañana:
+Va en tres partes:
+
+1. **Lo que ya funciona**, con la prueba que lo vigila.
+2. **Lo que se arregló y por qué**, que vale la pena recordar porque varias de
+   esas cosas estaban descritas como imposibles y no lo eran.
+3. **Lo que falta**, ordenado por lo que aporta frente a lo que cuesta, y
+   diciendo qué lo bloquea, que suele ser lo que de verdad decide el orden.
+
+Las ideas sueltas también se apuntan aunque nadie las vaya a hacer mañana:
 cuando llega el momento, lo caro no es escribir el código sino volver a averiguar
 qué se sabía y qué había que decidir antes de empezar.
 
 ---
 
-## Lo que ya dejó de estar pendiente
+## Lo que ya funciona
 
-Se apunta aquí porque varias de estas estaban descritas como difíciles o
-imposibles, y resultaron no serlo. Vale la pena recordar por qué.
+Inventario de lo que está hecho, para no tener que deducirlo del código. Cada
+línea lleva la prueba que lo vigila: si quieres saber si algo sigue en pie,
+ejecútala en vez de fiarte de esta lista.
+
+**Jugar**
+
+- Emula **Game Boy Advance y Game Boy Color** con el núcleo de mGBA. Reconoce la
+  consola por el contenido del fichero, no por la extensión.
+  `test:cabeceras`, `test:gbc`, `test:juegos`
+- **Mando táctil** que aparece solo cuando hace falta, decidido por cómo juegas
+  y no por qué aparato es, con tres modos (auto, siempre, nunca). `test:mando`
+- **Teclas reasignables**, guardadas por posición física del teclado y no por la
+  letra. Z es A y X es B, como en cualquier emulador. `test:controles`
+- **Avance rápido** conmutable: espacio en escritorio, botón propio en el mando.
+  `test:controles`
+- **Pantalla completa** que incluye partida, mando y equipo. `test:movil:mando`
+
+**Jugar con alguien**
+
+- **Sala con contraseña**, con el servidor de salas emparejando y apartándose.
+  `test:signaling`, `test:session`
+- **Vídeo de la partida del otro** a ~55 fotogramas por segundo. `test:fluidez`
+- **Voz en directo**, con silencio propio y volumen del compañero aparte del
+  juego. `test:voice`, `test:audio`
+- **Reconexión automática** si se cae el enlace. `test:reconexion`
+- La ventana del compañero se **arrastra a la esquina** que quieras.
+  `test:arrastre`
+- En móvil, **una pantalla a la vez** y se cambia deslizando. `test:cambio`
+
+**Pokémon**
+
+- **Paneles de equipo en vivo**, con sprite, nivel, tipos y estado, leídos de la
+  memoria de la partida. `test:paneles`, `test:equipo`, `test:resumen`
+- **Soul Link**: si cae tu Pokémon, se marca su pareja al otro lado, emparejados
+  por el mote. `test:soullink`
+- **Intercambios por dentro**, incluso entre dos copias aleatorizadas distintas,
+  recalculando las estadísticas para la ROM que recibe. Falta la interfaz.
+  `test:intercambio`, `test:estadisticas`
+- La tabla de caracteres del juego, los dos abecedarios enteros. `test:texto`
+
+**Aleatorizar**
+
+- **Quince opciones**, de los Pokémon salvajes a los objetos de tienda, y cada
+  una comprobada contra una ROM de verdad. `test:randomizer:options`
+- **Semilla fija**: la misma semilla da la misma ROM byte a byte. `test:semilla`
+- **Hasta tres partidas guardadas**, con nombre propio, compartiendo cupo entre
+  todos los juegos. `test:partidas`, `test:randomizer:ui`
+- **Recuperar una partida desde su semilla** sin haber descargado nada.
+  `test:rehacer`
+- **Llevársela a otro aparato** en un fichero con el guardado dentro.
+  `test:llevarse`
+- **Cola con límite** para que varias copias a la vez no tumben el servicio, y
+  el jugador ve su puesto. `test:cola`, `test:cola:servicio`, `test:cola:ui`
+
+**Montarlo**
+
+- **Despliegue en servidor propio**, con script reejecutable o con Docker.
+  Ver [despliegue.md](despliegue.md).
+- **Enlace público temporal** para probar con alguien de fuera, por Cloudflare o
+  por Tailscale. Ver [jugar-con-alguien-de-fuera.md](jugar-con-alguien-de-fuera.md).
+- **Dimensionado medido** pieza por pieza para 1000 jugadores.
+  Ver [capacidad.md](capacidad.md).
+
+---
+
+## Lo que se arregló, y por qué
+
+Esto no es un historial: es lo que costó entender. Varias de estas estaban
+descritas como difíciles o imposibles y no lo eran, y otras eran fallos cuya
+causa no era la que parecía. Guardar el porqué ahorra volver a investigarlo.
 
 - **Leer la memoria del juego.** Hecho y comprobado contra una partida real: la
   memoria empieza en `0x21000` del estado, el equipo en `0x02024284`, y el
@@ -60,7 +137,33 @@ imposibles, y resultaron no serlo. Vale la pena recordar por qué.
 - **La cola del aleatorizador.** No había ningún límite de copias simultáneas,
   que es lo que separa "los que sobran esperan" de "se cae para todos". Con la
   cola, los ajustes en caché y la compresión fuera del bucle de eventos, medido
-  A/B en la misma máquina: de 0,48 a 0,78 copias por segundo.
+  A/B en la misma máquina: de 0,48 a 0,78 copias por segundo. Ojo con la lección
+  que dejó: **asíncrono no crea capacidad** si la máquina ya va a tope de CPU,
+  solo reparte quién espera.
+- **Un aviso apagaba media aplicación.** Exportar una partida todavía sin
+  guardar llamaba a `fail()`, que además del mensaje pone el emulador en estado
+  de error. Eso apagaba toda la barra de botones -piden estar "running"- y de
+  paso detenía la lectura del equipo, y nada volvía a limpiarlo. Un mensaje de
+  ayuda dejaba la pantalla inservible para siempre. Ahora los avisos son una
+  cosa aparte de los fallos: se cierran y se van solos al resolverse.
+  `test:controles`
+- **El contador de partidas no cuadraba con lo que se veía.** Decía 1/3 y debajo
+  solo había dos huecos. No faltaba ninguno: el tercero lo ocupaba una partida
+  de otra ROM, y esas solo se enseñaban con el cupo lleno. El tope es de tres en
+  total y lo comparten todos los juegos, así que ahora se ven todas, cada una
+  diciendo de cuál es. `test:randomizer:ui`
+- **Los menús.** El de ajustes y el del randomizer pasaron de una columna de
+  botones a dos columnas de tarjetas, con la forma de un diseño que vino de
+  fuera y los colores de siempre. De paso: las partidas se pueden **nombrar**
+  -antes todas se llamaban por lo que se había aleatorizado y salían con el
+  mismo texto recortado- y la pantalla de "partida aleatorizada" dejó de
+  spoilear los iniciales. `test:menu`, `test:randomizer:ui`
+- **El túnel daba un enlace que no era.** Buscaba cualquier `*.trycloudflare.com`
+  en la salida de cloudflared, y ahí aparece también su propio endpoint interno,
+  así que a veces anunciaba `api.trycloudflare.com` como si fuera tu enlace. Y
+  su comprobación de "modo túnel" no comprobaba nada, porque `fetch` de Node
+  descarta la cabecera `Host` por especificación. Las dos cosas daban un enlace
+  roto sin avisar. Ver [jugar-con-alguien-de-fuera.md](jugar-con-alguien-de-fuera.md).
 
 ---
 

@@ -58,7 +58,7 @@
     "test:gbc": "node tools/tests/test-gbc.mjs",
     "test:cabeceras": "npx tsx tools/tests/test-cabeceras.mjs",
     "test:juegos": "node tools/tests/test-juegos-soportados.mjs",
-    "test:semilla": "node tools/tests/test-semilla.mjs",
+    "test:rehacer": "node tools/tests/test-rehacer.mjs",
     "test:estadisticas": "npx tsx tools/tests/test-estadisticas.mjs",
     "test:inyeccion": "node tools/tests/probar-inyeccion.mjs",
     "test:intercambio": "node tools/tests/probar-intercambio.mjs",
