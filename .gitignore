@@ -47,6 +47,12 @@ tools/cloudflared.exe
 # Capturas que dejan las pruebas al correrlas sin indicar carpeta.
 *.png
 
+# Pero los de la marca SI van: son parte del producto, no basura de una prueba.
+# Sin estas dos lineas el icono y el logotipo se quedaban fuera del commit sin
+# decir nada, que es como se descubrio esta regla.
+!apps/web/public/*.png
+!docs/marca/*.png
+
 # El nucleo de DS lo baja tools/nds/preparar.mjs: es de otra gente y pesa 7 MB.
 tools/nds/nucleo/
 
