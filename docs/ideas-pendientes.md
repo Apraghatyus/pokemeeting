@@ -401,8 +401,35 @@ avisos del navegador:
   vídeo. Eso ya está contemplado: se avisa en vez de dejar un rectángulo blanco
   (`test:sin:video`), pero avisar no es arreglar.
 
-**Lo que NO es**, medido para no volver a mirarlo: leer el equipo cada tres
-segundos cuesta 12 ms con la CPU frenada seis veces. No es por ahí.
+**Lo que NO es.** Tres sospechas medidas y descartadas, para que nadie vuelva a
+gastar un rato en ellas:
+
+- **Leer el equipo cada tres segundos**: 12 ms con la CPU frenada seis veces.
+- **El rebobinado y el autoguardado del núcleo**, que vienen de fábrica
+  encendidos y no se usan en ningún sitio del programa. Parecía el premio gordo
+  -rebobinar guarda una instantánea por fotograma- y apagarlos no mueve la aguja:
+  2,51 ms de CPU por fotograma con ellos y 2,59 sin ellos, que es ruido. Ojo con
+  una trampa al reintentarlo: esos ajustes **no van en la fábrica**, que solo
+  acepta el canvas, sino en `setCoreSettings`. Pasarlos al crear el núcleo no da
+  error, simplemente no hacen nada, y la primera medición salió "sin efecto" por
+  eso y no por lo que se creía.
+- **Que el núcleo sea "de 64 bits"**: ver arriba.
+
+**La forma de medirlo**, porque la primera que se intentó no servía: en
+fotogramas por segundo el ruido es de ±30% -en la misma configuración salieron
+24 y 39- y no se puede concluir nada. Lo que sí se queda quieto es el **tiempo de
+CPU por fotograma** (`Performance.getMetrics` → `TaskDuration`, dividido por los
+fotogramas que pinta el lienzo): tres medidas seguidas dieron 2,46, 2,46 y 2,52.
+Esa es la que vale, y además es la que decide si un teléfono flojo llega.
+
+**La memoria, que es la sospecha viva.** `measureUserAgentSpecificMemory` -que se
+puede usar porque la página está aislada- reporta un bloque de **257 MB por cada
+hilo** del núcleo más unos 299 MB de la ventana. Casi seguro es la MISMA memoria
+del wasm contada una vez por hilo, así que lo real rondará los 300 MB y no el
+gigabyte largo que suma la API; conviene comprobarlo antes de citarlo. Aun así,
+300 MB en un teléfono de 1,5 GB explica bien tanto el "la página no responde"
+como que el sistema le quite el contexto de vídeo. Y ese tamaño viene dentro del
+wasm: para bajarlo hay que recompilar mGBA, no se puede desde aquí.
 
 Caminos, de más a menos prometedor:
 
@@ -421,6 +448,71 @@ Caminos, de más a menos prometedor:
 Cambiar de núcleo es la opción que peor sale: el resto del programa -equipo,
 medallas, combate, fin de partida- está construido sobre leer **savestates de
 mGBA**. Otro núcleo significa rehacer todo eso.
+
+---
+
+## El cable link: intercambiar y combatir dentro del juego
+
+La idea es que funcionen el intercambio y el combate **del propio juego**, con su
+sala de unión y todo. Esto es lo que se ha podido averiguar antes de intentarlo,
+porque la respuesta corta es que hay dos caminos y uno de ellos está cerrado por
+una razón que no es técnica.
+
+**Qué hace falta de verdad.** Un cable link son dos consolas hablando por el
+puerto serie con un ritmo muy fino: los juegos se mandan palabras de 16 bits y se
+esperan con plazos contados en fotogramas. Para emularlo entre dos máquinas hacen
+falta tres cosas, y las tres a la vez:
+
+1. Que el núcleo deje enchufarle desde fuera lo que "llega por el cable".
+2. Que los dos núcleos vayan **en paso cerrado**: ninguno puede adelantarse,
+   porque el protocolo mide tiempos. Eso significa que cada uno se para a esperar
+   al otro.
+3. Que el viaje de ida y vuelta sea lo bastante corto como para que esa espera no
+   se note.
+
+**Lo que trae nuestro núcleo, comprobado en el binario**: el registro `SIOCNT`
+está, porque es parte del hardware, pero del controlador de enlace de mGBA
+-`lockstep`- **no hay ni una aparición**, y el envoltorio de JavaScript no expone
+nada de enlace. O sea que con este paquete, tal cual viene, no se puede.
+
+**Camino A: los dos juegos en la misma máquina.** Es como lo hace mGBA de
+escritorio, y es el que mejor funciona técnicamente: sin red de por medio, el
+paso cerrado es gratis. Y está **descartado por la regla fundacional del
+proyecto**: exigiría tener la ROM y la partida del otro en tu ordenador. No se
+descarta por difícil, se descarta porque este programa no mueve ROMs.
+
+**Camino B: el cable por la red.** Hay que (i) recompilar mGBA-wasm incluyendo el
+controlador de enlace y asomándolo a JavaScript, (ii) pasarle las palabras por el
+canal de datos que ya está abierto, y (iii) poner a los dos núcleos en paso
+cerrado. Lo caro no es (ii), que ya existe: es (i), que es trabajo en C y
+emscripten, y sobre todo (iii).
+
+Y conviene separar los dos usos, porque no cuestan lo mismo:
+
+- **Intercambiar** es un trámite corto y con plazos generosos. Es el candidato
+  razonable.
+- **Combatir** intercambia datos en cada turno y con plazos mucho más justos.
+  Sobre una conexión normal, los dos juegos irían a tirones; y en un teléfono que
+  ya va justo -ver la sección de arriba-, el paso cerrado lo hunde del todo.
+
+**Camino C, el que ya está hecho: no emular el cable.** Para intercambiar no hace
+falta. El motor está escrito y probado: se copian los cien bytes del Pokémon de
+una partida a otra, validando contra la ROM **que recibe** para no crear un Bad
+Egg, y en dos fases para que nadie pierda nada si se corta la conexión. Le falta
+solo la interfaz. Es legal, es barato y funciona entre dos copias aleatorizadas
+distintas, que es justo lo que el cable de verdad NO sabría hacer.
+
+Para combatir no hay equivalente: un combate por cable es un protocolo en vivo y
+no se puede falsear editando memoria. Si algún día se quiere combate sin cable,
+lo que habría que hacer es un **simulador fuera del juego** -leer los dos equipos
+y resolver el combate en JavaScript- con la ventaja de que las estadísticas y los
+tipos ya se saben leer de cada ROM, y el inconveniente de que es un proyecto
+entero aparte.
+
+**La recomendación**, con lo que se sabe hoy: hacer la interfaz del intercambio
+por el camino C, que está a un paso, y no tocar el cable hasta que eso esté en
+manos de alguien. El combate por cable es, con diferencia, lo más caro de todo lo
+que hay apuntado en este documento.
 
 ---
 
