@@ -50,6 +50,7 @@
     "nds:probar": "node tools/nds/probar-nds.mjs",
     "test:paquete": "npx tsx tools/tests/test-paquete.mjs",
     "test:llevarse": "node tools/tests/test-llevarse-partida.mjs",
+    "test:importar": "node tools/tests/test-importar-sav.mjs",
     "test:cambio": "node tools/tests/test-cambio-pantalla.mjs",
     "test:fluidez": "node tools/tests/test-fluidez.mjs",
     "test:arrastre": "node tools/tests/test-arrastre.mjs",

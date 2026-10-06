@@ -143,6 +143,17 @@ causa no era la que parecía. Guardar el porqué ahorra volver a investigarlo.
   se probaba lo tocaba. La ñ real es 0x29 y la Ñ 0x14, comprobadas buscando
   "pequeño" y "SEÑOR" en la ROM espanola. Lo vigila `npm run test:texto`, que
   recorre los dos abecedarios enteros en vez de mirar letras sueltas.
+- **Importar una partida no hacia nada, y en silencio.** El nucleo guarda el
+  fichero que le subes con el nombre que trae, pero el juego lee siempre
+  `<nombre de la ROM>.sav`. O sea que al importar "mi partida.sav" el fichero se
+  quedaba ahi al lado, intacto, y el juego seguia con su guardado vacio: ni
+  error, ni aviso, nada. Solo funcionaba si el fichero ya se llamaba igual que la
+  ROM, que no es como se llaman ni los que exporta este programa ni los de otros
+  emuladores. Se vio al intentar usar una partida de verdad para medir otra cosa:
+  en `/data/saves` estaban los dos ficheros, el del juego a ceros y el importado
+  al lado con sus 23.623 bytes sin tocar. Ahora se renombra al subirlo.
+  `test:importar` comprueba el sistema de ficheros del nucleo, que es donde
+  estaba el fallo, y sin el arreglo ve cero bytes con contenido.
 - **A pantalla completa en vertical, el equipo "desaparecia".** No desaparecia:
   quedaba DEBAJO de la partida. La regla de pantalla completa, escrita para
   escritorio, reparte el alto entre la mesa y el mando con `flex: 1`, y lleva dos

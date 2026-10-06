@@ -516,15 +516,36 @@ export const useEmulator = () => {
     }
   }, [appendLog, fail]);
 
-  /** Importa un .sav existente para continuar una partida empezada en otro emulador. */
+  /**
+   * Importa un .sav existente para continuar una partida empezada en otro sitio.
+   *
+   * El fichero se **renombra** al nombre de la ROM que esta corriendo, y sin eso
+   * esto no funcionaba en absoluto. El nucleo guarda lo que le subes con el
+   * nombre que trae, pero el juego lee siempre `<nombre de la ROM>.sav`. O sea
+   * que importar "mi partida.sav" dejaba el fichero ahi al lado, sin tocar, y el
+   * juego seguia con su guardado vacio: ni error ni aviso, simplemente no pasaba
+   * nada. Solo funcionaba si el fichero ya se llamaba igual que la ROM, que no
+   * es como se llaman los que exporta este programa ni los de otros emuladores.
+   */
   const importSave = useCallback(
     async (file: File) => {
       const core = coreRef.current;
       if (!core) return;
-      await new Promise<void>((resolve) => core.uploadSaveOrSaveState(file, resolve));
+
+      const base = (core.gameName?.split('/').pop() ?? '').replace(/\.[^.]+$/, '');
+      if (!base) {
+        setState((prev) => ({
+          ...prev,
+          aviso: 'Carga primero la ROM y despues la partida: hay que saber a que juego pertenece.',
+        }));
+        return;
+      }
+
+      const comoLoEspera = new File([file], `${base}.sav`, { type: file.type });
+      await new Promise<void>((resolve) => core.uploadSaveOrSaveState(comoLoEspera, resolve));
       await core.FSSync();
       core.quickReload();
-      appendLog(`partida importada: ${file.name}`);
+      appendLog(`partida importada: ${file.name} -> ${comoLoEspera.name}`);
     },
     [appendLog],
   );
