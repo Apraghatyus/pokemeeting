@@ -2347,6 +2347,26 @@ details.partidas[open] > summary::before {
   box-shadow: inset 3px 0 0 0 var(--color-estado);
 }
 
+/* Los dos bordes a la vez.
+   El de estado se escribia despues que el de "esta peleando" y, como los dos son
+   box-shadow, lo borraba: al dormirse el que estaba en combate se le iba la
+   marca amarilla. Son dos cosas distintas -quien pelea y como esta- y las dos
+   tienen que verse, asi que aqui se suman en vez de pisarse. */
+.ficha--activo:is(
+  .ficha--debilitado,
+  .ficha--dormido,
+  .ficha--congelado,
+  .ficha--paralizado,
+  .ficha--quemado,
+  .ficha--envenenado
+) {
+  background: rgba(255, 203, 5, 0.1);
+  box-shadow:
+    inset 3px 0 0 0 var(--color-estado),
+    inset 0 0 0 1px var(--accent),
+    0 0 16px -4px var(--accent);
+}
+
 .ficha--debilitado { --color-estado: var(--rojo); }
 .ficha--dormido { --color-estado: #8a7fd4; }
 .ficha--congelado { --color-estado: #76c7e0; }

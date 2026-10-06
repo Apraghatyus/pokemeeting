@@ -31,11 +31,11 @@ type Props = {
    */
   especies: Especies;
   /**
-   * Cual esta en combate, para iluminarlo.
+   * La personalidad del que esta en combate, o null si no hay ninguno.
    *
-   * Todavia no lo manda nadie: saber si hay un combate en marcha necesita
-   * localizar ese dato en memoria, y eso esta pendiente. El estilo esta hecho
-   * para que el dia que llegue sea pasar este numero.
+   * Personalidad y no ranura: el juego NO sube al que pelea a la ranura 0, que
+   * es lo que se creia y lo que hacia que la marca se quedara siempre en la
+   * primera ficha. Se busca su copia de combate en memoria (`quienPelea`).
    */
   activo?: number | null;
   /**

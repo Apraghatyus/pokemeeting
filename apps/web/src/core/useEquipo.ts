@@ -18,6 +18,7 @@ import type { EquipoResumen } from '@emupoke/protocol';
 import {
   enDerrota,
   enSalonDeLaFama,
+  quienPelea,
   leerMedallas,
   mismoEquipo,
   releerEquipo,
@@ -135,6 +136,10 @@ export const useEquipo = (
       // El tipo de cada especie vive en la ROM, no en la partida, asi que se
       // añade aqui: lo manda cada lado con su copia, porque en dos
       // aleatorizadas por separado la misma especie tiene tipos distintos.
+      //
+      // Y quien esta peleando, que se busca en el mismo estado: tiene que ir
+      // dentro del equipo porque viaja con el al companero, y su memoria no
+      // sale de su ordenador.
       if (leido) {
         leido = {
           ...leido,
@@ -142,6 +147,7 @@ export const useEquipo = (
             ...r,
             tipos: especiesRef.current.tipos(r.especie),
           })),
+          peleando: quienPelea(estado, leido),
         };
       }
 

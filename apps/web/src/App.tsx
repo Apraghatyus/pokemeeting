@@ -6,7 +6,7 @@ import { useKeyboardOwnership } from './core/useKeyboardOwnership';
 import { useSession } from './net/useSession';
 import { useEquipo } from './core/useEquipo';
 import { useFinDePartida } from './core/useFinDePartida';
-import { useEquipoOrdenado } from './core/ordenEstable';
+import { useEquipoOrdenado } from './core/ordenEquipo';
 import { useEsEstrecha } from './core/useEsEstrecha';
 import { useEspecies } from './core/useEspecies';
 import { useMandoTactil } from './core/useMandoTactil';

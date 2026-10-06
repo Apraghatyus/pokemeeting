@@ -59,9 +59,9 @@ ejecútala en vez de fiarte de esta lista.
   recalculando las estadísticas para la ROM que recibe. Falta la interfaz.
   `test:intercambio`, `test:estadisticas`
 - La tabla de caracteres del juego, los dos abecedarios enteros. `test:texto`
-- **Orden estable del panel** y **borde azul al que está peleando**. Tercera
-  generación intercambia de verdad las ranuras al sacar otro Pokémon, así que el
-  de la ranura 0 es el que pelea. `test:orden`
+- **El panel en el mismo orden que el juego**, y **borde amarillo al que está
+  peleando de verdad**, encontrado por su copia de combate en memoria. Fuera de
+  combate no se ilumina a nadie. `test:orden`, `test:combate`, `test:bordes`
 - **Cartel de fin de partida, en sus dos finales.** Derrota por el mensaje del
   juego al caer el equipo; victoria por el del Salón de la Fama. Con medallas,
   Liga, equipo y sprites. `test:fin`, `test:derrota`, `test:victoria`,
@@ -143,17 +143,28 @@ causa no era la que parecía. Guardar el porqué ahorra volver a investigarlo.
   se probaba lo tocaba. La ñ real es 0x29 y la Ñ 0x14, comprobadas buscando
   "pequeño" y "SEÑOR" en la ROM espanola. Lo vigila `npm run test:texto`, que
   recorre los dos abecedarios enteros en vez de mirar letras sueltas.
-- **El borde del que pelea se quedaba pegado al primero.** El panel ordenaba el
-  equipo de forma estable -para que no se barajase solo en combate- y despues, al
-  pintarlo, colocaba a cada Pokemon **en su ranura de memoria**. O sea que
-  deshacia el orden justo en el ultimo paso, y de ahi salian los dos sintomas a
-  la vez: el panel se volvia a barajar, y el iluminado era siempre la ficha de
-  arriba, porque el que pelea esta en la ranura 0 y esa se dibujaba primero. El
-  resaltado no estaba pegado al primer Pokemon, estaba pegado al primer **hueco**.
-  Arreglado pintando en el orden que viene y diciendo quien va al frente por su
-  **personalidad** y no por su ranura: la ranura siempre seria 0, la personalidad
-  senala a un Pokemon concreto. Lo vigila `test:orden`, que comprueba que la
-  marca cae en el cuarto puesto de la lista y no en el primero.
+- **El panel no se parecia a la lista del juego, y el borde senalaba al que no
+  era.** Los dos fallos tenian la misma raiz: se dio por hecho que tercera
+  generacion sube a la ranura 0 al Pokemon que sale a pelear. Sobre esa idea se
+  construyo un orden "estable" -para que el panel no se barajara en combate- y un
+  resaltado que se limitaba a iluminar la ranura 0, sin tener que detectar el
+  combate.
+  Lo desmintio una partida: el equipo en el juego era [PEZGATO, A BUENO], el
+  panel ensenaba [A BUENO, PEZGATO] y la marca estaba en PEZGATO mientras peleaba
+  A BUENO. El juego **no** mueve las ranuras; se apunta aparte cual esta en el
+  campo.
+  Asi que el orden es el del juego y ya esta -es el unico que el jugador puede
+  comprobar mirando la pantalla- y quien pelea se busca de verdad: durante el
+  combate el juego guarda una copia de 88 bytes del que esta en el campo, y
+  dentro esta su **personalidad**, que ya usamos para identificarlos. O sea que
+  no hace falta localizar ninguna direccion nueva, se buscan las personalidades
+  que ya conocemos. `test:orden`, `test:combate`.
+- **El borde de estado borraba el del que pelea.** Al dormir al Pokemon que
+  estaba en el campo se le iba la marca amarilla. Las dos reglas usan box-shadow
+  y la del estado va despues en la hoja, asi que ganaba: un fallo de cascada, no
+  de logica. Son dos datos distintos -quien pelea y como esta- y los dos tienen
+  que verse. `test:bordes` lee el estilo ya calculado por el navegador, que es
+  donde se veia, y comprueba los seis estados.
 - **El volumen se reiniciaba al cargar otra ROM.** Se vio al aleatorizar: la
   copia nueva arrancaba sonando aunque tuvieras el juego silenciado. Al medirlo
   resulto ser mas viejo y mas gordo de lo reportado -ya pasaba con la **primera**
@@ -285,27 +296,28 @@ cualquier sitio.
 
 ---
 
-## Saber que hay un combate en marcha
+## Distinguir "hay combate" de "lo hubo"
 
-Se intentó y se tumbó, que es más útil que no haberlo intentado: el juego copia
-al Pokémon que sale a su estructura de combate, así que su personalidad aparece
-dos veces en memoria y parecía bastar con buscarla.
-
-No basta. **Esa copia sigue ahí después del combate**, así que decía que el
+La copia de combate sirve para saber **quién** pelea, y eso ya está hecho: el
+juego copia al Pokémon que sale a una estructura de 88 bytes con su personalidad
+dentro, y se busca ahí. Lo que esa copia **no** dice es si el combate sigue en
+marcha, y está medido: sigue ahí después de acabar, así que decía que el
 Bulbasaur seguía peleando mientras el jugador caminaba por el mapa.
 
-**Lo que lo bloqueaba ya no lo bloquea.** Iluminar al que pelea está hecho sin
-esto: como el juego sube al que sale a la ranura 0, basta con iluminar esa
-ranura. Así que esta entrada deja de ser urgente y pasa a ser lo que falta para
-lo demás.
+Aquí hubo escrito que esto ya no bloqueaba nada, porque "el juego sube al que
+sale a la ranura 0". **Eso era falso** y lo desmintió una partida: el equipo era
+[PEZGATO, A BUENO], peleaba A BUENO y la ranura 0 seguía siendo PEZGATO. El
+resaltado se rehízo buscando la copia, no mirando la ranura.
 
-Para qué sigue haciendo falta:
+Lo que falta por esto, hoy:
 
+- **Apagar el borde entre combate y combate.** Está pedido. Ahora mismo, al
+  acabar la pelea la marca se queda sobre el último que peleó, porque la copia no
+  se borra. Antes del primer combate de la sesión no se ilumina nadie, que es lo
+  correcto; el hueco es el "después".
 - **La pantalla de fin de partida**, para distinguir "se te cayó el equipo" de
   "estás a mitad de un combate y te quedan tres en la caja".
 - **Las medallas y la Liga**, que son banderas del mismo sitio.
-- Dejar de decir "al frente" y poder decir "peleando" sin mentir el resto del
-  tiempo.
 
 Se encuentra comparando dos estados de la misma partida, uno en mitad de una
 pelea y otro caminando, y mirando qué cambia: es el método con el que se

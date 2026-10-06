@@ -122,6 +122,14 @@ export type EquipoResumen = {
    * podria pisar a uno nuevo y el equipo del companero daria saltos atras.
    */
   momento: number;
+  /**
+   * La personalidad del que esta peleando, o null si no se sabe.
+   *
+   * Viaja con el equipo en vez de calcularlo quien recibe, y no es un capricho:
+   * para saberlo hay que mirar la memoria de la partida, y la del companero no
+   * sale de su ordenador. Lo manda quien puede saberlo.
+   */
+  peleando?: number | null;
 };
 
 /**

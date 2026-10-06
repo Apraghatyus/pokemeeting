@@ -1,20 +1,24 @@
-// El orden del panel y quién va al frente.
+// El panel ensena el equipo como lo tiene el juego.
 //
-// Existe por algo que se vio jugando: el panel se barajaba solo en mitad de un
-// combate. No estaba leyendo mal; es que tercera generación **intercambia de
-// verdad las ranuras del equipo** cuando sacas otro Pokémon, y el que entra pasa
-// a ser el primero. O sea que el panel acertaba mirando la memoria y parecía
-// equivocarse mirando la pantalla.
+// Antes aqui se probaba lo contrario: que el panel NO se barajara, recordando el
+// orden en que habian aparecido. Se hizo creyendo que tercera generacion sube a
+// la ranura 0 al que sale a pelear, y por tanto que el orden de memoria bailaba
+// en combate.
 //
-// Se arregla recordando el orden en que aparecieron. Y de paso cae gratis lo
-// otro: si el que pelea está siempre en la ranura 0, iluminar esa ranura es
-// iluminar al que pelea, sin tener que detectar el combate.
+// Una partida de verdad desmintio las dos cosas a la vez: el equipo en el juego
+// era [PEZGATO, A BUENO], el panel ensenaba [A BUENO, PEZGATO] -porque el orden
+// "estable" se habia quedado con otro reparto- y encima iluminaba a PEZGATO
+// mientras peleaba A BUENO.
+//
+// Asi que ahora manda el juego. El orden del panel tiene que poder compararse
+// con la lista del propio juego mirando la pantalla, que es lo que hace el
+// jugador.
 //
 // Uso: npx tsx tools/tests/test-orden.mjs
 import { pathToFileURL } from 'node:url';
 
-const { ordenarEstable } = await import(
-  pathToFileURL(`${process.cwd()}/apps/web/src/core/ordenEstable.ts`).href
+const { ordenarComoElJuego } = await import(
+  pathToFileURL(`${process.cwd()}/apps/web/src/core/ordenEquipo.ts`).href
 );
 
 let fallos = 0;
@@ -23,110 +27,67 @@ const check = (nombre, ok, detalle = '') => {
   if (!ok) fallos += 1;
 };
 
-/** Un Pokemon: su mote hace de identidad legible y la personalidad de real. */
 const pk = (mote, ranura, personalidad) => ({
-  ranura,
-  especie: 1,
-  mote,
-  nivel: 10,
-  estado: null,
-  tipos: null,
-  huevo: false,
-  personalidad,
+  ranura, especie: 1, mote, nivel: 10,
+  estado: null, tipos: null, huevo: false, personalidad,
 });
 
-const equipo = (...ranuras) => ({ juego: 'BPGS', momento: 0, ranuras });
+const equipo = (ranuras, peleando = null) => ({ juego: 'BPES', momento: 0, ranuras, peleando });
 const motes = (r) => r.map((x) => x.mote).join(',');
 
-// --- el caso que lo destapo ---
-// Cuatro Pokemon; el jugador los conoce en este orden.
-const inicial = equipo(
-  pk('Noay', 0, 101),
-  pk('Juja', 1, 102),
-  pk('Pxndx', 2, 103),
-  pk('Huesitos', 3, 104),
+// --- EL CASO QUE LO DESTAPO ---
+// En el juego: PEZGATO el primero, A BUENO el segundo. Peleando, A BUENO.
+const real = equipo([pk('PEZGATO', 0, 101), pk('A BUENO', 1, 102)], 102);
+const puesto = ordenarComoElJuego(real);
+
+check('el panel ensena el mismo orden que la lista del juego',
+  motes(puesto.ranuras) === 'PEZGATO,A BUENO', motes(puesto.ranuras));
+check('y el iluminado es el que pelea, no el primero',
+  puesto.alFrente === 102, String(puesto.alFrente));
+
+const dondeEsta = puesto.ranuras.findIndex((r) => r.personalidad === puesto.alFrente);
+check('o sea que la marca cae en el segundo de la lista', dondeEsta === 1,
+  `esta en el puesto ${dondeEsta}`);
+
+// --- sin combate no se ilumina a nadie ---
+// Una marca permanente sobre el primero no dice nada, y encima enganaba: parecia
+// que ese estaba peleando cuando solo era el primero de la lista.
+const paseando = ordenarComoElJuego(equipo([pk('PEZGATO', 0, 101), pk('A BUENO', 1, 102)]));
+check('fuera de combate no se ilumina a nadie', paseando.alFrente === null,
+  String(paseando.alFrente));
+check('pero el equipo se sigue viendo entero', paseando.ranuras.length === 2);
+
+// --- el orden lo manda la ranura, venga como venga ---
+// El lector local ya los da en orden, pero el del companero llega por la red.
+const desordenado = ordenarComoElJuego(
+  equipo([pk('Tercero', 2, 203), pk('Primero', 0, 201), pk('Segundo', 1, 202)]),
 );
+check('lo que llega de fuera se ordena igual',
+  motes(desordenado.ranuras) === 'Primero,Segundo,Tercero', motes(desordenado.ranuras));
 
-const primera = ordenarEstable(inicial, []);
-check('la primera vez manda la memoria', motes(primera.ranuras) === 'Noay,Juja,Pxndx,Huesitos',
-  motes(primera.ranuras));
-check('y el que va al frente es el de la ranura 0', primera.alFrente === 101);
-
-// En combate sacas a Huesitos: el juego lo sube a la ranura 0 y baja a Noay.
-const enCombate = equipo(
-  pk('Huesitos', 0, 104),
-  pk('Juja', 1, 102),
-  pk('Pxndx', 2, 103),
-  pk('Noay', 3, 101),
+// --- cambiar de Pokemon mueve la marca, no la lista ---
+const antes = ordenarComoElJuego(
+  equipo([pk('PEZGATO', 0, 101), pk('A BUENO', 1, 102)], 101),
 );
-
-const segunda = ordenarEstable(enCombate, primera.orden);
-check('al cambiar de Pokemon el panel NO se baraja',
-  motes(segunda.ranuras) === 'Noay,Juja,Pxndx,Huesitos', motes(segunda.ranuras));
-
-// Y lo que se gana: quien esta peleando es quien ocupa la ranura 0.
-const alFrente = segunda.ranuras.find((r) => r.personalidad === segunda.alFrente);
-check('y el iluminado es el que acaba de salir a pelear', alFrente?.mote === 'Huesitos',
-  alFrente?.mote ?? 'ninguno');
-
-// La que destapo el fallo que veia el jugador: "se queda solo con el primero".
-// El panel pinta en este orden, asi que el iluminado tiene que ser el CUARTO
-// de la lista, no el primero. Mientras el frente se dijo como ranura -siempre
-// 0- y el panel recoloco por ranura, la marca no se movia nunca de arriba.
-const puestoIluminado = segunda.ranuras.findIndex((r) => r.personalidad === segunda.alFrente);
-check('y la marca se mueve de sitio en el panel, no se queda en la primera ficha',
-  puestoIluminado === 3, `estaba en el puesto ${puestoIluminado}`);
-
-// Volver al primero lo devuelve al frente, sin mover el panel.
-const tercera = ordenarEstable(inicial, segunda.orden);
-check('volver a cambiar tampoco baraja nada',
-  motes(tercera.ranuras) === 'Noay,Juja,Pxndx,Huesitos', motes(tercera.ranuras));
-check('y el frente vuelve con el',
-  tercera.ranuras.find((r) => r.personalidad === tercera.alFrente)?.mote === 'Noay');
-
-// --- uno nuevo entra por el final, no por donde diga la memoria ---
-const conCapturado = equipo(
-  pk('Huesitos', 0, 104),
-  pk('Juja', 1, 102),
-  pk('Pxndx', 2, 103),
-  pk('Noay', 3, 101),
-  pk('Nuevo', 4, 105),
+const despues = ordenarComoElJuego(
+  equipo([pk('PEZGATO', 0, 101), pk('A BUENO', 1, 102)], 102),
 );
-const cuarta = ordenarEstable(conCapturado, segunda.orden);
-check('un Pokemon nuevo entra al final',
-  motes(cuarta.ranuras) === 'Noay,Juja,Pxndx,Huesitos,Nuevo', motes(cuarta.ranuras));
+check('al cambiar de Pokemon la lista no se mueve',
+  motes(antes.ranuras) === motes(despues.ranuras), motes(despues.ranuras));
+check('pero la marca si', antes.alFrente === 101 && despues.alFrente === 102);
 
-// --- y uno que se va, desaparece sin descolocar al resto ---
-const sinPxndx = equipo(pk('Huesitos', 0, 104), pk('Juja', 1, 102), pk('Noay', 2, 101));
-const quinta = ordenarEstable(sinPxndx, cuarta.orden);
-check('el que ya no esta desaparece y los demas no se mueven',
-  motes(quinta.ranuras) === 'Noay,Juja,Huesitos', motes(quinta.ranuras));
-
-// --- dos con el mismo mote no se confunden ---
-// Por eso se identifican por personalidad y no por el nombre.
-const gemelos = equipo(pk('Eevee', 0, 201), pk('Eevee', 1, 202));
-const sexta = ordenarEstable(gemelos, []);
-const gemelosAlReves = equipo(pk('Eevee', 0, 202), pk('Eevee', 1, 201));
-const septima = ordenarEstable(gemelosAlReves, sexta.orden);
-check('dos con el mismo mote mantienen cada uno su sitio',
-  septima.ranuras.map((r) => r.personalidad).join(',') === '201,202',
-  septima.ranuras.map((r) => r.personalidad).join(','));
-
-// --- casos de borde ---
-const vacia = ordenarEstable(null, [101, 102]);
-check('sin equipo no hay nadie al frente', vacia.alFrente === null);
-check('pero no se olvida el orden aprendido', vacia.orden.join(',') === '101,102',
-  vacia.orden.join(','));
-
-const sinNada = ordenarEstable(equipo(), []);
+// --- bordes ---
+const vacia = ordenarComoElJuego(null);
+check('sin equipo no hay nada que colocar', vacia.ranuras.length === 0 && vacia.alFrente === null);
 check('un equipo vacio tampoco rompe nada',
-  sinNada.ranuras.length === 0 && sinNada.alFrente === null);
+  ordenarComoElJuego(equipo([])).ranuras.length === 0);
 
-// --- si nadie ocupa la ranura 0, no se ilumina nada ---
-// Preferible ninguna marca a una marca en el que no es.
-const sinCabeza = ordenarEstable(equipo(pk('Juja', 1, 102)), []);
-check('sin nadie en la ranura 0 no se ilumina nadie', sinCabeza.alFrente === null,
-  String(sinCabeza.alFrente));
+// Dos con el mismo mote no se confunden: se identifican por personalidad.
+const gemelos = ordenarComoElJuego(
+  equipo([pk('Eevee', 0, 201), pk('Eevee', 1, 202)], 202),
+);
+check('con dos motes iguales se ilumina el que toca',
+  gemelos.ranuras.findIndex((r) => r.personalidad === gemelos.alFrente) === 1);
 
-console.log(fallos === 0 ? '\nEL PANEL NO SE BARAJA SOLO' : `\n${fallos} COMPROBACIONES FALLIDAS`);
+console.log(fallos === 0 ? '\nEL PANEL SE PARECE AL JUEGO' : `\n${fallos} COMPROBACIONES FALLIDAS`);
 process.exit(fallos === 0 ? 0 : 1);
