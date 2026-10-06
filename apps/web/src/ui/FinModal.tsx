@@ -10,6 +10,7 @@
 
 import type { EquipoResumen } from '@emupoke/protocol';
 import type { Especies } from '../core/useEspecies';
+import { Medallas } from './Medallas';
 import { Modal } from './Modal';
 
 type Props = {
@@ -18,6 +19,8 @@ type Props = {
   especies: Especies;
   /** Como se llama la partida, si es una aleatorizada con nombre. */
   nombrePartida: string | null;
+  /** Cuales se consiguieron. Vacio si de este juego no se saben leer. */
+  medallas: readonly boolean[];
   onContinuar: () => void;
   onReiniciar: () => void;
   onDescartar: () => void;
@@ -28,6 +31,7 @@ export const FinModal = ({
   equipo,
   especies,
   nombrePartida,
+  medallas,
   onContinuar,
   onReiniciar,
   onDescartar,
@@ -73,9 +77,9 @@ export const FinModal = ({
           </section>
         )}
 
-        {/* Las medallas y el avance en la Liga irian aqui. Todavia no se leen de
-            la memoria, y enseñar un marcador vacio o inventado seria peor que no
-            enseñar nada: ver docs/ideas-pendientes.md. */}
+        {/* Si de este juego todavia no se saben leer, no sale nada: un marcador
+            a cero para quien tiene cuatro medallas miente mas que callarse. */}
+        <Medallas conseguidas={medallas} />
 
         <div className="fin__salidas">
           <button type="button" className="button--primary button--wide" onClick={onReiniciar}>

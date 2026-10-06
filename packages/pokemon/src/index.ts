@@ -16,3 +16,4 @@ export * from './lectores';
 export * from './resumen';
 export * from './soullink';
 export * from './derrota';
+export * from './medallas';

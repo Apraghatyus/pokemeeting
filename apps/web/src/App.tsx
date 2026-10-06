@@ -275,6 +275,7 @@ export const App = () => {
           equipo={fin.equipoFinal}
           especies={especies}
           nombrePartida={nombreDeLaPartidaEnCurso(state.header?.crc32 ?? null)}
+          medallas={miEquipo.medallas.conseguidas}
           onContinuar={fin.continuar}
           onDescartar={fin.descartar}
           onReiniciar={() => {

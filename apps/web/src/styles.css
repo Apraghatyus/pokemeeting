@@ -3764,3 +3764,60 @@ details.partidas[open] > summary::before {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- medallas ---------- */
+
+.medallas {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 560px) {
+  .medallas {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.medalla {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 4px;
+  border-radius: 10px;
+}
+
+/* La que falta, apagada y con el borde punteado: se ve que ahi habia algo que
+   conseguir, que es justo lo que cuenta la pantalla de fin de partida. */
+.medalla__marca {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px dashed var(--border);
+  background: transparent;
+}
+
+.medalla__nombre {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  opacity: 0.55;
+  text-align: center;
+}
+
+.medalla--tiene .medalla__marca {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  box-shadow: 0 0 12px -2px var(--accent);
+}
+
+.medalla--tiene .medalla__nombre {
+  color: var(--text);
+  opacity: 1;
+}

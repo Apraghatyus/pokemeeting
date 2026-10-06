@@ -211,6 +211,36 @@ pestañas o en secciones plegadas, porque alargarlos más no arregla nada.
 
 ---
 
+## Las medallas: falta medir la direccion
+
+Lo de alrededor esta hecho: se leen del estado, se dibujan las ocho -las
+conseguidas a color y las que faltaron apagadas- y salen en la pantalla de fin
+de partida. Lo unico que falta es **donde** vive el byte.
+
+Y no se puede deducir. Las medallas son banderas, bits sueltos, y un byte de
+banderas no se distingue de cualquier otro byte: no tiene forma que buscar, al
+reves que el equipo, que se encuentra por su checksum. Rojo Fuego y Verde Hoja
+ademas **mueven sus bloques de guardado**, asi que tampoco vale una direccion
+fija, que es la misma razon por la que el equipo se busca en vez de leerse de
+una constante.
+
+Hay herramienta para medirlo: `npm run buscar:medallas -- antes.bin despues.bin`.
+Compara dos estados de la misma partida, uno antes y otro despues de ganar un
+gimnasio, y se queda con los bytes que cuadran con "las medallas se ganan en
+orden y no se pierden" -o sea, los que solo valen 0, 1, 3, 7...-. Con un tercer
+estado de otra medalla mas, lo que quede se cae solo.
+
+Para sacar los dos estados: menu ⋮ → Exportar estado, antes de entrar al
+combate del lider y despues de ganar.
+
+Mientras no se mida, `leerMedallas` devuelve "no se sabe" y la tarjeta no sale.
+Es deliberado: enseñar cero medallas a quien tiene cuatro miente mas que
+callarse. Y cuando se mida, hay una comprobacion que protege de medir mal: si el
+byte no es un prefijo de bits, se da por desconocido en vez de contar bits de
+cualquier sitio.
+
+---
+
 ## Saber que hay un combate en marcha
 
 Se intentó y se tumbó, que es más útil que no haberlo intentado: el juego copia

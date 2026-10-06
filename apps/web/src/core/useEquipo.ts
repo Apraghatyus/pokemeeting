@@ -15,7 +15,15 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EquipoResumen } from '@emupoke/protocol';
-import { enDerrota, mismoEquipo, releerEquipo, resumirEquipo } from '@emupoke/pokemon';
+import {
+  enDerrota,
+  leerMedallas,
+  mismoEquipo,
+  releerEquipo,
+  resumirEquipo,
+  SIN_SABER,
+  type Medallas,
+} from '@emupoke/pokemon';
 import type { MgbaModule } from './mgbaCore';
 import type { Especies } from './useEspecies';
 
@@ -45,6 +53,8 @@ export type EstadoEquipo = {
    * lecturas.
    */
   derrota: boolean;
+  /** Las medallas conseguidas, o "no se sabe" si de este juego aun no se leen. */
+  medallas: Medallas;
   /**
    * Si este juego permite leer el equipo.
    *
@@ -70,6 +80,7 @@ export const useEquipo = (
   const [equipo, setEquipo] = useState<EquipoResumen | null>(null);
   const [disponible, setDisponible] = useState(true);
   const [derrota, setDerrota] = useState(false);
+  const [medallas, setMedallas] = useState<Medallas>(SIN_SABER);
 
   const direccionRef = useRef<number | null>(null);
   const juegoRef = useRef<string>('');
@@ -126,6 +137,7 @@ export const useEquipo = (
 
       // Se mira en el mismo estado que acabamos de leer.
       setDerrota(enDerrota(estado));
+      setMedallas(leerMedallas(estado, juegoRef.current || leido?.juego || ''));
 
       setDisponible(true);
       if (mismoEquipo(ultimoRef.current, leido)) return;
@@ -149,6 +161,7 @@ export const useEquipo = (
     setEquipo(null);
     setDisponible(true);
     setDerrota(false);
+    setMedallas(SIN_SABER);
 
     if (!jugando) return;
 
@@ -162,5 +175,5 @@ export const useEquipo = (
     };
   }, [jugando, romName, mirar]);
 
-  return { equipo, disponible, derrota };
+  return { equipo, disponible, derrota, medallas };
 };
