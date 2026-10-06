@@ -133,13 +133,25 @@ const conMiPantallaVisible = await fpsQueLlegan(5);
 check('mientras se ve tu partida, al otro le llega en movimiento',
   conMiPantallaVisible >= MINIMO, `${conMiPantallaVisible.toFixed(1)} fps`);
 
+// Que equipo se esta ensenando, por su titulo.
+const tituloDelEquipo = () =>
+  movil.evaluate(() => document.querySelector('.equipo__titulo')?.textContent?.trim() ?? '');
+
 // --- se cambia de pantalla deslizando ---
 await deslizar(-140, 0);
 const despues = await visible();
 check('deslizando se pasa a la pantalla del companero', !despues.mia);
 
+// Y con ella su equipo, que es una sola decision y no dos. Antes iban por
+// separado -la pantalla lo llevaba el componente y el equipo la aplicacion- y
+// se desincronizaban: deslizabas a su partida y seguias viendo tu equipo.
+check('y con ella su equipo', /companero/i.test(await tituloDelEquipo()),
+  await tituloDelEquipo());
+
 await deslizar(140, 0);
 check('y deslizando al otro lado se vuelve a la tuya', (await visible()).mia);
+check('con tu equipo otra vez', /Tu equipo/i.test(await tituloDelEquipo()),
+  await tituloDelEquipo());
 await deslizar(-140, 0);
 
 const conMiPantallaOculta = await fpsQueLlegan(6);
@@ -161,19 +173,23 @@ const equipoVisible = () =>
     titulo: document.querySelector('.equipo__titulo')?.textContent?.trim() ?? '',
   }));
 
+// Venimos del tercer deslizamiento, asi que lo que se ve es lo suyo.
 const equipoAntes = await equipoVisible();
 check('en movil se enseña un equipo, no dos', equipoAntes.cuantos === 1, `${equipoAntes.cuantos}`);
-check('y empieza por el tuyo', /Tu equipo/i.test(equipoAntes.titulo), equipoAntes.titulo);
+check('y es el del lado que se esta mirando', /companero/i.test(equipoAntes.titulo),
+  equipoAntes.titulo);
 
+// El boton hace lo mismo que el gesto: las dos formas mueven la misma decision.
 await movil.locator('.equipo__cambiar').click();
 await movil.waitForTimeout(500);
 const equipoDespues = await equipoVisible();
-check('el boton cambia al equipo de tu companero', /companero/i.test(equipoDespues.titulo),
+check('el boton te devuelve a lo tuyo', /Tu equipo/i.test(equipoDespues.titulo),
   equipoDespues.titulo);
+check('y la pantalla grande vuelve contigo', (await visible()).mia);
 
 await movil.locator('.equipo__cambiar').click();
 await movil.waitForTimeout(500);
-check('y vuelve al tuyo', /Tu equipo/i.test((await equipoVisible()).titulo));
+check('y otra vez a lo suyo', /companero/i.test((await equipoVisible()).titulo));
 
 await navegador.close();
 console.log(fallos === 0 ? '\nEL CAMBIO DE PANTALLA NO CORTA LA TRANSMISION' : `\n${fallos} COMPROBACIONES FALLIDAS`);

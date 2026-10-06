@@ -151,6 +151,13 @@ export const App = () => {
   // sobre la partida dejaba al jugador de movil sin botones, porque el
   // navegador en pantalla completa pinta unicamente ese elemento.
   const marcoDeJuego = useRef<HTMLDivElement | null>(null);
+  /**
+   * Si se esta mirando lo del companero: su partida y su equipo.
+   *
+   * Es una sola decision y por eso es un solo estado. Antes la pantalla lo
+   * llevaba por su cuenta y el equipo por la suya, y se desincronizaban:
+   * deslizabas a su partida y seguias viendo tu equipo.
+   */
   const [verSuEquipo, setVerSuEquipo] = useState(false);
   const unoSolo = estrecha && conCompanero;
 
@@ -190,6 +197,10 @@ export const App = () => {
           <div className="mesa__centro">
         <Stage
           marcoCompleto={marcoDeJuego}
+          /* La pantalla y el equipo que se ensenan son la misma decision: al
+             deslizar a su partida tiene que verse tambien su equipo. */
+          mirandoLoSuyo={verSuEquipo}
+          onCambiarPantalla={() => setVerSuEquipo((v) => !v)}
           canvasRef={emulator.canvasRef}
           remoteStream={session.state.remoteStream}
           /* El nombre del fichero de su ROM no le dice nada a nadie, y ademas

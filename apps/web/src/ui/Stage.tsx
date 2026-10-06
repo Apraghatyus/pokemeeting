@@ -30,6 +30,16 @@ type Props = {
    * Sin este dato se usa la pantalla, que es lo correcto en escritorio.
    */
   marcoCompleto?: RefObject<HTMLElement | null>;
+  /**
+   * Si se esta mirando lo del companero en vez de lo propio.
+   *
+   * Vive fuera y no aqui porque **no es solo de que pantalla va**: en movil solo
+   * cabe un equipo a la vez, y al cambiar de pantalla tiene que cambiar tambien
+   * el equipo que se ensena. Teniendolo cada uno por su lado, deslizabas a su
+   * partida y seguias viendo tu equipo, que es lo que se reporto.
+   */
+  mirandoLoSuyo: boolean;
+  onCambiarPantalla: () => void;
 };
 
 /**
@@ -225,10 +235,11 @@ export const Stage = ({
   dropzone,
   controles,
   marcoCompleto,
+  mirandoLoSuyo,
+  onCambiarPantalla,
 }: Props) => {
   const marcoRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [swapped, setSwapped] = useState(false);
   const connected = remoteStream !== null;
   const { esquina, arrastrando, desplazamiento, alPulsar } = useArrastre(marcoRef);
   // En movil la ventana se queda donde esta: ver useEsEstrecha.
@@ -238,8 +249,9 @@ export const Stage = ({
   // Y ahi se cambia de pantalla deslizando, no con un boton: en una pantalla
   // pequeña un boton mas es sitio que se le quita a la partida.
   const puedeDeslizar = estrecha && connected;
-  const { desplazado, deslizando, alPulsar: alDeslizar } = useDeslizar(puedeDeslizar, () =>
-    setSwapped((v) => !v),
+  const { desplazado, deslizando, alPulsar: alDeslizar } = useDeslizar(
+    puedeDeslizar,
+    onCambiarPantalla,
   );
   const [fullscreen, setFullscreen] = useState(false);
 
@@ -267,7 +279,7 @@ export const Stage = ({
 
   // Sin companero no hay segunda pantalla: la tuya se queda todo el alto.
   const tamano = (mia: boolean) =>
-    !connected || mia !== swapped ? 'pantalla--grande' : 'pantalla--pequena';
+    !connected || mia !== mirandoLoSuyo ? 'pantalla--grande' : 'pantalla--pequena';
 
   return (
     <div
@@ -285,11 +297,11 @@ export const Stage = ({
     >
       <div
         className={`pantalla ${tamano(true)}${
-          swapped ? ` pantalla--${esquina}${arrastrando ? ' pantalla--arrastrando' : ''}` : ''
+          mirandoLoSuyo ? ` pantalla--${esquina}${arrastrando ? ' pantalla--arrastrando' : ''}` : ''
         }`}
-        onPointerDown={swapped && seArrastra ? alPulsar : undefined}
+        onPointerDown={mirandoLoSuyo && seArrastra ? alPulsar : undefined}
         style={
-          swapped && arrastrando
+          mirandoLoSuyo && arrastrando
             ? { transform: `translate(${desplazamiento.x}px, ${desplazamiento.y}px)` }
             : undefined
         }
@@ -317,7 +329,7 @@ export const Stage = ({
         {/* El boton de intercambiar va en las dos pantallas y el CSS lo enseña
             solo en la pequena. Si estuviera solo en la del companero, al
             intercambiar desapareceria y no habria forma de volver. */}
-        {connected && <BotonIntercambiar onSwap={() => setSwapped((v) => !v)} />}
+        {connected && <BotonIntercambiar onSwap={() => onCambiarPantalla()} />}
         {!hasRom && <div className="pantalla__encima">{dropzone}</div>}
       </div>
 
@@ -325,8 +337,8 @@ export const Stage = ({
         // Dos puntos para que se vea que hay otra pantalla detras. Sin esto,
         // nadie adivina que se puede deslizar.
         <div className="pantallas__puntos" aria-hidden="true">
-          <span className={swapped ? '' : 'is-aqui'} />
-          <span className={swapped ? 'is-aqui' : ''} />
+          <span className={mirandoLoSuyo ? '' : 'is-aqui'} />
+          <span className={mirandoLoSuyo ? 'is-aqui' : ''} />
         </div>
       )}
 
@@ -347,7 +359,7 @@ export const Stage = ({
             <span className="dot dot--on" />
             {partnerLabel}
           </span>
-          <BotonIntercambiar onSwap={() => setSwapped((v) => !v)} />
+          <BotonIntercambiar onSwap={() => onCambiarPantalla()} />
         </div>
       )}
     </div>

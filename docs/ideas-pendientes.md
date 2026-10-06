@@ -143,6 +143,22 @@ causa no era la que parecía. Guardar el porqué ahorra volver a investigarlo.
   se probaba lo tocaba. La ñ real es 0x29 y la Ñ 0x14, comprobadas buscando
   "pequeño" y "SEÑOR" en la ROM espanola. Lo vigila `npm run test:texto`, que
   recorre los dos abecedarios enteros en vez de mirar letras sueltas.
+- **A pantalla completa en vertical, el equipo "desaparecia".** No desaparecia:
+  quedaba DEBAJO de la partida. La regla de pantalla completa, escrita para
+  escritorio, reparte el alto entre la mesa y el mando con `flex: 1`, y lleva dos
+  clases y una pseudoclase contra la sola clase de la regla del movil, que ya
+  decia lo correcto. Ganaba la de escritorio, el mando se quedaba con casi todo
+  el alto y la partida ya no cabia en la mesa. Medido en 360x740: la mesa recibia
+  214 pixeles para una partida que pide 229. Es el mismo tipo de fallo que el del
+  equipo del companero, dos entradas mas abajo: una regla de escritorio con mas
+  especificidad ganando dentro de una @media.
+- **Al cambiar de pantalla no cambiaba el equipo.** En movil solo cabe un equipo
+  a la vez, y deslizar a la partida del companero seguia ensenando el tuyo. La
+  pantalla llevaba su estado dentro del componente y el equipo lo llevaba la
+  aplicacion, asi que podian discrepar. Ahora es **un solo estado**: "estoy
+  mirando lo suyo" decide las dos cosas, y el boton y el gesto mueven lo mismo.
+  Lo vigila `test:cambio`, que ya probaba el gesto y ahora comprueba tambien que
+  el equipo lo sigue.
 - **En movil, el equipo del companero se quedaba en columna.** Dos fichas
   apiladas en vez de una tira, y eso empujaba el mando fuera de la pantalla. La
   causa no estaba en las clases, que estaban bien: en escritorio su lista crece

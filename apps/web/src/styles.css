@@ -2508,6 +2508,21 @@ details.partidas[open] > summary::before {
     flex: 0 0 auto;
   }
 
+  /* Y a pantalla completa tambien, que es donde se perdia el equipo.
+   *
+   * Justo encima se dice `flex: 0 0 auto` para que cada cosa ocupe lo suyo.
+   * Pero la regla de pantalla completa, que esta mucho mas arriba y pensada
+   * para escritorio, dice `flex: 1` con dos clases y una pseudoclase contra una
+   * sola clase de aqui. Ganaba ella.
+   *
+   * Y con `flex: 1` el mando, que tiene mucho contenido, se quedaba con casi
+   * todo el alto: medido en un movil de 360x740, la mesa recibia 214 pixeles
+   * para una partida que pide 229, asi que la partida se desbordaba y tapaba al
+   * equipo. No desaparecia, quedaba debajo. */
+  .juego:fullscreen .mesa {
+    flex: 0 0 auto;
+  }
+
   .mesa__centro {
     order: -1;
     /* La partida manda sobre el alto de la ventana, no sobre el hueco: debajo

@@ -110,6 +110,56 @@ const desborda = await page.evaluate(
 );
 check('la pagina no se desplaza a lo ancho', desborda === false);
 
+// --- 3. a pantalla completa, el equipo sigue debajo de la partida ---
+//
+// Aqui el equipo "desaparecia", y no desaparecia: quedaba DEBAJO de la partida.
+// La regla de pantalla completa, pensada para escritorio, reparte el alto entre
+// la mesa y el mando con `flex: 1`, y lleva dos clases y una pseudoclase contra
+// la sola clase de la regla del movil. Ganaba ella, el mando se quedaba con casi
+// todo el alto y la partida ya no cabia en la mesa: se desbordaba por encima del
+// equipo. Medido en 360x740: la mesa recibia 214 pixeles para una partida de 229.
+//
+// Por eso no se comprueba si el equipo "se ve" -se veia, segun el navegador-
+// sino que la partida quepa en su hueco, que es lo que fallaba.
+await page.getByRole('button', { name: 'Jugar tal cual' }).click({ timeout: 20_000 }).catch(() => {});
+await page.waitForTimeout(2500);
+
+await page.locator('.pantalla__boton--completa').first().click({ timeout: 8_000 });
+await page.waitForTimeout(1200);
+
+const completa = await page.evaluate(() => {
+  const caja = (sel) => {
+    const el = document.querySelector(sel);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { arriba: Math.round(r.top), abajo: Math.round(r.bottom) };
+  };
+  return {
+    enCompleta: document.fullscreenElement !== null,
+    centro: caja('.mesa__centro'),
+    partida: caja('.pantallas'),
+    equipo: caja('.equipo'),
+    mando: caja('.pad'),
+  };
+});
+
+check('se entra en pantalla completa', completa.enCompleta === true);
+
+if (completa.enCompleta && completa.centro && completa.partida) {
+  // Un pixel de margen: los redondeos del navegador no son un fallo.
+  check('la partida cabe en su hueco y no se desborda',
+    completa.partida.abajo <= completa.centro.abajo + 1,
+    `partida hasta ${completa.partida.abajo}, hueco hasta ${completa.centro.abajo}`);
+
+  check('el equipo queda DEBAJO de la partida, no tapado por ella',
+    completa.equipo.arriba >= completa.partida.abajo - 1,
+    `equipo desde ${completa.equipo.arriba}, partida hasta ${completa.partida.abajo}`);
+
+  check('y el mando debajo del equipo, que es el orden de siempre',
+    completa.mando.arriba >= completa.equipo.abajo - 1,
+    `mando desde ${completa.mando.arriba}, equipo hasta ${completa.equipo.abajo}`);
+}
+
 await navegador.close();
 console.log(fallos === 0 ? '\nEN MOVIL NO SE DESCOLOCA NADA' : `\n${fallos} COMPROBACIONES FALLIDAS`);
 process.exit(fallos === 0 ? 0 : 1);
