@@ -106,5 +106,25 @@ check('un huevo no pelea',
 
 check('la copia de combate ocupa 88 bytes', TAMANO_COMBATIENTE === 88);
 
+// --- la bandera de "hay combate" ---
+// Falta medirla, y hasta entonces tiene que decir que no lo sabe en vez de
+// inventarse un si o un no. "No lo se" y "no hay combate" no son lo mismo: solo
+// el segundo justifica apagar la marca amarilla.
+const { enCombate, DIRECCION_EN_COMBATE, quienPelea: qp } = pk;
+
+check('de ningun juego se sabe todavia donde esta la bandera de combate',
+  Object.keys(DIRECCION_EN_COMBATE).length === 0,
+  Object.keys(DIRECCION_EN_COMBATE).join(',') || 'ninguno');
+
+check('asi que se dice "no lo se", no "no hay combate"',
+  enCombate(vacio(), 'BPES') === null);
+
+// Y mientras no se sepa, no se deja de senalar a quien pelea: callarse por una
+// bandera que no tenemos seria perder lo que si funciona.
+check('sin bandera, se sigue senalando al que pelea',
+  qp(ponerCombatiente(vacio(), 0x8000, equipo.ranuras[1]), equipo, 'BPES') === 0x33334444);
+
+check('un juego que no existe tampoco rompe nada', enCombate(vacio(), 'ZZZ') === null);
+
 console.log(fallos === 0 ? '\nEL QUE PELEA NO SE ADIVINA' : `\n${fallos} COMPROBACIONES FALLIDAS`);
 process.exit(fallos === 0 ? 0 : 1);

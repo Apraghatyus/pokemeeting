@@ -22,7 +22,7 @@
 // cuadraria ninguno y esto diria "no lo se" en vez de senalar al que no es. Un
 // hueco honesto, que es como se hizo tambien con las medallas.
 
-import { region } from './savestate';
+import { desplazamientoDe, region } from './savestate';
 import type { EquipoResumen } from '@emupoke/protocol';
 
 /** Lo que ocupa la copia de combate de un Pokemon. */
@@ -41,20 +41,60 @@ const NIVEL = 0x2a;
 const PERSONALIDAD = 0x48;
 
 /**
+ * Donde vive la bandera de "hay un combate en marcha", por juego.
+ *
+ * Vacio a proposito: todavia no se ha medido ninguna. Anadir una entrada aqui es
+ * lo unico que hace falta, y el valor sale de `npm run buscar:combate`.
+ *
+ * Tiene que ser una direccion que valga **cero fuera del combate**, que es lo
+ * que comprueba `enCombate`. La herramienta las busca justo asi.
+ */
+export const DIRECCION_EN_COMBATE: Readonly<Record<string, number>> = {};
+
+/**
+ * Si hay un combate ahora mismo. Null si de este juego aun no se sabe.
+ *
+ * Null y false no son lo mismo y por eso no se devuelve un booleano: "no lo se"
+ * tiene que poder distinguirse de "no hay combate", porque solo el segundo
+ * justifica apagar la marca.
+ */
+export const enCombate = (estado: Uint8Array, codigoJuego: string): boolean | null => {
+  const direccion = DIRECCION_EN_COMBATE[codigoJuego.slice(0, 3).toUpperCase()];
+  if (direccion === undefined) return null;
+
+  const donde = desplazamientoDe(direccion);
+  if (!donde) return null;
+
+  const byte = estado[donde.offset];
+  if (byte === undefined) return null;
+
+  return byte !== 0;
+};
+
+/**
  * La personalidad del que esta peleando, o null si no se sabe.
  *
  * Devuelve null tambien cuando no hay combate: la copia no existe o no cuadra
  * con nadie del equipo.
  *
- * UN AVISO sobre lo que esto NO distingue: al acabar el combate, la copia se
- * queda ahi con lo ultimo que hubo. O sea que entre combate y combate esto sigue
- * senalando al ultimo que peleo. Se acepta porque la alternativa es peor -no
- * senalar a nadie- y porque en cuanto empieza el siguiente combate el juego
- * reescribe la copia con el que sale, que es cuando importa. Distinguir "hay
- * combate" de "lo hubo" sigue pendiente.
+ * UN AVISO sobre lo que esto NO distingue por si solo: al acabar el combate, la
+ * copia se queda ahi con lo ultimo que hubo, asi que entre combate y combate
+ * seguiria senalando al ultimo que peleo. Para eso esta `enCombate`, que se
+ * mira antes; mientras de este juego no se sepa donde esta esa bandera, el aviso
+ * sigue en pie.
  */
-export const quienPelea = (estado: Uint8Array, equipo: EquipoResumen | null): number | null => {
+export const quienPelea = (
+  estado: Uint8Array,
+  equipo: EquipoResumen | null,
+  /** Para mirar la bandera de combate, si de este juego ya se sabe donde esta. */
+  codigoJuego = '',
+): number | null => {
   if (!equipo || equipo.ranuras.length === 0) return null;
+
+  // Si consta que no hay combate, no hay nadie peleando y punto. Solo apaga con
+  // un "no" explicito: mientras no se sepa, se sigue senalando al ultimo, que
+  // es menos util pero no es mentira nueva.
+  if (codigoJuego && enCombate(estado, codigoJuego) === false) return null;
 
   try {
     const memoria = region(estado, 'ewram');

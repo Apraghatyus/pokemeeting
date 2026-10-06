@@ -311,10 +311,23 @@ resaltado se rehízo buscando la copia, no mirando la ranura.
 
 Lo que falta por esto, hoy:
 
-- **Apagar el borde entre combate y combate.** Está pedido. Ahora mismo, al
-  acabar la pelea la marca se queda sobre el último que peleó, porque la copia no
-  se borra. Antes del primer combate de la sesión no se ilumina nadie, que es lo
-  correcto; el hueco es el "después".
+- **Apagar el borde entre combate y combate.** Está pedido y es lo único que
+  falta de esa pantalla. Al acabar la pelea la marca se queda sobre el último que
+  peleó, porque la copia no se borra. Antes del primer combate de la sesión no se
+  ilumina nadie, que es lo correcto; el hueco es el "después".
+
+  **Todo lo demás está puesto.** `enCombate` ya se consulta antes de señalar a
+  nadie y `DIRECCION_EN_COMBATE` está vacío a propósito: añadir una entrada ahí
+  es lo único que falta. Y mientras esté vacío dice "no lo sé", que no es lo
+  mismo que "no hay combate": solo lo segundo apaga la marca, así que un hueco
+  no quita lo que ya funciona.
+
+  Hay herramienta: `npm run buscar:combate -- --dentro c1.bin --fuera m1.bin`.
+  Busca banderas en los dos sentidos -las que se encienden al entrar en combate y
+  las que se apagan- porque las dos existen y no se sabe cuál aparecerá antes.
+  Para sacar los estados, menú ⋮ → Exportar estado: uno con el menú de LUCHA en
+  pantalla y otro caminando por el mapa. Con dos de cada, de combates distintos y
+  de sitios distintos, lo que quede ya es candidato de verdad.
 - **La pantalla de fin de partida**, para distinguir "se te cayó el equipo" de
   "estás a mitad de un combate y te quedan tres en la caja".
 - **Las medallas y la Liga**, que son banderas del mismo sitio.

@@ -147,7 +147,7 @@ export const useEquipo = (
             ...r,
             tipos: especiesRef.current.tipos(r.especie),
           })),
-          peleando: quienPelea(estado, leido),
+          peleando: quienPelea(estado, leido, juegoRef.current || leido.juego),
         };
       }
 

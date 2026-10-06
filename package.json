@@ -61,6 +61,7 @@
     "test:bordes": "node tools/tests/test-bordes.mjs",
     "test:derrota": "npx tsx tools/tests/test-derrota.mjs",
     "test:combate": "npx tsx tools/tests/test-combate.mjs",
+    "buscar:combate": "node tools/buscar-combate.mjs",
     "test:victoria": "npx tsx tools/tests/test-victoria.mjs",
     "test:medallas": "npx tsx tools/tests/test-medallas.mjs",
     "buscar:medallas": "node tools/buscar-medallas.mjs",
