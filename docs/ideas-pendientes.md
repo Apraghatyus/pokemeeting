@@ -478,10 +478,12 @@ falta tres cosas, y las tres a la vez:
 3. Que el viaje de ida y vuelta sea lo bastante corto como para que esa espera no
    se note.
 
-**Lo que trae nuestro núcleo, comprobado en el binario**: el registro `SIOCNT`
-está, porque es parte del hardware, pero del controlador de enlace de mGBA
--`lockstep`- **no hay ni una aparición**, y el envoltorio de JavaScript no expone
-nada de enlace. O sea que con este paquete, tal cual viene, no se puede.
+**Lo que trae nuestro núcleo, comprobado dos veces**: en el binario de
+`@thenick775/mgba-wasm` 2.5.1 el registro `SIOCNT` aparece, porque es parte del
+hardware, pero del controlador de enlace de mGBA -`lockstep`- **no hay ni una
+aparición**. Y de las **48 funciones** que el paquete expone a JavaScript,
+**ninguna** tiene que ver con el puerto serie. O sea que con este paquete, tal
+cual viene, no se puede ni empezar.
 
 **Camino A: los dos juegos en la misma máquina.** Es como lo hace mGBA de
 escritorio, y es el que mejor funciona técnicamente: sin red de por medio, el
@@ -504,18 +506,61 @@ Y conviene separar los dos usos, porque no cuestan lo mismo:
   ya va justo -ver la sección de arriba-, el paso cerrado lo hunde del todo.
 
 **Camino C, el que ya está hecho: no emular el cable.** Para intercambiar no hace
-falta. El motor está escrito y probado: se copian los cien bytes del Pokémon de
-una partida a otra, validando contra la ROM **que recibe** para no crear un Bad
-Egg, y en dos fases para que nadie pierda nada si se corta la conexión. Le falta
-solo la interfaz. Es legal, es barato y funciona entre dos copias aleatorizadas
-distintas, que es justo lo que el cable de verdad NO sabría hacer.
+falta, y además el cable lo haría **peor**: entre dos copias aleatorizadas
+distintas, un intercambio por cable entregaría un Pokémon con las estadísticas de
+la ROM de origen, y el que lo recibe se lo quedaría así media partida.
+
+Lo que hay escrito y probado, función por función:
+
+- `prepararOferta` saca los cien bytes del Pokémon **sin borrarlo**. Mientras el
+  otro no confirme, tu partida sigue intacta.
+- `aplicarRecepcion` lo mete en la tuya, y hace tres cosas que no son obvias:
+  valida los índices contra los límites de **la ROM que recibe** -un movimiento
+  que existe en su copia puede no existir en la tuya, y eso no da un Pokémon
+  raro, da un Bad Egg-, **recalcula las estadísticas** con la tabla de tu ROM, y
+  al terminar vuelve a leer el equipo para comprobar que quedó bien escrito. Si
+  algo no cuadra, lanza en vez de dejarte la partida tocada.
+- `describirTrato` explica en palabras lo que cambia al cruzar dos copias.
+
+Y el camino de vuelta también existe: el estado modificado se escribe en el
+sistema de ficheros del núcleo y se carga, que es lo mismo que hace el menú de
+cargar estado.
+
+**Lo que falta, concretamente:**
+
+1. **Cuatro mensajes en el protocolo** (ofrezco / acepto / confirmo / cancelo) con
+   su validación. Hoy `PeerMessage` solo tiene `equipo`, pero el canal de datos
+   ya está abierto y `peer.send` acepta cualquier JSON.
+2. **La pantalla**: elegir el Pokémon, enseñar lo que dice `describirTrato`, y
+   confirmar.
+3. **Resolver la duplicación**, que es el problema de diseño de verdad y conviene
+   verlo antes de escribir nada. Aquí no hay un servidor que arbitre: cada uno
+   edita su propia partida. Si A aplica lo de B y la conexión se corta antes de
+   que B aplique lo de A, **B se queda con el suyo y A tiene los dos**. Eso es un
+   duplicado, y en una Nuzlocke es peor que perder el Pokémon. Lo que hay que
+   decidir es el orden de los pasos para que la ventana mala sea "ninguno de los
+   dos lo ha aplicado" en vez de "solo uno". Las dos fases del motor están para
+   eso, pero el acuerdo entre los dos lados está por escribir.
+4. **Un momento seguro para aplicarlo.** Aplicar un intercambio carga un estado
+   modificado, y hacerlo en mitad de un combate o de un diálogo es pedir
+   problemas. Lo razonable es exigir que las dos partidas estén en el mapa, que
+   ahora mismo **ya se sabe comprobar**: `enCombate` existe desde que se arregló
+   el borde amarillo.
 
 Para combatir no hay equivalente: un combate por cable es un protocolo en vivo y
-no se puede falsear editando memoria. Si algún día se quiere combate sin cable,
-lo que habría que hacer es un **simulador fuera del juego** -leer los dos equipos
-y resolver el combate en JavaScript- con la ventaja de que las estadísticas y los
-tipos ya se saben leer de cada ROM, y el inconveniente de que es un proyecto
-entero aparte.
+no se puede falsear editando memoria.
+
+**La alternativa sin cable sería un simulador fuera del juego**: leer los dos
+equipos y resolver el combate en JavaScript, como hacen los simuladores de
+internet. Lo que ya se tiene es más de lo que parece: de cada Pokémon se leen sus
+**cuatro movimientos** (van en los cien bytes) y de cada especie sus
+**estadísticas base y sus tipos**, de la ROM de cada uno, así que funcionaría
+también entre copias aleatorizadas distintas. Lo que falta es la **tabla de
+movimientos** -potencia, tipo, precisión, efecto-, que está en la ROM y se
+localiza igual que las otras dos, y después las mecánicas de combate de tercera
+generación enteras: fórmula de daño, prioridades, estados, habilidades, objetos,
+críticos y su generador de números. Eso último es el proyecto aparte, y no es
+pequeño.
 
 **La recomendación**, con lo que se sabe hoy: hacer la interfaz del intercambio
 por el camino C, que está a un paso, y no tocar el cable hasta que eso esté en
