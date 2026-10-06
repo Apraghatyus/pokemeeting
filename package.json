@@ -22,6 +22,7 @@
     "test:mando": "node tools/tests/test-mando.mjs",
     "test:controles": "node tools/tests/test-controles.mjs",
     "test:movil:mando": "node tools/tests/test-movil-mando.mjs",
+    "test:movil:colocacion": "node tools/tests/test-movil-colocacion.mjs",
     "test:menu": "node tools/tests/test-menu.mjs",
     "test:equipo:rival": "npx tsx tools/tests/test-equipo-rival.mjs",
     "test:roms": "npx tsx tools/tests/test-roms.mjs",

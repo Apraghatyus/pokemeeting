@@ -2557,6 +2557,22 @@ details.partidas[open] > summary::before {
     padding-bottom: 4px;
   }
 
+  /* El del companero TAMBIEN en tira, y hace falta decirlo aparte.
+   *
+   * En escritorio su columna crece de abajo arriba con `column-reverse`, y esa
+   * regla lleva dos clases -`.equipo--companero .equipo__lista`- contra una de
+   * la de aqui. Las @media NO suman especificidad, asi que la de escritorio
+   * ganaba tambien en el movil: su equipo se quedaba en columna, se comia el
+   * alto de dos fichas y empujaba el mando fuera de la pantalla. El tuyo salia
+   * bien, que es lo que lo hacia dificil de ver.
+   *
+   * Medido en un movil de 360: la lista ocupaba 158 pixeles y las dos fichas
+   * estaban a alturas distintas. En tira son 80 y una sola fila. */
+  .equipo--companero .equipo__lista {
+    flex-direction: row;
+    justify-content: flex-start;
+  }
+
   /* Sin barra de desplazamiento a la vista: estorba mas que ayuda en un movil,
      y los puntos de arriba ya dicen que hay mas. */
   .equipo__lista::-webkit-scrollbar {
@@ -3290,6 +3306,38 @@ details.partidas[open] > summary::before {
   letter-spacing: 0.1em;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+/* En un movil el pie no cabe en una fila, y no se partia: los botones no
+   encogen -asi debe ser, un boton cortado no se puede pulsar- y el unico que
+   cedia era el texto, que se estrujaba en una columna de una palabra por linea
+   mientras el boton de aleatorizar se salia igualmente por la derecha.
+   Medido en un movil de 360: en una fila el pie pedia 551 pixeles para un
+   modal de 326.
+   Asi que se apila. Los creditos arriba, que son lo accesorio, y los dos
+   botones abajo repartiendose el ancho a partes iguales. */
+@media (max-width: 560px) {
+  .modal__pie {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 11px 16px;
+  }
+
+  .aleatorizar__nota {
+    max-width: none;
+  }
+
+  .aleatorizar__acciones {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .aleatorizar__acciones button {
+    width: 100%;
+    padding: 12px 8px;
+  }
 }
 
 .cuenta {

@@ -143,6 +143,22 @@ causa no era la que parecía. Guardar el porqué ahorra volver a investigarlo.
   se probaba lo tocaba. La ñ real es 0x29 y la Ñ 0x14, comprobadas buscando
   "pequeño" y "SEÑOR" en la ROM espanola. Lo vigila `npm run test:texto`, que
   recorre los dos abecedarios enteros en vez de mirar letras sueltas.
+- **En movil, el equipo del companero se quedaba en columna.** Dos fichas
+  apiladas en vez de una tira, y eso empujaba el mando fuera de la pantalla. La
+  causa no estaba en las clases, que estaban bien: en escritorio su lista crece
+  de abajo arriba con `column-reverse`, y esa regla lleva **dos** clases contra
+  **una** de la del movil. Las @media no suman especificidad, asi que la de
+  escritorio ganaba tambien en el movil. El equipo propio salia bien, que es lo
+  que lo hacia dificil de ver. Medido en 360: la lista ocupaba 158 pixeles y las
+  fichas estaban a alturas distintas; en tira son 77 y una sola fila.
+- **El pie del modal del aleatorizador se salia de la pantalla en movil.** No
+  cabia en una fila y no se partia: los botones no encogen -asi debe ser, un
+  boton cortado no se puede pulsar- asi que el unico que cedia era el texto de
+  creditos, que se estrujaba en cinco lineas de una palabra mientras el boton se
+  salia igual por la derecha. Medido en 360: el pie pedia 551 pixeles para un
+  modal de 326, y los botones llegaban hasta el 418 con el modal acabando en
+  343. Ahora se apila. Las dos cosas las vigila `test:movil:colocacion`, que lee
+  lo que calcula el navegador y no las clases, porque ahi no estaba el fallo.
 - **El panel no se parecia a la lista del juego, y el borde senalaba al que no
   era.** Los dos fallos tenian la misma raiz: se dio por hecho que tercera
   generacion sube a la ranura 0 al Pokemon que sale a pelear. Sobre esa idea se
