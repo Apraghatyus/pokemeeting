@@ -110,21 +110,58 @@ check('la copia de combate ocupa 88 bytes', TAMANO_COMBATIENTE === 88);
 // Falta medirla, y hasta entonces tiene que decir que no lo sabe en vez de
 // inventarse un si o un no. "No lo se" y "no hay combate" no son lo mismo: solo
 // el segundo justifica apagar la marca amarilla.
-const { enCombate, DIRECCION_EN_COMBATE, quienPelea: qp } = pk;
+const { enCombate, MARCAS_DE_COMBATE, quienPelea: qp } = pk;
 
-check('de ningun juego se sabe todavia donde esta la bandera de combate',
-  Object.keys(DIRECCION_EN_COMBATE).length === 0,
-  Object.keys(DIRECCION_EN_COMBATE).join(',') || 'ninguno');
+const marcas = MARCAS_DE_COMBATE.BPRS;
+check('de Rojo Fuego espanol si se sabe', Array.isArray(marcas) && marcas.length === 2,
+  `${marcas?.length ?? 0} marcas`);
 
-check('asi que se dice "no lo se", no "no hay combate"',
-  enCombate(vacio(), 'BPES') === null);
+/** Pone una marca de combate donde toca, como la deja el juego al pelear. */
+const ponerMarca = (estado, { direccion, valor }) => {
+  const off = 0x21000 + (direccion - 0x02000000);
+  estado[off] = valor & 0xff;
+  estado[off + 1] = (valor >>> 8) & 0xff;
+  estado[off + 2] = (valor >>> 16) & 0xff;
+  estado[off + 3] = (valor >>> 24) & 0xff;
+  return estado;
+};
 
-// Y mientras no se sepa, no se deja de senalar a quien pelea: callarse por una
-// bandera que no tenemos seria perder lo que si funciona.
-check('sin bandera, se sigue senalando al que pelea',
-  qp(ponerCombatiente(vacio(), 0x8000, equipo.ranuras[1]), equipo, 'BPES') === 0x33334444);
+check('sin las marcas puestas, no hay combate', enCombate(vacio(), 'BPRS') === false);
+check('con una puesta, si lo hay',
+  enCombate(ponerMarca(vacio(), marcas[0]), 'BPRS') === true);
+check('y con la otra tambien, que para eso son dos',
+  enCombate(ponerMarca(vacio(), marcas[1]), 'BPRS') === true);
 
-check('un juego que no existe tampoco rompe nada', enCombate(vacio(), 'ZZZ') === null);
+// Lo que hace que una direccion equivocada no mienta: el valor tiene que ser
+// EXACTAMENTE ese, no basta con que no sea cero.
+check('un valor cualquiera en esa direccion NO cuenta como combate',
+  enCombate(ponerMarca(vacio(), { direccion: marcas[0].direccion, valor: 0x08123456 }), 'BPRS') === false);
+
+// Y la clave es de cuatro letras: estos son punteros a codigo, y en otro idioma
+// el codigo esta en otro sitio.
+check('de otro idioma no se dice que no, se dice que no se sabe',
+  enCombate(vacio(), 'BPRE') === null);
+check('ni de otro juego', enCombate(vacio(), 'BPGS') === null);
+
+// --- lo que une las dos cosas ---
+const peleandoConMarca = ponerMarca(
+  ponerCombatiente(vacio(), 0x8000, equipo.ranuras[1]),
+  marcas[0],
+);
+check('en combate se senala a quien pelea',
+  qp(peleandoConMarca, equipo, 'BPRS') === 0x33334444);
+
+// EL FALLO QUE SE REPORTO: al acabar la pelea la copia del Pokemon se queda en
+// memoria, asi que sin esto seguia senalando al ultimo que peleo mientras el
+// jugador caminaba por el mapa.
+const fueraDeCombate = ponerCombatiente(vacio(), 0x8000, equipo.ranuras[1]);
+check('y al salir se apaga, aunque la copia siga ahi',
+  qp(fueraDeCombate, equipo, 'BPRS') === null);
+
+// Mientras del juego no se sepa, no se apaga nada: perder lo que ya funciona
+// por una bandera que no tenemos seria peor.
+check('de un juego sin medir, se sigue senalando',
+  qp(fueraDeCombate, equipo, 'BPGS') === 0x33334444);
 
 console.log(fallos === 0 ? '\nEL QUE PELEA NO SE ADIVINA' : `\n${fallos} COMPROBACIONES FALLIDAS`);
 process.exit(fallos === 0 ? 0 : 1);

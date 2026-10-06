@@ -339,52 +339,49 @@ cualquier sitio.
 
 ---
 
-## Distinguir "hay combate" de "lo hubo"
+## Distinguir "hay combate" de "lo hubo" — RESUELTO
 
-La copia de combate sirve para saber **quién** pelea, y eso ya está hecho: el
-juego copia al Pokémon que sale a una estructura de 88 bytes con su personalidad
-dentro, y se busca ahí. Lo que esa copia **no** dice es si el combate sigue en
-marcha, y está medido: sigue ahí después de acabar, así que decía que el
-Bulbasaur seguía peleando mientras el jugador caminaba por el mapa.
+**Ya está.** El borde amarillo se enciende al entrar en combate y se apaga al
+salir. Lo que faltaba era saber si el combate sigue, porque la copia del Pokémon
+que pelea **no se borra** al acabar: por eso la marca se quedaba sobre el último
+que peleó mientras se caminaba por el mapa.
 
-Aquí hubo escrito que esto ya no bloqueaba nada, porque "el juego sube al que
-sale a la ranura 0". **Eso era falso** y lo desmintió una partida: el equipo era
-[PEZGATO, A BUENO], peleaba A BUENO y la ranura 0 seguía siendo PEZGATO. El
-resaltado se rehízo buscando la copia, no mirando la ranura.
+**Cómo se sabe ahora.** No es una bandera de "estoy peleando": son dos punteros a
+código que el juego deja puestos mientras el combate corre y pone a cero al
+salir, en `0x02021644` y `0x020216cc`. Se buscaron punteros a propósito, porque
+son de lo poco **comprobable**: no basta con que no sean cero, tienen que valer
+exactamente lo que valen. Eso convierte una dirección equivocada en un "no lo sé"
+en vez de en un sí inventado.
 
-Lo que falta por esto, hoy:
+**Medido contra 22 estados** de dos partidas: 14 dentro de combate y 8 fuera, de
+dos combates que no tienen nada que ver y de sitios distintos del mapa. Y con
+**dos ROMs**, una aleatorizada y la normal: los dos punteros valieron siempre lo
+mismo en los catorce y cero en los ocho, en las dos copias. O sea que el
+aleatorizador no mueve ese código, que era la duda razonable.
 
-- **Apagar el borde entre combate y combate. PEDIDO TRES VECES.** Es lo único
-  que falta de esa pantalla y lo único que bloquea un comando. Al acabar la pelea la marca se queda sobre el último que
-  peleó, porque la copia no se borra. Antes del primer combate de la sesión no se
-  ilumina nadie, que es lo correcto; el hueco es el "después".
+**Dos caminos descartados por el camino**, que es lo que de verdad ahorra tiempo
+a quien venga después:
 
-  **Todo lo demás está puesto.** `enCombate` ya se consulta antes de señalar a
-  nadie y `DIRECCION_EN_COMBATE` está vacío a propósito: añadir una entrada ahí
-  es lo único que falta. Y mientras esté vacío dice "no lo sé", que no es lo
-  mismo que "no hay combate": solo lo segundo apaga la marca, así que un hueco
-  no quita lo que ya funciona.
+- Lo que cambia en la parte baja de EWRAM es el **montón**: bloques que el
+  combate reserva y libera, reconocibles por su cabecera `0xA3A3`. Cuadra
+  perfectamente, pero su dirección depende de lo que se hubiera reservado antes.
+- Un byte en `0x0202000a` que parecía una bandera de libro -1 en combate, 0
+  fuera, aislado- y **no lo era**: es la parte alta de un puntero que cruza los
+  `0x02010000` según cuánto montón se haya pedido. Se vio al mirar los bytes
+  crudos alrededor; por la cuenta sola habría pasado por buena.
 
-  Hay herramienta: `npm run buscar:combate -- --dentro c1.bin --fuera m1.bin`.
-  Busca banderas en los dos sentidos -las que se encienden al entrar en combate y
-  las que se apagan- porque las dos existen y no se sabe cuál aparecerá antes.
-  Para sacar los estados, menú ⋮ → Exportar estado: uno con el menú de LUCHA en
-  pantalla y otro caminando por el mapa. Con dos de cada, de combates distintos y
-  de sitios distintos, lo que quede ya es candidato de verdad.
-- **La pantalla de fin de partida**, para distinguir "se te cayó el equipo" de
-  "estás a mitad de un combate y te quedan tres en la caja".
-- **Las medallas y la Liga**, que son banderas del mismo sitio.
+La clave de la tabla es de **cuatro** letras y no de tres, a diferencia del resto
+del proyecto: estos son punteros a código y en otro idioma el código está en otro
+sitio. Rojo Fuego en inglés dice "no lo sé", que es lo correcto.
 
-Se encuentra comparando dos estados de la misma partida, uno en mitad de una
-pelea y otro caminando, y mirando qué cambia: es el método con el que se
-encontró todo lo demás.
+Lo vigilan `test:combate` -la lógica, incluido que un valor cualquiera en esa
+dirección no cuente- y `test:borde:combate`, que carga dos estados de verdad en
+el navegador y mira la ficha. Los estados no están en el repositorio, son
+partidas de alguien: se pasan por línea de órdenes.
 
-**Se intentó automatizarlo y no salió**, y queda apuntado para no repetirlo: se
-puede meter un guardado y atravesar la intro a base de pulsar A, pero llegar a
-un combate pide navegar por el mapa, y eso desde una prueba es demasiado frágil.
-El guardado que había era de una partida recién empezada, sin equipo. Lo que
-hace falta es que alguien exporte los dos estados **desde una partida de
-verdad**, con el botón de "Exportar estado" que ya está en los ajustes.
+Lo que esto **no** resuelve y sigue pendiente: la pantalla de fin de partida
+podría usarlo para distinguir "se te cayó el equipo" de "estás a mitad de un
+combate", y las medallas y la Liga siguen sin medir.
 
 ---
 

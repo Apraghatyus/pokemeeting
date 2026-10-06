@@ -40,16 +40,55 @@ const ESPECIE = 0x00;
 const NIVEL = 0x2a;
 const PERSONALIDAD = 0x48;
 
+/** Un sitio de memoria que solo vale eso mientras hay combate. */
+export type MarcaDeCombate = { direccion: number; valor: number };
+
 /**
- * Donde vive la bandera de "hay un combate en marcha", por juego.
+ * Como se sabe que hay un combate en marcha, por juego.
  *
- * Vacio a proposito: todavia no se ha medido ninguna. Anadir una entrada aqui es
- * lo unico que hace falta, y el valor sale de `npm run buscar:combate`.
+ * NO es una bandera de "estoy peleando": son dos punteros a codigo que el juego
+ * deja puestos mientras el combate corre y pone a cero al salir. Se buscaron
+ * asi a proposito, porque un puntero a ROM es de lo poco que se puede
+ * **comprobar**: no basta con que no sea cero, tiene que valer exactamente lo
+ * que vale, y eso convierte una direccion equivocada en un "no lo se" en vez de
+ * en un si inventado.
  *
- * Tiene que ser una direccion que valga **cero fuera del combate**, que es lo
- * que comprueba `enCombate`. La herramienta las busca justo asi.
+ * MEDIDO contra 22 estados de dos partidas distintas: 14 dentro de combate y 8
+ * fuera, de dos combates que no tienen nada que ver y de sitios distintos del
+ * mapa. Y, lo que mas tranquiliza, con DOS ROMs: una aleatorizada y la normal.
+ * Los dos punteros valieron siempre lo mismo en los catorce de combate y cero
+ * en los ocho de fuera, en las dos copias. O sea que el aleatorizador no mueve
+ * este codigo, que era la duda razonable.
+ *
+ * Se descartaron por el camino, y conviene saberlo para no repetirlo:
+ *
+ *   - Lo que sale en la parte baja de EWRAM: es el monton, y lo que cambia ahi
+ *     son bloques que el combate reserva y libera. Cuadra, pero su direccion
+ *     depende de lo que hubiera reservado antes, asi que no es fiable.
+ *   - Un byte en 0x0202000a que parecia una bandera de libro -1 en combate, 0
+ *     fuera- y no lo era: es la parte alta de un puntero que cruza los
+ *     0x02010000 segun cuanto monton se haya pedido. Casi se cuela.
+ *
+ * La clave es la de cuatro letras y no la de tres: estos son punteros a codigo,
+ * y en otro idioma el codigo esta en otro sitio. Rojo Fuego en ingles NO vale
+ * esta direccion, y mejor que diga "no lo se" a que diga que no hay combate.
  */
-export const DIRECCION_EN_COMBATE: Readonly<Record<string, number>> = {};
+export const MARCAS_DE_COMBATE: Readonly<Record<string, readonly MarcaDeCombate[]>> = {
+  // Rojo Fuego, espanol.
+  BPRS: [
+    { direccion: 0x02021644, valor: 0x0825bb94 },
+    { direccion: 0x020216cc, valor: 0x0825bb8c },
+  ],
+};
+
+/** Lee cuatro bytes en little endian, o null si no caben. */
+const leerU32 = (estado: Uint8Array, offset: number): number | null => {
+  if (offset < 0 || offset + 4 > estado.length) return null;
+  return (
+    ((estado[offset]! | (estado[offset + 1]! << 8) | (estado[offset + 2]! << 16)) >>> 0) +
+    estado[offset + 3]! * 0x1000000
+  );
+};
 
 /**
  * Si hay un combate ahora mismo. Null si de este juego aun no se sabe.
@@ -57,18 +96,21 @@ export const DIRECCION_EN_COMBATE: Readonly<Record<string, number>> = {};
  * Null y false no son lo mismo y por eso no se devuelve un booleano: "no lo se"
  * tiene que poder distinguirse de "no hay combate", porque solo el segundo
  * justifica apagar la marca.
+ *
+ * Basta con que cuadre UNO de los dos punteros. Son dos y no uno porque asi un
+ * combate que por lo que sea no use uno de ellos sigue reconociendose.
  */
 export const enCombate = (estado: Uint8Array, codigoJuego: string): boolean | null => {
-  const direccion = DIRECCION_EN_COMBATE[codigoJuego.slice(0, 3).toUpperCase()];
-  if (direccion === undefined) return null;
+  const marcas = MARCAS_DE_COMBATE[codigoJuego.slice(0, 4).toUpperCase()];
+  if (!marcas || marcas.length === 0) return null;
 
-  const donde = desplazamientoDe(direccion);
-  if (!donde) return null;
+  for (const marca of marcas) {
+    const donde = desplazamientoDe(marca.direccion);
+    if (!donde) continue;
+    if (leerU32(estado, donde.offset) === marca.valor) return true;
+  }
 
-  const byte = estado[donde.offset];
-  if (byte === undefined) return null;
-
-  return byte !== 0;
+  return false;
 };
 
 /**
