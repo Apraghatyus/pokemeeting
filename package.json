@@ -35,6 +35,7 @@
     "test:randomizer:options": "node tools/tests/test-randomizer-options.mjs",
     "dev:tunnel": "npm run dev:tunnel --workspace=@emupoke/web",
     "test:audio": "node tools/tests/test-audio.mjs",
+    "test:volumen": "node tools/tests/test-volumen.mjs",
     "test:reconexion": "node tools/tests/test-reconexion.mjs",
     "tunnel": "node tools/tunnel.mjs",
     "test:partidas": "node tools/tests/test-randomizer-limpio.mjs",

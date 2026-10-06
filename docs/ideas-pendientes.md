@@ -154,6 +154,17 @@ causa no era la que parecía. Guardar el porqué ahorra volver a investigarlo.
   **personalidad** y no por su ranura: la ranura siempre seria 0, la personalidad
   senala a un Pokemon concreto. Lo vigila `test:orden`, que comprueba que la
   marca cae en el cuarto puesto de la lista y no en el primero.
+- **El volumen se reiniciaba al cargar otra ROM.** Se vio al aleatorizar: la
+  copia nueva arrancaba sonando aunque tuvieras el juego silenciado. Al medirlo
+  resulto ser mas viejo y mas gordo de lo reportado -ya pasaba con la **primera**
+  ROM de la sesion: la barra decia 70% y el juego sonaba al 100%-, porque para
+  mGBA el volumen es una propiedad del juego cargado y `loadGame` lo pone a tope.
+  Se arregla volviendo a ponerlo despues de cada carga, en la capa que envuelve
+  el nucleo, que es donde estan los dos sitios que cargan juego. El nivel **se
+  pasa** en vez de leerlo del nucleo antes de cargar: sin juego cargado
+  `getVolume()` devuelve 0, asi que preservarlo asi silenciaba la primera ROM.
+  Esa version intermedia llego a escribirse y la delato la medicion, no la
+  lectura. `test:volumen` compara lo que suena con lo que dice la barra.
 - **El fin de partida saltaba en el combate del laboratorio.** Y es la segunda
   vez que esta regla se equivoca, en la direccion contraria a la primera (ver
   abajo), asi que las dos se cuentan juntas o no se entiende la de ahora. Al

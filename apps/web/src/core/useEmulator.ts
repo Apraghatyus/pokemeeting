@@ -157,6 +157,17 @@ export const useEmulator = () => {
     return { ...initialState, volume, volumeBeforeMute: volume || initialState.volume };
   });
 
+  /**
+   * El volumen de ahora mismo, para quien no puede depender de el.
+   *
+   * Cargar una ROM tiene que volver a ponerle el volumen al nucleo, porque
+   * `loadGame` lo borra. Pero si `openRom` dependiera de `state.volume`, se
+   * rehacia la funcion con cada movimiento de la barra. En una ref se lee el
+   * valor de siempre sin arrastrar la dependencia.
+   */
+  const volumeRef = useRef(state.volume);
+  volumeRef.current = state.volume;
+
   const appendLog = useCallback((line: string) => {
     setState((prev) => ({ ...prev, log: [...prev.log, line].slice(-MAX_LOG_LINES) }));
   }, []);
@@ -251,7 +262,7 @@ export const useEmulator = () => {
         // abierto es pedir problemas. De eso se encarga el gancho.
         // Cada copia generada estrena su propio nombre, asi que no hay nada
         // que descartar: no puede heredar el guardado de otra.
-        const loaded = await loadRomFile(core, file);
+        const loaded = await loadRomFile(core, file, toMultiplier(volumeRef.current));
         romBytesRef.current = bytes;
 
         if (source === 'usuario') {
@@ -313,7 +324,7 @@ export const useEmulator = () => {
         const bytes = core.FS.readFile(romPath);
         const header = readRomHeader(bytes);
 
-        await loadExistingRom(core, romPath);
+        await loadExistingRom(core, romPath, toMultiplier(volumeRef.current));
         core.resumeAudio();
         romBytesRef.current = bytes;
         generatedPathRef.current = romPath;

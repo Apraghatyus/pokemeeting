@@ -161,9 +161,39 @@ export type LoadedRom = {
  * Sube una ROM al FS virtual y la arranca.
  * El fichero nunca sale del navegador del jugador.
  */
+/**
+ * Arranca un juego y le pone el volumen que toca.
+ *
+ * mGBA pone el volumen a tope en cada `loadGame`: para el nucleo el nivel es una
+ * propiedad del juego cargado. Para quien juega es al reves -el volumen es suyo,
+ * no de la partida- asi que hay que volver a ponerlo despues de cada carga.
+ *
+ * Se veia de dos formas, y la segunda es la que lo delato: al aleatorizar, la
+ * copia nueva arrancaba sonando aunque tuvieras el juego silenciado. Y antes de
+ * eso, mas callado, ya pasaba con la primera ROM: el nivel guardado se aplicaba
+ * al arrancar el nucleo y `loadGame` lo borraba acto seguido, asi que la barra
+ * decia 70% y el juego sonaba al 100%.
+ *
+ * El nivel **se recibe** en vez de leerlo del nucleo antes de cargar, y eso no
+ * es un detalle: sin juego cargado `getVolume()` devuelve 0, asi que preservarlo
+ * asi silenciaba la primera ROM de la sesion. Quien sabe el volumen es quien lo
+ * guarda, no el nucleo.
+ *
+ * @param volumen multiplicador, 0 es silencio y 1 es el volumen de fabrica
+ */
+const arrancarJuego = (core: MgbaModule, romPath: string, volumen: number): boolean => {
+  const arrancado = core.loadGame(romPath);
+  // Se pone tambien si no arranco: un juego que no abre tampoco deberia dejarte
+  // el volumen cambiado.
+  core.setVolume(volumen);
+  return arrancado;
+};
+
 export const loadRomFile = async (
   core: MgbaModule,
   file: File,
+  /** El volumen del jugador, que `loadGame` borra y hay que volver a poner. */
+  volumen: number,
   /**
    * Se ejecuta con el juego anterior ya cerrado y antes de subir el nuevo.
    *
@@ -187,7 +217,7 @@ export const loadRomFile = async (
 
   await new Promise<void>((resolve) => core.uploadRom(file, resolve));
   const romPath = `${core.filePaths().gamePath}/${file.name}`;
-  if (!core.loadGame(romPath)) {
+  if (!arrancarJuego(core, romPath, volumen)) {
     throw new Error(`mGBA no pudo arrancar "${file.name}". Puede estar corrupta o no ser una ROM de GBA.`);
   }
   return { romPath, fileName: file.name };
@@ -225,12 +255,17 @@ export const DEFAULT_KEY_BINDINGS: readonly (readonly [sdlKey: string, gbaInput:
  * estan ahi, asi que no hay nada que subir, solo cerrar el juego anterior y
  * abrir este.
  */
-export const loadExistingRom = async (core: MgbaModule, romPath: string): Promise<void> => {
+export const loadExistingRom = async (
+  core: MgbaModule,
+  romPath: string,
+  /** El volumen del jugador, igual que en `loadRomFile`. */
+  volumen: number,
+): Promise<void> => {
   if (core.gameName) {
     core.quitGame();
     await new Promise((resolve) => setTimeout(resolve, 120));
   }
-  if (!core.loadGame(romPath)) {
+  if (!arrancarJuego(core, romPath, volumen)) {
     throw new Error(`No se pudo abrir "${romPath.split('/').pop()}". Puede que ya no exista.`);
   }
 };
