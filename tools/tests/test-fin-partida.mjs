@@ -9,6 +9,13 @@
 // combate del laboratorio, con el equipo a medio caer, con huevos, y con el
 // equipo todavía vacío.
 //
+// Hay DOS caminos y conviene no mezclarlos al leer esto:
+//
+//   - Lo dice el juego (el mensaje de ir corriendo al Centro Pokémon). Basta,
+//     aunque solo tengas un Pokémon.
+//   - Lo deducimos del equipo caído. Respaldo, y pide dos Pokémon distintos,
+//     que es lo que deja fuera el combate del laboratorio.
+//
 // Uso: npx tsx tools/tests/test-fin-partida.mjs
 import { pathToFileURL } from 'node:url';
 
@@ -29,10 +36,18 @@ check('el modulo de la regla se puede cargar', fuente !== null);
 // --- la condicion, replicada desde el modulo ---
 // Se copia a proposito en vez de exportarla: lo que se quiere fijar aqui es el
 // COMPORTAMIENTO esperado, para que si alguien cambia la del modulo salte.
-const seAcabo = (equipo) => {
+const seAcabo = (equipo, { loDiceElJuego = false, vistos = null } = {}) => {
+  // Camino bueno: el juego lo ha dicho. No hace falta nada mas.
+  if (loDiceElJuego) return true;
+
   const pelean = (equipo?.ranuras ?? []).filter((r) => !r.huevo);
   if (pelean.length === 0) return false;
-  return pelean.every((r) => r.estado === 'debilitado');
+  if (!pelean.every((r) => r.estado === 'debilitado')) return false;
+
+  // Camino de respaldo: dos Pokemon distintos vistos alguna vez. Por defecto,
+  // los que hay ahora mismo.
+  const conocidos = vistos ?? new Set(pelean.map((r) => r.personalidad));
+  return conocidos.size >= 2;
 };
 
 const pk = (personalidad, estado = null, huevo = false) => ({
@@ -52,12 +67,22 @@ const equipo = (...ranuras) => ({ juego: 'BPRS', momento: Date.now(), ranuras })
 
 check('un equipo vacio no acaba nada', seAcabo(equipo()) === false);
 
-// EL CASO QUE FALLABA. Saliste con tu inicial a buscar el segundo, te lo
-// debilitaron antes de capturar nada, y el cartel no aparecia: la regla exigia
-// haber tenido dos Pokemon distintos. Perder antes de la primera captura es de
-// las formas mas normales de que se acabe una Nuzlocke, asi que cuenta.
-check('con un solo Pokemon debilitado, se acabo',
-  seAcabo(equipo(pk(1, 'debilitado'))) === true);
+// LOS DOS CASOS QUE FALLARON, que son el mismo equipo y dan resultados
+// distintos. Lo unico que cambia entre ellos es si el juego lo ha dicho, y por
+// eso la regla no puede decidirlo contando Pokemon.
+
+// Primero: el combate del laboratorio. Un solo Pokemon, debilitado, y el juego
+// NO dice nada porque no te manda al Centro Pokemon: el rival se burla y te
+// quedas donde estabas. El cartel salia encima del dialogo del propio rival.
+check('en el combate del laboratorio NO se acaba nada',
+  seAcabo(equipo(pk(1, 'debilitado')), { loDiceElJuego: false }) === false);
+
+// Y el otro: saliste con tu inicial a buscar el segundo y te lo debilitaron
+// antes de capturar nada. Ahi el juego SI lo dice, y cuenta aunque solo tengas
+// uno. Perder antes de la primera captura es de las formas mas normales de que
+// se acabe una Nuzlocke.
+check('pero perdiendo de verdad con un solo Pokemon, si',
+  seAcabo(equipo(pk(1, 'debilitado')), { loDiceElJuego: true }) === true);
 
 check('medio equipo caido no es fin de partida',
   seAcabo(equipo(pk(1, 'debilitado'), pk(2), pk(3, 'debilitado'))) === false);
@@ -86,7 +111,12 @@ check('y con el equipo lleno igual',
 // Y con uno en el equipo y los demas en la caja, igual: lo que se mira es lo
 // que llevas encima, que es lo unico que se puede leer.
 check('uno solo debilitado cuenta aunque hayas tenido mas',
-  seAcabo(equipo(pk(5, 'debilitado'))) === true);
+  seAcabo(equipo(pk(5, 'debilitado')), { vistos: new Set([1, 2, 3, 4, 5]) }) === true);
+
+// Y el respaldo no se salta con el mismo Pokemon contado dos veces: se cuentan
+// personalidades distintas, que es lo unico que no se repite.
+check('el mismo Pokemon dos veces no son dos Pokemon',
+  seAcabo(equipo(pk(1, 'debilitado')), { vistos: new Set([1]) }) === false);
 
 console.log(fallos === 0 ? '\nLA REGLA NO SE INVENTA FINALES' : `\n${fallos} COMPROBACIONES FALLIDAS`);
 process.exit(fallos === 0 ? 0 : 1);

@@ -154,6 +154,19 @@ causa no era la que parecía. Guardar el porqué ahorra volver a investigarlo.
   **personalidad** y no por su ranura: la ranura siempre seria 0, la personalidad
   senala a un Pokemon concreto. Lo vigila `test:orden`, que comprueba que la
   marca cae en el cuarto puesto de la lista y no en el primero.
+- **El fin de partida saltaba en el combate del laboratorio.** Y es la segunda
+  vez que esta regla se equivoca, en la direccion contraria a la primera (ver
+  abajo), asi que las dos se cuentan juntas o no se entiende la de ahora. Al
+  quitar el minimo de dos Pokemon, la regla paso a ser "si lo que tienes esta
+  debilitado, se acabo", y eso incluye el tutorial: el cartel salia encima del
+  dialogo del propio rival, en el minuto dos. Lo que separa los dos casos no es
+  cuantos Pokemon tienes, es **quien lo dice**: al perder de verdad el juego te
+  manda al Centro Pokemon y lo anuncia, y al perder en el laboratorio no pasa
+  nada de eso. Asi que ahora hay dos caminos: si lo dice el juego se acaba
+  aunque tengas uno solo, y si lo deducimos del equipo caido hacen falta dos
+  Pokemon distintos, que es justo lo que el laboratorio no puede darte. El
+  precio: en un idioma cuyo mensaje no se reconozca, perder con un solo Pokemon
+  no saldria. `test:fin` prueba el mismo equipo por los dos caminos.
 - **El fin de partida no saltaba con un solo Pokemon.** La regla exigia haber
   tenido DOS Pokemon distintos, para que el combate del laboratorio quedara
   fuera por construccion. Estaba mal, y lo demostro el primero que lo jugo: salio

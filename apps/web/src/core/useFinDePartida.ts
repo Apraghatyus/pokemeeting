@@ -13,19 +13,40 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EquipoResumen } from '@emupoke/protocol';
 
-// Aquí hubo una regla que exigía haber tenido DOS Pokémon distintos, para que
-// el combate del laboratorio -donde solo tienes al inicial- quedara fuera por
-// construcción.
+// ESTA REGLA SE HA EQUIVOCADO DOS VECES, UNA EN CADA DIRECCIÓN. Las dos están
+// aquí porque la forma de la regla de ahora es la consecuencia de las dos, y sin
+// ellas parece complicada de más.
 //
-// Estaba mal, y lo demostró el primero que lo jugó: salió con su inicial a
-// buscar el segundo, se lo debilitaron antes de capturar nada, y el cartel no
-// apareció. Perder antes de la primera captura no es un caso raro: es de las
-// formas más normales de que se acabe una Nuzlocke.
+//   1. Exigía haber tenido DOS Pokémon distintos, para que el combate del
+//      laboratorio -donde solo tienes al inicial- quedara fuera por
+//      construcción. Falló: alguien salió con su inicial a buscar el segundo, se
+//      lo debilitaron antes de capturar nada, y no apareció nada. Perder antes
+//      de la primera captura no es un caso raro: es de las formas más normales
+//      de que se acabe una Nuzlocke.
 //
-// Así que la regla es la simple: si lo que tienes está debilitado, se acabó.
-// El combate del laboratorio puede dar un cartel de más, y para eso está la ✕,
-// que lo cierra sin dar nada por terminado. Un cartel de más se quita con un
-// clic; un final que no se reconoce deja la partida contando como viva.
+//   2. Así que se quitó el mínimo y quedó la regla simple -si lo que tienes está
+//      debilitado, se acabó-, confiando en que la ✕ limpiara el cartel de más.
+//      También falló, y se vio igual de claro: el cartel salta en el combate del
+//      laboratorio, encima del propio diálogo del rival. Un falso final en el
+//      minuto dos no es un clic de molestia, es que el reto empieza roto.
+//
+// LO QUE SEPARA LOS DOS CASOS no es cuántos Pokémon tienes: es **quién lo dice**.
+// Al perder de verdad, el juego te manda al Centro Pokémon y lo anuncia ("…fue
+// corriendo a un CENTRO PKMN…"). Al perder en el laboratorio no pasa nada de
+// eso: el rival se burla y te quedas donde estabas. O sea que el mensaje del
+// juego distingue solo los dos casos, sin contar Pokémon.
+//
+// Así que hay dos caminos y no uno:
+//
+//   - **Lo dice el juego** -> se acabó, aunque solo tuvieras un Pokémon. Esto es
+//     el caso (1), y es el camino bueno.
+//   - **Lo deduce el equipo caído** -> respaldo, por si el mensaje no se
+//     reconoce, y entonces sí se exigen dos Pokémon. Esto deja fuera el caso (2)
+//     por construcción, porque en el laboratorio solo puedes tener uno.
+//
+// La ✕ sigue estando para lo que la regla no pueda saber -las cajas no se leen,
+// así que quien guarde Pokémon sanos ahí vería un final que no lo es-, pero ya
+// no se le pide que tape el combate del tutorial.
 
 export type FinDePartida = {
   /** Si hay que enseñar el cartel ahora mismo. */
@@ -94,6 +115,17 @@ const escribir = (partida: string, estado: Guardado): void => {
   }
 };
 
+/**
+ * Cuántos Pokémon distintos hacen falta para fiarse del equipo caído.
+ *
+ * Dos, y el número sale de un sitio concreto: en el combate del laboratorio solo
+ * puedes tener uno. No es un umbral elegido a ojo, es la forma de decir "esto no
+ * es el tutorial" sin tener que reconocer el tutorial.
+ *
+ * Solo manda en el camino de respaldo. Cuando lo dice el juego, con uno basta.
+ */
+const MINIMO_PARA_DEDUCIRLO = 2;
+
 /** Si todos los que hay están debilitados. Sin Pokémon no hay nada que decidir. */
 const equipoCaido = (equipo: EquipoResumen | null): boolean => {
   const vivos = equipo?.ranuras ?? [];
@@ -160,7 +192,9 @@ export const useFinDePartida = (
       // La victoria manda: si el juego esta ensenando el Salon de la Fama, da
       // igual como este el equipo. Y lo que ya se decidio no se cambia, para
       // que una partida continuada no reescriba su propio final.
-      const acabaAhora = victoria || derrota || equipoCaido(equipo);
+      // El respaldo pide dos Pokémon; el mensaje del juego no pide ninguno.
+      const loDeduzco = equipoCaido(equipo) && vistos.size >= MINIMO_PARA_DEDUCIRLO;
+      const acabaAhora = victoria || derrota || loDeduzco;
 
       const siguiente: Guardado = {
         ...previo,
