@@ -158,6 +158,70 @@ if (completa.enCompleta && completa.centro && completa.partida) {
   check('y el mando debajo del equipo, que es el orden de siempre',
     completa.mando.arriba >= completa.equipo.abajo - 1,
     `mando desde ${completa.mando.arriba}, equipo hasta ${completa.equipo.abajo}`);
+
+  // Y a pantalla completa el mando tambien llega abajo. Aqui habia una regla
+  // que lo estiraba para llenar, y con el mando ya pegado al fondo eso dejaba
+  // un claro: 91 pixeles medidos en un movil de 360x800.
+  const sobraEnCompleta = await page.evaluate(() => {
+    const abajo = [...document.querySelectorAll('.pad button')].map(
+      (b) => b.getBoundingClientRect().bottom,
+    );
+    return abajo.length ? Math.round(window.innerHeight - Math.max(...abajo)) : null;
+  });
+  check('y a pantalla completa tambien llega abajo',
+    sobraEnCompleta !== null && sobraEnCompleta >= 0 && sobraEnCompleta < 40,
+    `sobran ${sobraEnCompleta}px`);
+}
+
+// --- 4. el mando llega abajo en cualquier telefono ---
+//
+// El tercer fallo que se reporto, visto en un movil mas alto que el que se
+// probaba: los botones quedaban flotando en medio con un agujero negro enorme
+// debajo. La partida y el mando tenian altura fija, asi que en un telefono alto
+// sobraba sitio y nadie lo usaba. Medido antes de tocarlo: en 360x640 sobraban
+// 35 pixeles, pero en 360x800 eran 195 y en 412x915, 275.
+//
+// Y ese hueco NO puede ir a la partida: en vertical la limita el ancho, no el
+// alto. O sea que es del mando.
+// Pestana limpia: la de arriba ya ha pasado por pantalla completa y conviene
+// no medir el alto sobre un estado del que no sabemos si quedo algo.
+const otra = await contexto.browser().newContext({
+  viewport: { width: 360, height: 640 },
+  deviceScaleFactor: 2,
+  isMobile: true,
+  hasTouch: true,
+});
+const movil = await otra.newPage();
+await movil.goto(URL, { waitUntil: 'load' });
+await movil.waitForFunction(() => !document.querySelector('.dropzone button')?.disabled, null, {
+  timeout: 30_000,
+});
+await movil.setInputFiles('input[type=file][accept*=".gba"]', ROM);
+await movil.getByRole('button', { name: 'Jugar tal cual' }).click({ timeout: 20_000 }).catch(() => {});
+await movil.waitForTimeout(3500);
+
+for (const [ancho, alto] of [
+  [360, 640],
+  [360, 800],
+  [412, 915],
+]) {
+  await movil.setViewportSize({ width: ancho, height: alto });
+  await movil.waitForTimeout(1200);
+
+  const medida = await movil.evaluate(() => {
+    const botones = [...document.querySelectorAll('.pad button')];
+    const abajo = botones.map((b) => b.getBoundingClientRect().bottom);
+    return {
+      cuantos: botones.length,
+      sobra: abajo.length ? Math.round(window.innerHeight - Math.max(...abajo)) : null,
+      desborda: document.documentElement.scrollHeight > window.innerHeight + 1,
+    };
+  });
+
+  check(`en ${ancho}x${alto} el mando llega abajo`,
+    medida.sobra !== null && medida.sobra >= 0 && medida.sobra < 40,
+    `sobran ${medida.sobra}px por debajo del ultimo boton`);
+  check(`y en ${ancho}x${alto} no se sale de la pantalla`, medida.desborda === false);
 }
 
 await navegador.close();

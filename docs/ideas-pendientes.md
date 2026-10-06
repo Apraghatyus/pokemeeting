@@ -154,6 +154,21 @@ causa no era la que parecía. Guardar el porqué ahorra volver a investigarlo.
   al lado con sus 23.623 bytes sin tocar. Ahora se renombra al subirlo.
   `test:importar` comprueba el sistema de ficheros del nucleo, que es donde
   estaba el fallo, y sin el arreglo ve cero bytes con contenido.
+- **En un movil alto, los botones quedaban flotando con un agujero debajo.** La
+  partida y el mando tenian altura fija, asi que el sitio que sobraba no lo usaba
+  nadie. Medido: en 360x640 sobraban 35 pixeles -justo cabia, y por eso no se
+  habia visto- pero en 360x800 eran 195 y en 412x915, 275. Y ese hueco **no puede
+  ir a la partida**: en vertical la limita el ancho, no el alto, asi que por
+  mucho alto que haya no crece. Es del mando.
+  Se arregla con dos decisiones. Los tamanos pasan a `clamp` con el alto de la
+  ventana -el minimo es lo que ya habia, asi que en un telefono pequeno no cambia
+  nada, y el maximo evita botones de pantalla completa en una tablet- y las
+  piezas de la cruceta pasan a porcentajes, lo que de paso borra cuatro juegos de
+  medidas repetidas. Y el mando se pega ABAJO en vez de estirarse: se probo
+  estirandolo y quedaba peor, con L y R en el borde de arriba, lejos del pulgar.
+  Tambien se quito el `flex: 1 1 auto` de pantalla completa, que con el mando ya
+  pegado al fondo dejaba 91 pixeles de claro. `test:movil:colocacion` lo mide en
+  tres tamanos y en pantalla completa.
 - **A pantalla completa en vertical, el equipo "desaparecia".** No desaparecia:
   quedaba DEBAJO de la partida. La regla de pantalla completa, escrita para
   escritorio, reparte el alto entre la mesa y el mando con `flex: 1`, y lleva dos

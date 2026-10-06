@@ -249,9 +249,13 @@ body {
   min-height: 0;
 }
 
-/* El mando se queda con lo que sobre, que es justo lo que se queria. */
+/* El mando se coloca igual que fuera de pantalla completa: pegado abajo y sin
+   estirarse. Antes aqui decia `flex: 1 1 auto` para que se quedara con lo que
+   sobrara, y con el mando ya pegado al fondo eso dejaba de tener sentido:
+   medido en un movil de 360x800, en pantalla completa sobraban 91 pixeles por
+   debajo del ultimo boton mientras que fuera sobraban 6. */
 .juego:fullscreen .pad {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-height: 0;
 }
 
@@ -1542,16 +1546,42 @@ button.is-active {
 
 /* ---------- mando tactil ---------- */
 
+/*
+ * El mando se reparte el alto que sobre, en vez de medir siempre lo mismo.
+ *
+ * Antes la partida y el mando tenian altura fija, asi que en un telefono alto
+ * sobraba un agujero negro enorme debajo. Medido: en 360x640 sobraban 35
+ * pixeles -justo cabia- pero en 360x800 sobraban 195 y en 412x915, 275.
+ *
+ * Y el hueco no puede ir a la partida: en vertical la partida la limita el
+ * ANCHO, no el alto, asi que por mucho alto que haya no crece. O sea que ese
+ * sitio es del mando, y ahi se nota: botones mas grandes y mas separados en los
+ * telefonos que dan para ello.
+ *
+ * Los tamanos van con clamp y no con media queries por aparato: el minimo es lo
+ * que ya habia -asi en los telefonos pequenos no cambia nada- y el maximo evita
+ * que en una tablet salgan botones de pantalla completa.
+ *
+ * Y el mando se pega ABAJO en vez de estirarse para llenar. Se probo estirando y
+ * quedaba peor: L y R se iban al borde de arriba, lejos de donde esta el pulgar,
+ * con un claro enorme en medio. El hueco que sobra es mejor dejarlo arriba, bajo
+ * el equipo, que repartirlo entre los botones.
+ */
 .pad {
+  --tecla: clamp(58px, 8.5vh, 78px);
+  --cruz: clamp(138px, 21vh, 196px);
+
   display: grid;
   grid-template-areas:
     "hombros hombros"
     "cruceta cara"
     "menu    menu";
   grid-template-columns: 1fr 1fr;
-  gap: 14px 10px;
-  margin: 14px auto 0;
+  gap: clamp(14px, 2.4vh, 26px) 10px;
+  /* El auto de arriba es lo que lo empuja al fondo. */
+  margin: auto auto 0;
   max-width: 560px;
+  flex: 0 0 auto;
   /* El navegador no debe interpretar estos gestos como scroll ni como zoom. */
   touch-action: none;
   user-select: none;
@@ -1571,8 +1601,8 @@ button.is-active {
   position: relative;
   justify-self: center;
   align-self: center;
-  width: 150px;
-  height: 150px;
+  width: var(--cruz);
+  height: var(--cruz);
 }
 
 .pad__menu {
@@ -1598,8 +1628,8 @@ button.is-active {
 .btn {
   display: grid;
   place-items: center;
-  width: 62px;
-  height: 62px;
+  width: var(--tecla, 62px);
+  height: var(--tecla, 62px);
   padding: 0;
   border-radius: 50%;
   background: var(--bg-raised);
@@ -1617,16 +1647,18 @@ button.is-active {
 }
 
 /* A y B en diagonal, como en la consola. */
+/* En porcentaje y no en pixeles: asi la diagonal se mantiene cuando la caja
+   crece en un telefono mas alto. */
 .btn--a {
   position: absolute;
   right: 0;
-  top: 26px;
+  top: 17.3%;
 }
 
 .btn--b {
   position: absolute;
   left: 0;
-  bottom: 26px;
+  bottom: 17.3%;
 }
 
 .btn--wide {
@@ -1651,8 +1683,8 @@ button.is-active {
   position: relative;
   justify-self: center;
   align-self: center;
-  width: 150px;
-  height: 150px;
+  width: var(--cruz);
+  height: var(--cruz);
   touch-action: none;
 }
 
@@ -1667,11 +1699,13 @@ button.is-active {
   border-color: var(--accent);
 }
 
+/* Todo en porcentaje del cuadro: la cruceta entera escala con --cruz y no hay
+   que repetir cuatro juegos de medidas por cada tamano de pantalla. */
 .dpad__arm--up,
 .dpad__arm--down {
-  left: 50px;
-  width: 50px;
-  height: 52px;
+  left: 33.33%;
+  width: 33.33%;
+  height: 34.67%;
 }
 
 .dpad__arm--up {
@@ -1688,9 +1722,9 @@ button.is-active {
 
 .dpad__arm--left,
 .dpad__arm--right {
-  top: 50px;
-  width: 52px;
-  height: 50px;
+  top: 33.33%;
+  width: 34.67%;
+  height: 33.33%;
 }
 
 .dpad__arm--left {
@@ -1707,10 +1741,10 @@ button.is-active {
 
 .dpad__hub {
   position: absolute;
-  left: 50px;
-  top: 50px;
-  width: 50px;
-  height: 50px;
+  left: 33.33%;
+  top: 33.33%;
+  width: 33.33%;
+  height: 33.33%;
   background: var(--bg-raised);
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
@@ -1750,37 +1784,10 @@ button.is-active {
     gap: 10px 8px;
   }
 
-  .btn {
-    width: 58px;
-    height: 58px;
-  }
-
-  .dpad,
-  .pad__face {
-    width: 138px;
-    height: 138px;
-  }
-
-  .dpad__arm--up,
-  .dpad__arm--down {
-    left: 46px;
-    width: 46px;
-    height: 48px;
-  }
-
-  .dpad__arm--left,
-  .dpad__arm--right {
-    top: 46px;
-    width: 48px;
-    height: 46px;
-  }
-
-  .dpad__hub {
-    left: 46px;
-    top: 46px;
-    width: 46px;
-    height: 46px;
-  }
+  /* Aqui habia cuatro juegos de medidas fijas repetidas para un mando mas
+     pequeno. Ya no hacen falta: el clamp de arriba arranca justo en ese tamano
+     y las piezas van en porcentaje, asi que un telefono pequeno ve lo mismo que
+     veia y uno grande aprovecha el sitio. */
 }
 
 /* Movil en horizontal: el alto escasea, asi que el mando se reparte a los
