@@ -343,8 +343,8 @@ resaltado se rehízo buscando la copia, no mirando la ranura.
 
 Lo que falta por esto, hoy:
 
-- **Apagar el borde entre combate y combate.** Está pedido y es lo único que
-  falta de esa pantalla. Al acabar la pelea la marca se queda sobre el último que
+- **Apagar el borde entre combate y combate. PEDIDO TRES VECES.** Es lo único
+  que falta de esa pantalla y lo único que bloquea un comando. Al acabar la pelea la marca se queda sobre el último que
   peleó, porque la copia no se borra. Antes del primer combate de la sesión no se
   ilumina nadie, que es lo correcto; el hueco es el "después".
 
@@ -377,6 +377,53 @@ verdad**, con el botón de "Exportar estado" que ya está en los ajustes.
 
 ---
 
+## El emulador en móviles flojos
+
+Reportado tres veces, dos de ellas por otras personas: el juego va lento, el
+vídeo que llega al compañero sale borroso y deformado, y acaba en pantalla en
+blanco o en "la página no responde".
+
+**La teoría de que el núcleo es "de 64 bits" no se sostiene, y conviene zanjarla
+antes de gastar trabajo ahí.** mGBA aquí es WebAssembly, que es de 32 bits y no
+tiene arquitectura propia: el navegador lo traduce al procesador que haya, ARM
+incluido. Un móvil no puede "no poder con la arquitectura". Lo que sí puede es no
+tener CPU suficiente, que es otra cosa y se arregla en otro sitio.
+
+**Lo que de verdad pasa**, según lo que se ha podido medir y lo que dicen los
+avisos del navegador:
+
+- El emulador corre **en el hilo principal**, el mismo que pinta la interfaz. No
+  hay ni Worker ni OffscreenCanvas. Por eso el aviso que sale es "la página no
+  responde": no es que el emulador vaya lento, es que mientras emula no deja
+  respirar a nada más.
+- Encima va la codificación del vídeo para el compañero, a 60 por segundo.
+- Y cuando el sistema anda justo de memoria, le quita al navegador el contexto de
+  vídeo. Eso ya está contemplado: se avisa en vez de dejar un rectángulo blanco
+  (`test:sin:video`), pero avisar no es arreglar.
+
+**Lo que NO es**, medido para no volver a mirarlo: leer el equipo cada tres
+segundos cuesta 12 ms con la CPU frenada seis veces. No es por ahí.
+
+Caminos, de más a menos prometedor:
+
+1. **Llevar el emulador a un Worker con OffscreenCanvas.** Es el arreglo de
+   verdad: la interfaz deja de competir con la emulación y se acaban los "no
+   responde". Es también el más caro, porque hoy el núcleo recibe un canvas del
+   DOM y todo lo demás cuelga de ahí.
+2. **Bajar lo que cuesta compartir pantalla en los aparatos flojos.** Ojo: bajar
+   a 30 fps ya se probó y se midió, y se descartó porque no se nota como "ir a la
+   mitad" sino como tirones. Si se vuelve a intentar, que sea bajando resolución
+   antes que fotogramas, y midiendo.
+3. **Dejar elegir**: en un móvil que no da abasto, poder apagar el envío de vídeo
+   y quedarse solo con el equipo y la voz. Es poco trabajo y devuelve la partida
+   a quien hoy no puede jugar.
+
+Cambiar de núcleo es la opción que peor sale: el resto del programa -equipo,
+medallas, combate, fin de partida- está construido sobre leer **savestates de
+mGBA**. Otro núcleo significa rehacer todo eso.
+
+---
+
 ## Intercambios en la interfaz
 
 El mecanismo está hecho y comprobado; falta la parte que ve el jugador: elegir
@@ -386,6 +433,20 @@ conexión.
 
 Lo que se enseña antes de aceptar ya sabe decirlo `describirTrato`: que entregas
 un BULBASAUR y que en la copia del otro esa especie es de otro tipo.
+
+**Cuidado con una confusión que ya ha pasado**, y que hay que resolver en la
+interfaz y no explicándola: alguien intentó intercambiar **desde dentro del
+juego**, en la sala de unión del Centro Pokémon, y se quedó en "Espera unos
+instantes" sin encontrar a nadie. Es lo esperable y no se va a arreglar: ahí el
+juego busca un **cable link**, y aquí no hay ninguno. Son dos emuladores
+independientes, cada uno con su ROM, y entre ellos no viaja nada que el juego
+reconozca como cable.
+
+El intercambio de este programa es otra cosa: se editan los cien bytes del
+Pokémon en la memoria de cada partida. Por eso, cuando se haga la interfaz, tiene
+que estar **fuera del juego** -en la barra, como un botón de intercambiar- y
+decir en algún sitio que la sala de unión del juego no sirve. Si no, el primero
+que lo intente volverá a perder diez minutos ahí dentro.
 
 ---
 
