@@ -68,12 +68,11 @@ body {
 }
 
 /* Antes esto era un cuadro amarillo con un triangulo dentro. Ahora es el
-   logotipo, asi que ni fondo ni centrado de texto: la imagen trae lo suyo. */
+   logotipo, asi que ni fondo, ni centrado de texto, ni esquinas redondeadas:
+   la imagen ya viene recortada en redondo y con el fondo transparente. */
 .brand__mark {
   width: 34px;
   height: 34px;
-  border-radius: 9px;
-  object-fit: cover;
   flex-shrink: 0;
 }
 
