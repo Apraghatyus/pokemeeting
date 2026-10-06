@@ -334,6 +334,35 @@ body {
   background: #000;
 }
 
+/* El aviso de que el lienzo se quedo sin contexto de video. Tapa la pantalla
+   entera porque debajo no hay nada que mirar: justo eso es el problema. */
+.pantalla__caida {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  text-align: center;
+  background: var(--bg-panel);
+}
+
+.pantalla__caida strong {
+  font-size: 13px;
+  color: var(--rojo);
+}
+
+.pantalla__caida p {
+  margin: 0;
+  max-width: 34ch;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
 .pantalla__etiqueta {
   position: absolute;
   top: 10px;

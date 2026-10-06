@@ -255,6 +255,38 @@ export const Stage = ({
   );
   const [fullscreen, setFullscreen] = useState(false);
 
+  /**
+   * Si el navegador le ha quitado al lienzo su contexto de video.
+   *
+   * Pasa de verdad y se reporto tres veces: en un telefono justo de memoria, el
+   * sistema le retira la memoria de video al navegador y el lienzo se queda en
+   * blanco. Sin escuchar esto no habia ni aviso ni vuelta atras, porque el
+   * navegador **solo** intenta restaurarlo si alguien atiende el evento y
+   * llama a preventDefault. Y aun atendiendolo, mGBA no vuelve solo: sus
+   * texturas se fueron con el contexto. Asi que lo honesto no es fingir que se
+   * arregla, es decir lo que ha pasado y ofrecer recargar.
+   */
+  const [sinVideo, setSinVideo] = useState(false);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const alPerder = (evento: Event) => {
+      // Sin esto el navegador ni siquiera intenta devolverlo.
+      evento.preventDefault();
+      setSinVideo(true);
+    };
+    const alVolver = () => setSinVideo(false);
+
+    canvas.addEventListener('webglcontextlost', alPerder);
+    canvas.addEventListener('webglcontextrestored', alVolver);
+    return () => {
+      canvas.removeEventListener('webglcontextlost', alPerder);
+      canvas.removeEventListener('webglcontextrestored', alVolver);
+    };
+  }, [canvasRef]);
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -307,6 +339,21 @@ export const Stage = ({
         }
       >
         <canvas ref={canvasRef} className="pantalla__media" width={240} height={160} />
+
+        {/* Un rectangulo en blanco sin explicacion es lo peor que puede pasar
+            aqui: parece que la aplicacion se ha roto sin motivo. */}
+        {sinVideo && (
+          <div className="pantalla__caida" role="alert">
+            <strong>El movil se quedo sin memoria de video.</strong>
+            <p>
+              La imagen no vuelve sola. Lo que hayas guardado dentro del juego esta a salvo;
+              al recargar tendras que volver a abrir la ROM.
+            </p>
+            <button type="button" className="button--primary" onClick={() => location.reload()}>
+              Recargar
+            </button>
+          </div>
+        )}
         <span className="pantalla__etiqueta">
           <span className="dot dot--on" />
           Tu partida
