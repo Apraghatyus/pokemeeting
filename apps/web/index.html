@@ -3,8 +3,27 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23e4574a'/%3E%3Cpath d='M2 16h28' stroke='%23111' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='5' fill='%23fff' stroke='%23111' stroke-width='3'/%3E%3C/svg%3E" />
-    <title>Emupoke Together</title>
+
+    <!-- El icono es solo la bola del logotipo, sin el nombre debajo: a 32
+         pixeles el texto no se lee y lo unico que hace es encoger el dibujo. -->
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/icono-192.png" />
+
+    <title>Pokemeeting</title>
+    <meta
+      name="description"
+      content="Juega a Pokemon con alguien: cada uno con su propia partida, viendo la del otro en directo y hablando por voz."
+    />
+    <!-- El mismo fondo que la pagina, para que el navegador no pinte una franja
+         blanca encima en el movil. -->
+    <meta name="theme-color" content="#0b0f14" />
+
+    <meta property="og:title" content="Pokemeeting" />
+    <meta
+      property="og:description"
+      content="Juega a Pokemon con alguien: cada uno con su propia partida, viendo la del otro en directo."
+    />
+    <meta property="og:image" content="/logo.png" />
   </head>
   <body>
     <div id="root"></div>

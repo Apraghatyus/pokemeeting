@@ -1,4 +1,4 @@
-# Emupoke Together
+# Pokemeeting
 
 Un emulador de Game Boy Advance que corre en el navegador, pensado para jugar a
 Pokémon acompañado: cada jugador corre su propia partida en su propio ordenador

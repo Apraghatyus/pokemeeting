@@ -1,6 +1,6 @@
 # Desplegar en un servidor propio
 
-Instructivo para dejar Emupoke Together corriendo en un servidor tuyo, con tu
+Instructivo para dejar Pokemeeting corriendo en un servidor tuyo, con tu
 dominio, sin tuneles temporales.
 
 Lo que hay aqui esta comprobado contra el proyecto tal y como esta: los puertos
@@ -104,7 +104,7 @@ Dos unidades de systemd. El servicio de aleatorizacion ya escucha solo en
 
 ```ini
 [Unit]
-Description=Emupoke Together - servidor de salas
+Description=Pokemeeting - servidor de salas
 After=network.target
 
 [Service]
@@ -122,7 +122,7 @@ WantedBy=multi-user.target
 
 ```ini
 [Unit]
-Description=Emupoke Together - aleatorizacion
+Description=Pokemeeting - aleatorizacion
 After=network.target
 
 [Service]

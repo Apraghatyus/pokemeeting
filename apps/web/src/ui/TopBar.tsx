@@ -51,11 +51,12 @@ export const TopBar = ({
   return (
     <header className="topbar">
       <div className="brand">
-        <span className="brand__mark" aria-hidden="true">
-          ▶
-        </span>
+        {/* El logotipo, no un triangulo generico. Va como imagen y no como
+            fondo en el estilo para que se pueda describir y para que el
+            navegador la cachee como cualquier otra. */}
+        <img className="brand__mark" src="/icono-192.png" alt="" aria-hidden="true" />
         <div>
-          <strong>Emupoke Together</strong>
+          <strong>Pokemeeting</strong>
           <span className="brand__sub">Sesion compartida</span>
         </div>
       </div>
