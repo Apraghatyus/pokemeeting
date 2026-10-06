@@ -130,6 +130,15 @@ export type EquipoResumen = {
    * sale de su ordenador. Lo manda quien puede saberlo.
    */
   peleando?: number | null;
+  /**
+   * Si esa partida esta ahora mismo en un combate. Null si no se sabe.
+   *
+   * Viaja con el equipo por el mismo motivo que `peleando`: lo sabe quien tiene
+   * la memoria delante. Y hace falta para algo que no es obvio: mientras hay
+   * combate el juego **mueve las ranuras del equipo**, asi que el panel tiene
+   * que dejar de seguirlas o se baraja solo en mitad de la pelea.
+   */
+  enCombate?: boolean | null;
 };
 
 /**

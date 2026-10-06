@@ -186,6 +186,17 @@ causa no era la que parecía. Guardar el porqué ahorra volver a investigarlo.
   modal de 326, y los botones llegaban hasta el 418 con el modal acabando en
   343. Ahora se apila. Las dos cosas las vigila `test:movil:colocacion`, que lee
   lo que calcula el navegador y no las clases, porque ahi no estaba el fallo.
+- **El panel se reorganizaba al entrar en combate.** Y es la segunda mitad de
+  una queja que parecia contraria a la primera. Pedido: que el orden solo cambie
+  cuando el jugador reordena su equipo desde el menu, no al entrar en combate ni
+  al pulsar POKeMON. Pedido antes: que el panel ensene el mismo orden que la
+  lista del juego. Las dos son ciertas, y lo que las concilia es **saber cuando
+  hay combate**, que antes no se sabia y ahora si. La regla cabe en una frase:
+  fuera de combate manda el juego -asi reordenar a mano se ve- y dentro de
+  combate no se mueve nada, porque ahi el juego cambia las ranuras por su cuenta.
+  De un juego cuya bandera de combate no este medida se sigue al juego, que es
+  lo que deja funcionando lo que el jugador SI controla. `test:orden` lo prueba
+  con el ciclo entero: mapa, combate, vuelta al mapa y reordenar a mano.
 - **El panel no se parecia a la lista del juego, y el borde senalaba al que no
   era.** Los dos fallos tenian la misma raiz: se dio por hecho que tercera
   generacion sube a la ranura 0 al Pokemon que sale a pelear. Sobre esa idea se

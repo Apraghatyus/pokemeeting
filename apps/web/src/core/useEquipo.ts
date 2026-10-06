@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EquipoResumen } from '@emupoke/protocol';
 import {
+  enCombate,
   enDerrota,
   enSalonDeLaFama,
   quienPelea,
@@ -148,6 +149,7 @@ export const useEquipo = (
             tipos: especiesRef.current.tipos(r.especie),
           })),
           peleando: quienPelea(estado, leido, juegoRef.current || leido.juego),
+          enCombate: enCombate(estado, juegoRef.current || leido.juego),
         };
       }
 

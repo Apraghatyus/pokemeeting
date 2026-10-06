@@ -1,57 +1,104 @@
 // En que orden se ensena el equipo, y a quien se ilumina.
 //
-// AQUI HUBO UN ORDEN "ESTABLE" Y SE HA QUITADO. La idea era que el panel no se
-// barajara solo: se recordaba el orden en que habian aparecido y se colocaban
-// siempre asi, pasara lo que pasara en memoria. Se construyo sobre la idea de
-// que tercera generacion sube a la ranura 0 al que sale a pelear.
+// La regla tiene UNA frase: fuera de combate manda el juego, y dentro de
+// combate no se mueve nada.
 //
-// Las dos cosas estaban mal, y lo enseno una partida de verdad: el equipo en el
-// juego era [PEZGATO, A BUENO], el panel ensenaba [A BUENO, PEZGATO], y el
-// resaltado senalaba a PEZGATO mientras peleaba A BUENO. O sea que el orden
-// "estable" no protegia de nada -el juego no mueve las ranuras- y ademas hacia
-// que el panel no se pareciera a la lista del propio juego.
+// Y las dos mitades vienen de dos quejas distintas, que parecian contrarias y
+// no lo eran:
 //
-// Asi que el orden es el del juego, y ya esta. Es el unico que se puede
-// comprobar mirando la pantalla, que es lo que hace el jugador.
+//   - "El panel no se parece a la lista del juego". Cierto: aqui hubo un orden
+//     propio que recordaba como habian aparecido, y acababa ensenando un reparto
+//     que no coincidia con el del juego ni cuando el jugador lo reordenaba a
+//     mano. Por eso fuera de combate se sigue al juego y punto.
+//   - "No se debe reorganizar cuando entre en combate y pulse POKeMON". Tambien
+//     cierto: durante un combate el juego mueve las ranuras por su cuenta, asi
+//     que seguirlas ahi hace que el panel se baraje solo justo cuando el jugador
+//     esta mirando otra cosa.
 //
-// Y quien pelea se lee aparte, buscando la copia de combate por personalidad
-// (ver `quienPelea` en el paquete de dominio). Si no hay combate, no se ilumina
-// a nadie: una marca permanente sobre el primero no dice nada.
+// Lo que las concilia es saber cuando hay combate, que antes no se sabia. Ahora
+// si: viene con el equipo, medido de la memoria de cada partida.
+//
+// Si de un juego no se sabe -porque su bandera de combate no esta medida- se
+// sigue al juego. Es la opcion que deja funcionando lo que el jugador SI
+// controla, que es reordenar su equipo a mano.
 
+import { useRef } from 'react';
 import type { EquipoResumen, PokemonResumen } from '@emupoke/protocol';
 
 export type EquipoOrdenado = {
-  /** Los mismos Pokemon, en el orden en que los tiene el juego. */
+  /** Los mismos Pokemon, en el orden en que toca ensenarlos. */
   ranuras: PokemonResumen[];
   /**
    * La personalidad del que esta peleando, o null si no hay combate.
    *
    * Se dice por personalidad y no por ranura. La ranura es un sitio, y el que
-   * pelea no esta en un sitio fijo: eso fue justo el fallo.
+   * pelea no esta en un sitio fijo: eso fue justo el fallo que hubo aqui.
    */
   alFrente: number | null;
+  /** El orden aprendido, para pasarselo a la siguiente lectura. */
+  orden: number[];
+};
+
+const porRanura = (ranuras: readonly PokemonResumen[]): PokemonResumen[] =>
+  [...ranuras].sort((a, b) => a.ranura - b.ranura);
+
+/**
+ * Coloca el equipo.
+ *
+ * @param equipo  lo que dice la memoria ahora mismo
+ * @param previo  personalidades en el orden en que se estaban ensenando
+ */
+export const ordenarComoElJuego = (
+  equipo: EquipoResumen | null,
+  previo: readonly number[] = [],
+): EquipoOrdenado => {
+  if (!equipo || equipo.ranuras.length === 0) {
+    // El orden aprendido se conserva aunque la lectura venga vacia: no haber
+    // podido leer no es lo mismo que haberse quedado sin equipo.
+    return { ranuras: [], alFrente: null, orden: [...previo] };
+  }
+
+  const alFrente = equipo.peleando ?? null;
+
+  // Fuera de combate, y cuando no se sabe, manda el juego.
+  if (equipo.enCombate !== true) {
+    const ranuras = porRanura(equipo.ranuras);
+    return { ranuras, alFrente, orden: ranuras.map((r) => r.personalidad) };
+  }
+
+  // En combate: se mantiene el orden que ya se estaba ensenando. Se identifican
+  // por personalidad, los cuatro bytes que no cambian nunca; el mote no vale
+  // -dos pueden llamarse igual- y la especie tampoco.
+  const porPersonalidad = new Map(equipo.ranuras.map((r) => [r.personalidad, r]));
+  const ranuras: PokemonResumen[] = [];
+
+  for (const personalidad of previo) {
+    const ranura = porPersonalidad.get(personalidad);
+    if (!ranura) continue;
+    ranuras.push(ranura);
+    porPersonalidad.delete(personalidad);
+  }
+
+  // Lo que no estuviera en el orden anterior entra al final, por su ranura. Es
+  // el caso de capturar en mitad de un combate.
+  for (const ranura of porRanura([...porPersonalidad.values()])) ranuras.push(ranura);
+
+  return { ranuras, alFrente, orden: ranuras.map((r) => r.personalidad) };
 };
 
 /**
- * Coloca el equipo como lo tiene el juego.
+ * El equipo listo para pintar, recordando el orden entre lecturas.
  *
- * El lector ya los devuelve en orden, pero se ordena igualmente: el equipo del
- * companero llega por la red, y lo que llega de fuera no se da por ordenado.
+ * El orden vive en una ref y no en el estado: cambiarlo no tiene que provocar un
+ * repintado por si mismo, solo acompanar al equipo que ya lo provoca.
  */
-export const ordenarComoElJuego = (equipo: EquipoResumen | null): EquipoOrdenado => {
-  if (!equipo || equipo.ranuras.length === 0) return { ranuras: [], alFrente: null };
-
-  return {
-    ranuras: [...equipo.ranuras].sort((a, b) => a.ranura - b.ranura),
-    alFrente: equipo.peleando ?? null,
-  };
-};
-
-/** El equipo listo para pintar. */
 export const useEquipoOrdenado = (
   equipo: EquipoResumen | null,
 ): { equipo: EquipoResumen | null; alFrente: number | null } => {
-  const colocado = ordenarComoElJuego(equipo);
+  const orden = useRef<number[]>([]);
+
+  const colocado = ordenarComoElJuego(equipo, orden.current);
+  orden.current = colocado.orden;
 
   return {
     equipo: equipo ? { ...equipo, ranuras: colocado.ranuras } : null,

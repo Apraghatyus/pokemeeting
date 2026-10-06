@@ -58,11 +58,14 @@ const cargarEstado = async (fichero) => {
   return Boolean(ok);
 };
 
-/** Cuantas fichas estan iluminadas, y cuantas hay. */
+/** Cuantas fichas estan iluminadas, cuantas hay y en que orden. */
 const fichas = () =>
   page.evaluate(() => ({
     total: document.querySelectorAll('.ficha:not(.ficha--hueco)').length,
     encendidas: document.querySelectorAll('.ficha--activo').length,
+    orden: [...document.querySelectorAll('.ficha:not(.ficha--hueco) .ficha__nombre')]
+      .map((e) => e.textContent?.trim() ?? '')
+      .join(','),
   }));
 
 check('se carga el estado de dentro del combate', (await cargarEstado(COMBATE)) === true);
@@ -71,12 +74,24 @@ check('con la partida en combate se ve el equipo', enPelea.total > 0, `${enPelea
 check('y UNO esta iluminado: el que pelea', enPelea.encendidas === 1,
   `${enPelea.encendidas} iluminadas`);
 
+// EL SEGUNDO FALLO QUE SE REPORTO: al entrar en combate, el panel se
+// reorganizaba solo. El juego mueve sus ranuras durante la pelea, asi que el
+// panel tiene que dejar de seguirlas mientras dure.
 check('se carga el estado de caminando', (await cargarEstado(MAPA)) === true);
 const enMapa = await fichas();
 check('fuera de combate se sigue viendo el equipo', enMapa.total > 0, `${enMapa.total} fichas`);
-// EL FALLO QUE SE REPORTO.
+// EL PRIMER FALLO QUE SE REPORTO.
 check('pero NO hay ninguno iluminado', enMapa.encendidas === 0,
   `${enMapa.encendidas} iluminadas`);
+
+// Y el orden: fuera de combate manda el juego. Se vuelve a entrar en combate y
+// el panel tiene que quedarse como estaba.
+const ordenEnMapa = enMapa.orden;
+await cargarEstado(COMBATE);
+const alVolverAPelear = await fichas();
+check('al entrar en combate el panel NO se reorganiza',
+  alVolverAPelear.orden === ordenEnMapa,
+  `en el mapa ${ordenEnMapa}, peleando ${alVolverAPelear.orden}`);
 
 await navegador.close();
 console.log(fallos === 0 ? '\nEL BORDE SOLO SE ENCIENDE EN COMBATE' : `\n${fallos} COMPROBACIONES FALLIDAS`);

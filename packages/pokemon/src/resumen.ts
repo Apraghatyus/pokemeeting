@@ -185,6 +185,9 @@ export const mismoEquipo = (a: EquipoResumen | null, b: EquipoResumen | null): b
   // Cambiar de Pokemon en combate no cambia el equipo, pero si lo que se
   // ensena. Sin esto el cambio no se repintaba ni se mandaba al companero.
   if ((a.peleando ?? null) !== (b.peleando ?? null)) return false;
+  // Entrar o salir de un combate cambia como se ordena el panel, asi que dos
+  // lecturas que solo difieran en eso NO dicen lo mismo.
+  if ((a.enCombate ?? null) !== (b.enCombate ?? null)) return false;
   return a.ranuras.every((uno, i) => {
     const otro = b.ranuras[i]!;
     return (
