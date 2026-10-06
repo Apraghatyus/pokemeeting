@@ -64,6 +64,8 @@
     "test:bordes": "node tools/tests/test-bordes.mjs",
     "test:derrota": "npx tsx tools/tests/test-derrota.mjs",
     "test:combate": "npx tsx tools/tests/test-combate.mjs",
+    "test:trato": "npx tsx tools/tests/test-intercambio-red.mjs",
+    "test:trato:ui": "node tools/tests/test-intercambio-ui.mjs",
     "test:borde:combate": "node tools/tests/test-borde-combate.mjs",
     "buscar:combate": "node tools/buscar-combate.mjs",
     "test:victoria": "npx tsx tools/tests/test-victoria.mjs",

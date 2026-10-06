@@ -569,29 +569,53 @@ que hay apuntado en este documento.
 
 ---
 
-## Intercambios en la interfaz
+## Intercambios — HECHO
 
-El mecanismo está hecho y comprobado; falta la parte que ve el jugador: elegir
-el Pokémon, mandar los cien bytes por el canal de datos -que ya está abierto- y
-confirmar en dos fases para que nadie duplique ni pierda nada si se corta la
-conexión.
+Se intercambia desde el boton de la barra, con el Pokemon elegido a mano y sin
+tocar la sala de union del juego. El motor ya estaba; lo que se ha anadido es el
+protocolo, la pantalla y, sobre todo, el acuerdo entre los dos lados.
 
-Lo que se enseña antes de aceptar ya sabe decirlo `describirTrato`: que entregas
-un BULBASAUR y que en la copia del otro esa especie es de otro tipo.
+**Como se evita el duplicado**, que era el problema de diseno y no la pantalla.
+No hay servidor que arbitre, asi que no existe un instante en que los dos
+cambios ocurran a la vez. En vez de buscarlo, se mueve el riesgo:
 
-**Cuidado con una confusión que ya ha pasado**, y que hay que resolver en la
-interfaz y no explicándola: alguien intentó intercambiar **desde dentro del
-juego**, en la sala de unión del Centro Pokémon, y se quedó en "Espera unos
-instantes" sin encontrar a nadie. Es lo esperable y no se va a arreglar: ahí el
-juego busca un **cable link**, y aquí no hay ninguno. Son dos emuladores
-independientes, cada uno con su ROM, y entre ellos no viaja nada que el juego
-reconozca como cable.
+1. Primero viajan las OFERTAS. Nadie toca su partida, asi que cortarse no cuesta
+   nada.
+2. Cuando los dos tienen las dos ofertas y los dos han dicho que si, cada lado
+   tiene ya todo lo que necesita para terminar **por su cuenta**: a partir de
+   ahi el companero sobra.
+3. Antes de escribir nada se apunta el trato en un diario que sobrevive a cerrar
+   el navegador, con los bytes dentro.
 
-El intercambio de este programa es otra cosa: se editan los cien bytes del
-Pokémon en la memoria de cada partida. Por eso, cuando se haga la interfaz, tiene
-que estar **fuera del juego** -en la barra, como un botón de intercambiar- y
-decir en algún sitio que la sala de unión del juego no sirve. Si no, el primero
-que lo intente volverá a perder diez minutos ahí dentro.
+Y aplicar es idempotente -escribir el mismo bloque en la misma ranura dos veces
+deja lo mismo-, asi que reintentar nunca estropea nada.
+
+**La ventana que queda, dicha y no tapada**: entre que mando mi "si" y recibo el
+suyo. Si se corta justo ahi, yo no aplico. Eso es a propósito: **no aplicar es el
+lado seguro**, porque deja a los dos con lo suyo. Lo contrario -aplicar por si
+acaso- es lo que crea el duplicado.
+
+**Dos cosas que salieron al probarlo de verdad**, y que no se habrian visto de
+otra forma:
+
+- El motor llamaba a `localizarEquipo` **sin el codigo del juego**, y eso busca
+  por forma y se queda con la tira mas larga que parezca un equipo: la del rival.
+  El intercambio decia "hecho" y no cambiaba nada, porque escribia en el equipo
+  del entrenador contra el que habias peleado. Es el mismo fallo que tuvo el
+  panel en su dia, pero aqui no ensena: escribe.
+- El boton estaba atado a tener companero, y rematar un trato a medias se hace
+  **sin** companero. El boton de terminarlo quedaba fuera de alcance justo
+  cuando hacia falta. Ahora sale con partida.
+
+Lo vigilan `test:trato` -lo que se rechaza por el canal, que es mas importante
+que lo que se acepta: lo que entra acaba escrito en la partida de alguien- y
+`test:trato:ui`, que monta dos navegadores en una sala, intercambia de verdad y
+comprueba los dos equipos antes y despues. Esa prueba incluye el caso que no se
+puede provocar a mano: que con un solo "si" **nadie** toque su partida.
+
+Lo que sigue faltando: enseñar lo que dice `describirTrato` sobre como cambia el
+Pokemon en la copia del otro. Para eso hace falta su ROM, que no sale de su
+ordenador, asi que habria que mandarle a cada uno lo que su propia copia dice.
 
 ---
 

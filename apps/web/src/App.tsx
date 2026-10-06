@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { RomFingerprint } from '@emupoke/protocol';
+import type { EquipoResumen, RomFingerprint } from '@emupoke/protocol';
 import { useTeclas } from './core/useTeclas';
 import { useEmulator } from './core/useEmulator';
 import { useKeyboardOwnership } from './core/useKeyboardOwnership';
@@ -12,9 +12,11 @@ import { useEspecies } from './core/useEspecies';
 import { useMandoTactil } from './core/useMandoTactil';
 import { codificarSemilla } from './core/semilla';
 import { nombreDePartida, sePuedeRehacer, todasLasPartidas } from './core/partidas';
-import { motesDebilitados } from '@emupoke/pokemon';
+import { motesDebilitados, parseGameCode } from '@emupoke/pokemon';
 import { EquipoPanel } from './ui/EquipoPanel';
 import { AjustesModal } from './ui/AjustesModal';
+import { IntercambioModal } from './ui/IntercambioModal';
+import { useIntercambio } from './core/useIntercambio';
 import { FinModal } from './ui/FinModal';
 import { TOTAL_LIGA, type PasoLiga } from './ui/Liga';
 import { RandomizerModal } from './ui/RandomizerModal';
@@ -40,6 +42,7 @@ export const App = () => {
 
   const [roomOpen, setRoomOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [tratoOpen, setTratoOpen] = useState(false);
   const [randomizerOpen, setRandomizerOpen] = useState(false);
 
   // El mando en pantalla aparece solo cuando hace falta: lo decide con que se
@@ -50,7 +53,7 @@ export const App = () => {
   // este en un boton: si no, las flechas moverian al personaje por detras.
   const keyboardOwner = useKeyboardOwnership(
     emulator.coreRef,
-    roomOpen || menuOpen || randomizerOpen,
+    roomOpen || menuOpen || randomizerOpen || tratoOpen,
   );
 
   // Espacio enciende y apaga el avance rapido, como en casi cualquier emulador.
@@ -126,6 +129,14 @@ export const App = () => {
   // El reto se acaba cuando cae el equipo entero. No lo dice el juego -ahi
   // pierdes, vuelves al Centro Pokemon y sigues-: es la regla de la Nuzlocke,
   // asi que se aplica aqui.
+  const intercambio = useIntercambio(
+    emulator.coreRef,
+    emulator.romBytesRef.current,
+    state.romName,
+    session.enviarDelTrato,
+    session.escucharTrato,
+  );
+
   const fin = useFinDePartida(miEquipo.equipo, state.romName, miEquipo.derrota, miEquipo.victoria);
 
   // Mandarle el equipo al companero. Se hace desde un solo sitio y no al
@@ -170,6 +181,8 @@ export const App = () => {
         session={session.state}
         keyboardOwner={keyboardOwner}
         onOpenRoom={() => setRoomOpen(true)}
+        onOpenTrade={() => setTratoOpen(true)}
+        hayPartida={hasRom}
         onToggleMenu={() => setMenuOpen((v) => !v)}
         menuOpen={menuOpen}
         volume={state.volume}
@@ -307,6 +320,16 @@ export const App = () => {
           }}
         />
 
+        <IntercambioModal
+          open={tratoOpen}
+          onClose={() => setTratoOpen(false)}
+          intercambio={intercambio}
+          equipo={equipoMio.equipo}
+          especies={especies}
+          conCompanero={conCompanero}
+          generacion={generacionDelEquipo(equipoMio.equipo)}
+        />
+
         <AjustesModal
           open={menuOpen}
           onClose={() => setMenuOpen(false)}
@@ -373,6 +396,10 @@ export const App = () => {
  * Se busca por el CRC de la ROM cargada, que es lo que une una partida con su
  * copia. Jugando una ROM tal cual no hay partida que nombrar, y devuelve null.
  */
+/** De que juego es el equipo, para elegir la coleccion de sprites. */
+const generacionDelEquipo = (equipo: EquipoResumen | null): number =>
+  equipo ? (parseGameCode(equipo.juego).game?.generacion ?? 3) : 3;
+
 const LIGA_COMPLETA: readonly PasoLiga[] = Array.from({ length: TOTAL_LIGA }, () => 'derrotado');
 
 const nombreDeLaPartidaEnCurso = (crc32: string | null): string | null => {

@@ -138,7 +138,76 @@ export type EquipoResumen = {
  * Va por el canal de datos de WebRTC, que es cifrado y punto a punto: el
  * servidor de salas los presento y se aparto, y esto ya no lo ve nadie mas.
  */
-export type PeerMessage = { type: 'equipo'; equipo: EquipoResumen };
+/**
+ * Lo que se ofrece en un intercambio.
+ *
+ * Van los cien bytes del Pokemon tal cual, en base64 porque esto viaja como
+ * JSON. Van tambien el mote, la especie y el nivel, y no es informacion
+ * repetida: quien recibe tiene que poder ensenar QUE le ofrecen antes de
+ * aceptar, y descifrar el bloque para eso seria pedirle que se fie primero.
+ */
+export type OfertaIntercambio = {
+  /** Identifica el trato. Los dos lados acaban usando el mismo. */
+  trato: string;
+  /** De que ranura del equipo sale, 0 a 5. */
+  ranura: number;
+  /** Los cien bytes, en base64. */
+  bloque: string;
+  mote: string;
+  especie: number;
+  nivel: number;
+};
+
+export type PeerMessage =
+  | { type: 'equipo'; equipo: EquipoResumen }
+  | { type: 'oferta'; oferta: OfertaIntercambio }
+  /** "Por mi adelante": el que lo manda ya ha confirmado. */
+  | { type: 'trato-listo'; trato: string }
+  | { type: 'trato-roto'; trato: string };
+
+/** Cuanto ocupa un Pokemon de tercera generacion, y por tanto su bloque. */
+const BYTES_DE_UN_POKEMON = 100;
+
+/**
+ * Como tiene que ser el bloque escrito en base64, y por que asi y no por su
+ * longitud a secas.
+ *
+ * Medir la cadena NO basta, y se vio probandolo: 100 bytes y 101 ocupan los
+ * mismos 136 caracteres. Dejar pasar uno de 101 no da un Pokemon raro, da un
+ * byte escrito encima del Pokemon de al lado.
+ *
+ * Lo que si los distingue es el relleno del final: 100 bytes acaban en "==",
+ * 101 en un solo "=" y 102 sin ninguno. Asi que se exige el tamano exacto Y el
+ * relleno, y de paso que no haya nada que no sea base64.
+ */
+const BLOQUE_EN_BASE64 = 136;
+const BLOQUE_VALIDO = /^[A-Za-z0-9+/]{134}==$/;
+
+const esOferta = (valor: unknown): valor is OfertaIntercambio => {
+  if (typeof valor !== 'object' || valor === null) return false;
+  const o = valor as Record<string, unknown>;
+  return (
+    typeof o.trato === 'string' &&
+    o.trato.length > 0 &&
+    o.trato.length <= 64 &&
+    typeof o.ranura === 'number' &&
+    Number.isInteger(o.ranura) &&
+    o.ranura >= 0 &&
+    o.ranura < 6 &&
+    typeof o.bloque === 'string' &&
+    // Exacto, no "como mucho": un bloque de otro tamano no es un Pokemon.
+    o.bloque.length === BLOQUE_EN_BASE64 &&
+    BLOQUE_VALIDO.test(o.bloque) &&
+    typeof o.mote === 'string' &&
+    o.mote.length <= 20 &&
+    typeof o.especie === 'number' &&
+    typeof o.nivel === 'number' &&
+    o.nivel >= 1 &&
+    o.nivel <= 100
+  );
+};
+
+export { BYTES_DE_UN_POKEMON };
 
 /**
  * Lee un mensaje del companero sin fiarse de el.
@@ -156,7 +225,18 @@ export const parsePeerMessage = (crudo: string): PeerMessage | null => {
   }
   if (typeof datos !== 'object' || datos === null) return null;
 
-  const mensaje = datos as { type?: unknown; equipo?: unknown };
+  const mensaje = datos as { type?: unknown; equipo?: unknown; oferta?: unknown; trato?: unknown };
+
+  // Los del intercambio se miran aqui arriba porque no llevan equipo dentro.
+  if (mensaje.type === 'oferta') {
+    return esOferta(mensaje.oferta) ? { type: 'oferta', oferta: mensaje.oferta } : null;
+  }
+  if (mensaje.type === 'trato-listo' || mensaje.type === 'trato-roto') {
+    const trato = mensaje.trato;
+    if (typeof trato !== 'string' || trato.length === 0 || trato.length > 64) return null;
+    return { type: mensaje.type, trato };
+  }
+
   if (mensaje.type !== 'equipo') return null;
 
   const equipo = mensaje.equipo as EquipoResumen | undefined;

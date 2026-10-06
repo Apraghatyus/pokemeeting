@@ -1,5 +1,10 @@
 import { useCallback, useRef, useState } from 'react';
-import { parsePeerMessage, type EquipoResumen, type RomFingerprint } from '@emupoke/protocol';
+import {
+  parsePeerMessage,
+  type EquipoResumen,
+  type PeerMessage,
+  type RomFingerprint,
+} from '@emupoke/protocol';
 import { compareRoms, type RomCompatibility } from '@emupoke/pokemon';
 import { PeerLink, type PeerState } from './peerLink';
 import { SignalingClient } from './signalingClient';
@@ -112,6 +117,8 @@ export const useSession = (
   /** Momento del ultimo equipo que llego, para descartar los que lleguen tarde. */
   const ultimoEquipoRef = useRef<number | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  /** Quien esta pendiente de los mensajes del intercambio. */
+  const oyentesDelTrato = useRef(new Set<(mensaje: PeerMessage) => void>());
   // La pista del microfono sobrevive a la conexion: si el companero se va y
   // vuelve, se reengancha al nuevo enlace sin volver a pedir permiso.
   const micTrackRef = useRef<MediaStreamTrack | null>(null);
@@ -199,6 +206,15 @@ export const useSession = (
             // cuadre se descarta y la partida sigue.
             const mensaje = parsePeerMessage(crudo);
             if (!mensaje) return;
+
+            // Los del intercambio van a quien los este escuchando, y no al
+            // estado. Un intercambio es una conversacion de varios pasos: si un
+            // mensaje se guardara en una variable de estado, dos que llegaran
+            // en el mismo instante se pisarian y el trato se quedaria colgado.
+            if (mensaje.type !== 'equipo') {
+              for (const oyente of oyentesDelTrato.current) oyente(mensaje);
+              return;
+            }
 
             // El canal de datos no garantiza el orden. Sin esta comprobacion,
             // un mensaje que llega tarde pisaria a uno mas nuevo y el equipo
@@ -494,9 +510,37 @@ export const useSession = (
     peerRef.current?.send(JSON.stringify({ type: 'equipo', equipo }));
   }, []);
 
+  /**
+   * Manda un mensaje del intercambio.
+   *
+   * Devuelve si se pudo mandar, al reves que `enviarEquipo`. Ahi dar un aviso
+   * por perdido no cuesta nada porque el siguiente lo repite; aqui un mensaje
+   * que no sale deja al otro esperando, y quien lo manda tiene que enterarse.
+   */
+  const enviarDelTrato = useCallback((mensaje: PeerMessage): boolean => {
+    const peer = peerRef.current;
+    if (!peer) return false;
+    try {
+      peer.send(JSON.stringify(mensaje));
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  /** Se apunta a los mensajes del intercambio. Devuelve como darse de baja. */
+  const escucharTrato = useCallback((oyente: (mensaje: PeerMessage) => void) => {
+    oyentesDelTrato.current.add(oyente);
+    return () => {
+      oyentesDelTrato.current.delete(oyente);
+    };
+  }, []);
+
   return {
     state,
     enviarEquipo,
+    enviarDelTrato,
+    escucharTrato,
     createRoom,
     joinRoom,
     leave,

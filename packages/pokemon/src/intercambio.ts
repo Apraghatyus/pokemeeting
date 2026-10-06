@@ -28,6 +28,29 @@ import {
   type EstadisticasBase,
 } from './rom';
 import { leerTexto } from './texto';
+import { leerCabecera } from './savestate';
+
+/**
+ * El equipo DEL JUGADOR, no el que se le parezca mas.
+ *
+ * `localizarEquipo` sin el codigo del juego busca por forma y se queda con la
+ * tira mas larga que parezca un equipo, y en memoria hay otra igual de valida:
+ * la del rival. Ya paso una vez con el panel -ensenaba los Pokemon del
+ * entrenador contra el que estabas- y aqui seria peor, porque esto no ensena:
+ * escribe. Un intercambio aplicado en el equipo rival dice "hecho" y no cambia
+ * nada en tu partida.
+ *
+ * El codigo sale del propio estado, asi que no hay que pedirselo a nadie.
+ */
+const equipoDelJugador = (estado: Uint8Array): Equipo | null => {
+  let codigo = '';
+  try {
+    codigo = leerCabecera(estado).codigoJuego;
+  } catch {
+    // Sin cabecera legible se busca como se pueda, que es lo que habia antes.
+  }
+  return localizarEquipo(estado, undefined, codigo);
+};
 
 /**
  * Hasta donde puede llegar un indice sin corromper la partida que recibe.
@@ -88,7 +111,7 @@ export type Oferta = {
  * pierde un Pokemon si la conexion se corta a medias.
  */
 export const prepararOferta = (estado: Uint8Array, indice: number): Oferta => {
-  const equipo = localizarEquipo(estado);
+  const equipo = equipoDelJugador(estado);
   if (!equipo) throw new IntercambioInvalidoError('No encuentro tu equipo en la partida.');
   const ranura = equipo.ranuras[indice];
   if (!ranura) {
@@ -130,7 +153,7 @@ export const aplicarRecepcion = (
   const veredicto = validarRecibido(bloque, contexto.limites);
   if (!veredicto.ok) throw new IntercambioInvalidoError(veredicto.motivo);
 
-  const equipo = localizarEquipo(estado);
+  const equipo = equipoDelJugador(estado);
   if (!equipo) throw new IntercambioInvalidoError('No encuentro tu equipo en la partida.');
 
   // Un Pokemon guarda sus estadisticas ya calculadas y el juego solo las rehace
@@ -153,7 +176,7 @@ export const aplicarRecepcion = (
     conContador = escribirContador(nuevo, direccionContador, cuantos);
   }
 
-  const comprobado = localizarEquipo(conContador);
+  const comprobado = equipoDelJugador(conContador);
   if (!comprobado || !comprobado.ranuras[indice]?.pokemon.valido) {
     throw new IntercambioInvalidoError(
       'El Pokemon no quedo bien escrito en la partida, asi que no se aplica el cambio.',

@@ -6,6 +6,10 @@ type Props = {
   session: SessionState;
   keyboardOwner: KeyboardOwner;
   onOpenRoom: () => void;
+  /** Abre el intercambio. */
+  onOpenTrade: () => void;
+  /** Si hay partida en marcha. Sin juego no hay nada que intercambiar. */
+  hayPartida: boolean;
   onToggleMenu: () => void;
   menuOpen: boolean;
   /** Volumen del juego, de 0 a 200. */
@@ -35,6 +39,8 @@ export const TopBar = ({
   session,
   keyboardOwner,
   onOpenRoom,
+  onOpenTrade,
+  hayPartida,
   onToggleMenu,
   menuOpen,
   volume,
@@ -73,6 +79,28 @@ export const TopBar = ({
       </button>
 
       <div className="topbar__right">
+        {/* Existe AQUI y no escondido en un menu a proposito: quien quiere
+            intercambiar lo primero que hace es irse a la sala de union del
+            juego, que busca un cable que aqui no hay y se queda esperando para
+            siempre. Un boton a la vista es lo unico que evita ese viaje.
+            *
+            * Y sale con partida, no solo con companero. Si un intercambio se
+            * quedo a medias hay que poder rematarlo, y eso se hace sin el otro:
+            * atarlo a estar conectado dejaba el boton de terminarlo fuera de
+            * alcance justo cuando hacia falta. Sin companero, el propio cartel
+            * explica que hace falta una sala. */}
+        {hayPartida && (
+          <button
+            type="button"
+            className="iconbutton"
+            onClick={onOpenTrade}
+            title="Intercambiar un Pokemon"
+            aria-label="Intercambiar un Pokemon"
+          >
+            ⇄
+          </button>
+        )}
+
         <VolumeControl
           volume={volume}
           onVolume={onVolume}
