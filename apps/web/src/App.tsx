@@ -16,6 +16,7 @@ import { motesDebilitados } from '@emupoke/pokemon';
 import { EquipoPanel } from './ui/EquipoPanel';
 import { AjustesModal } from './ui/AjustesModal';
 import { FinModal } from './ui/FinModal';
+import { TOTAL_LIGA, type PasoLiga } from './ui/Liga';
 import { RandomizerModal } from './ui/RandomizerModal';
 import { RomDropZone, RoomDropZoneHint } from './ui/RomDropZone';
 import { RoomModal } from './ui/RoomModal';
@@ -125,7 +126,7 @@ export const App = () => {
   // El reto se acaba cuando cae el equipo entero. No lo dice el juego -ahi
   // pierdes, vuelves al Centro Pokemon y sigues-: es la regla de la Nuzlocke,
   // asi que se aplica aqui.
-  const fin = useFinDePartida(miEquipo.equipo, state.romName, miEquipo.derrota);
+  const fin = useFinDePartida(miEquipo.equipo, state.romName, miEquipo.derrota, miEquipo.victoria);
 
   // Mandarle el equipo al companero. Se hace desde un solo sitio y no al
   // leerlo, para que tambien salga cuando abre el canal: quien ya estaba
@@ -272,10 +273,21 @@ export const App = () => {
             lo que no puede moverse es justo la pantalla del juego. */}
         <FinModal
           open={fin.terminada}
-          equipo={fin.equipoFinal}
+          resultado={fin.resultado}
+          /* El de la foto fija si lo hay, y si no el de ahora. La foto solo
+             existe cuando el cartel salta con la pagina abierta; al recargar
+             con la partida ya terminada no hay ninguna, y antes de esto el
+             cartel se quedaba sin equipo del todo. Ensenar el de ahora es menos
+             exacto que la foto, pero es lo que paso, y el hueco no es nada. */
+          equipo={fin.equipoFinal ?? equipoMio.equipo}
           especies={especies}
           nombrePartida={nombreDeLaPartidaEnCurso(state.header?.crc32 ?? null)}
           medallas={miEquipo.medallas.conseguidas}
+          /* Llegar al Salon de la Fama exige haber pasado por los cinco, asi
+             que en una victoria la Liga se sabe entera sin leer nada mas. En
+             una derrota no se sabe por donde ibas -eso son banderas y hay que
+             localizarlas-, y mientras no se sepa no se ensena. */
+          liga={fin.resultado === 'victoria' ? LIGA_COMPLETA : []}
           onContinuar={fin.continuar}
           onDescartar={fin.descartar}
           onReiniciar={() => {
@@ -350,6 +362,8 @@ export const App = () => {
  * Se busca por el CRC de la ROM cargada, que es lo que une una partida con su
  * copia. Jugando una ROM tal cual no hay partida que nombrar, y devuelve null.
  */
+const LIGA_COMPLETA: readonly PasoLiga[] = Array.from({ length: TOTAL_LIGA }, () => 'derrotado');
+
 const nombreDeLaPartidaEnCurso = (crc32: string | null): string | null => {
   if (!crc32) return null;
   const partida = todasLasPartidas().find((p) => p.crc32 === crc32);

@@ -12,9 +12,9 @@
 // una funcion que pone nombres, y con eso pinta igual una partida de Rojo
 // Fuego que, el dia que exista su lector, una de Oro.
 
-import { useState } from 'react';
 import { parejaCaida, parseGameCode, TAMANO_EQUIPO, TIPOS_GEN3 } from '@emupoke/pokemon';
 import type { Especies } from '../core/useEspecies';
+import { SpriteEspecie } from './Sprite';
 import type { EquipoResumen, EstadoPokemon, PokemonResumen } from '@emupoke/protocol';
 
 type Props = {
@@ -84,79 +84,6 @@ const SIGLA: Readonly<Record<EstadoPokemon, string>> = {
   envenenado: 'VEN',
 };
 
-/**
- * De donde salen los sprites.
- *
- * Se sirven desde el repositorio de PokeAPI, que es el unico de los que se
- * probaron que manda `Cross-Origin-Resource-Policy: cross-origin`. Sin esa
- * cabecera el navegador los bloquea, porque esta pagina corre con aislamiento
- * cross-origin para poder usar el emulador. Los de Pokemon Showdown, que
- * encajarian mejor con el estilo, no la mandan y quedan descartados.
- *
- * No se descarga nada ni se guarda nada: son etiquetas de imagen normales, y
- * el navegador las cachea el solo.
- */
-const SPRITES = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon';
-
-/** El juego de sprites que mejor pega con cada generacion. */
-const COLECCION: Readonly<Record<number, string>> = {
-  2: 'versions/generation-ii/crystal',
-  3: 'versions/generation-iii/firered-leafgreen',
-};
-
-/**
- * El sprite de una especie, con su plan B.
- *
- * Se intenta primero la coleccion de la generacion que se esta jugando, para
- * que se vea como en el juego; si esa especie no esta ahi, la general; y si
- * tampoco, el circulo con las dos letras de siempre. Asi tambien funciona sin
- * internet, que es como se juega muchas veces.
- */
-const Sprite = ({
-  nacional,
-  generacion,
-  inicial,
-  tonoDe,
-}: {
-  nacional: number;
-  generacion: number;
-  inicial: string;
-  tonoDe: number;
-}) => {
-  const [intento, setIntento] = useState(0);
-
-  const candidatas =
-    nacional > 0
-      ? [
-          COLECCION[generacion] ? `${SPRITES}/${COLECCION[generacion]}/${nacional}.png` : null,
-          `${SPRITES}/${nacional}.png`,
-        ].filter((url): url is string => url !== null)
-      : [];
-
-  if (intento >= candidatas.length) {
-    return (
-      <span
-        className="ficha__sprite"
-        style={{ '--tono': tonoDe } as React.CSSProperties}
-        aria-hidden="true"
-      >
-        {inicial}
-      </span>
-    );
-  }
-
-  return (
-    <img
-      className="ficha__sprite ficha__sprite--imagen"
-      src={candidatas[intento]}
-      onError={() => setIntento((n) => n + 1)}
-      alt=""
-      aria-hidden="true"
-      loading="lazy"
-      draggable={false}
-    />
-  );
-};
 
 /**
  * Los tipos de un Pokemon, uno o dos.
@@ -221,7 +148,7 @@ const Ficha = ({
           ?
         </span>
       ) : (
-        <Sprite
+        <SpriteEspecie
           key={pokemon.especie}
           nacional={especies.nacional(pokemon.especie)}
           generacion={generacion}
@@ -282,9 +209,12 @@ export const EquipoPanel = ({
   // Siempre seis huecos, tenga o no Pokemon. Asi el sitio de cada uno esta
   // reservado desde el principio: al capturar el tercero aparece en su fila y
   // los otros dos no se mueven, en vez de recolocarse los tres.
-  const huecos = Array.from({ length: TAMANO_EQUIPO }, (_, i) =>
-    ranuras.find((r) => r.ranura === i) ?? null,
-  );
+  //
+  // Se pinta en el orden en que vienen, que ya es el estable. Antes se colocaba
+  // cada uno en su ranura de memoria, y eso deshacia el orden justo al pintar:
+  // el panel se volvia a barajar en combate y el iluminado acababa siendo
+  // siempre la primera ficha, porque el que pelea esta en la ranura 0.
+  const huecos = Array.from({ length: TAMANO_EQUIPO }, (_, i) => ranuras[i] ?? null);
 
   return (
     <aside className={`equipo equipo--${lado}`} aria-label={titulo}>
@@ -310,7 +240,7 @@ export const EquipoPanel = ({
                 pokemon={pokemon}
                 especies={especies}
                 generacion={generacion}
-                activo={activo === pokemon.ranura}
+                activo={activo !== null && activo === pokemon.personalidad}
                 parejaRota={
                   caidosDelOtro !== undefined && parejaCaida(pokemon.mote, caidosDelOtro)
                 }

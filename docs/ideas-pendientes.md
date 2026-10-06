@@ -59,6 +59,15 @@ ejecútala en vez de fiarte de esta lista.
   recalculando las estadísticas para la ROM que recibe. Falta la interfaz.
   `test:intercambio`, `test:estadisticas`
 - La tabla de caracteres del juego, los dos abecedarios enteros. `test:texto`
+- **Orden estable del panel** y **borde azul al que está peleando**. Tercera
+  generación intercambia de verdad las ranuras al sacar otro Pokémon, así que el
+  de la ranura 0 es el que pelea. `test:orden`
+- **Cartel de fin de partida, en sus dos finales.** Derrota por el mensaje del
+  juego al caer el equipo; victoria por el del Salón de la Fama. Con medallas,
+  Liga, equipo y sprites. `test:fin`, `test:derrota`, `test:victoria`,
+  `test:fin:ui`
+- **Medallas con su imagen de verdad**, las conseguidas a color y las que
+  faltaron apagadas. Falta medir dónde vive el byte. `test:medallas`
 
 **Aleatorizar**
 
@@ -134,6 +143,17 @@ causa no era la que parecía. Guardar el porqué ahorra volver a investigarlo.
   se probaba lo tocaba. La ñ real es 0x29 y la Ñ 0x14, comprobadas buscando
   "pequeño" y "SEÑOR" en la ROM espanola. Lo vigila `npm run test:texto`, que
   recorre los dos abecedarios enteros en vez de mirar letras sueltas.
+- **El borde del que pelea se quedaba pegado al primero.** El panel ordenaba el
+  equipo de forma estable -para que no se barajase solo en combate- y despues, al
+  pintarlo, colocaba a cada Pokemon **en su ranura de memoria**. O sea que
+  deshacia el orden justo en el ultimo paso, y de ahi salian los dos sintomas a
+  la vez: el panel se volvia a barajar, y el iluminado era siempre la ficha de
+  arriba, porque el que pelea esta en la ranura 0 y esa se dibujaba primero. El
+  resaltado no estaba pegado al primer Pokemon, estaba pegado al primer **hueco**.
+  Arreglado pintando en el orden que viene y diciendo quien va al frente por su
+  **personalidad** y no por su ranura: la ranura siempre seria 0, la personalidad
+  senala a un Pokemon concreto. Lo vigila `test:orden`, que comprueba que la
+  marca cae en el cuarto puesto de la lista y no en el primero.
 - **El fin de partida no saltaba con un solo Pokemon.** La regla exigia haber
   tenido DOS Pokemon distintos, para que el combate del laboratorio quedara
   fuera por construccion. Estaba mal, y lo demostro el primero que lo jugo: salio
@@ -339,25 +359,56 @@ pareja haya caído, hay que guardarlo por nuestra cuenta según se vea.
 
 ## Pantalla de fin de partida
 
-Cuando se te cae el equipo entero, un modal que cierre la historia: hasta dónde
-llegaste, qué medallas sacaste y, si llegaste a la Liga, en qué combate se acabó.
-Las medallas conseguidas a color y las que faltaron en gris o con el borde
-punteado, para que se vea de un vistazo lo que quedó por hacer.
+**Hecha**, en sus dos finales, con el mismo componente: `FinModal` cambia de tono
+y de palabras, pero enseña lo mismo. Medallas, Liga, equipo con sprites y dos
+salidas, **seguir jugando** o **reiniciar**.
 
-Y dos salidas: **seguir jugando** o **reiniciar**.
+Cómo sabe cada final:
 
-**La mitad ya está al alcance.** El estado de cada Pokémon se lee en cada
-vistazo, debilitado incluido: de ahí sale la lógica del Soul Link. Saber que han
-caído los seis es mirar lo que ya se mira.
+- **Derrota**: el mensaje que suelta el juego al caerte el equipo ("…fue
+  corriendo a un CENTRO PKMN…"), con la regla del equipo caído de respaldo.
+- **Victoria**: el mensaje del Salón de la Fama. Y de ahí sale gratis la Liga
+  entera, porque llegar ahí exige haber pasado por los cinco.
 
-Lo que falta es lo otro:
+Lo que falta:
 
-- **Las medallas.** Son banderas en la memoria del juego, así que se leen igual
-  que el equipo, pero hay que encontrar dónde. El método es el que ya funcionó
-  dos veces: dos estados de la misma partida, uno antes y otro después de ganar
-  un gimnasio, y mirar qué bit cambió.
-- **La Liga.** Igual, pero más fino: hay que distinguir "estoy en el Alto Mando"
-  de "voy por el segundo". Probablemente sea un contador y no una bandera.
+- **Las medallas.** Se pintan bien, pero no se leen: falta medir la dirección.
+  Ver la sección de arriba.
+- **La Liga cuando pierdes.** En una victoria se sabe entera; en una derrota no
+  se sabe por dónde ibas, y mientras no se sepa la tarjeta no sale. Hay que
+  distinguir "estoy en el Alto Mando" de "voy por el segundo", y probablemente
+  sea un contador y no una bandera.
+- **Contra quién caíste.** El equipo rival se lee de la memoria (está en
+  `0x0202402C` en Rojo Fuego), así que se puede decir "caíste contra X Nv. 62" y
+  además sale bien en una partida aleatorizada, que es donde un dato de catálogo
+  mentiría. Falta comprobar esa dirección contra una partida de verdad antes de
+  fiarse de ella.
+
+### De dónde salen las imágenes, y por qué de ahí
+
+Esto condiciona cualquier pantalla que quiera enseñar dibujos, así que conviene
+no volver a investigarlo:
+
+La página corre con **aislamiento cross-origin**, que es lo que el emulador
+necesita para usar memoria compartida. A cambio, el navegador **bloquea toda
+imagen de fuera que no mande `Cross-Origin-Resource-Policy`**. No se puede
+configurar desde aquí: o la manda el servidor de la imagen, o no se ve.
+
+- **Pokémon y medallas**: repositorio de sprites de PokeAPI. Manda la cabecera.
+  Las ocho de Kanto son `sprites/badges/1..8` en orden de gimnasio; no se dio por
+  supuesto, se descargaron y se miraron (1 gema gris, 2 gota, 5 corazón, 8 hoja,
+  y la 9 ya es el ala de Johto).
+- **Retratos del Alto Mando**: **no hay**. PokeAPI no tiene entrenadores, y
+  Pokémon Showdown, que sí los tiene y buenos, no manda la cabecera. Por eso los
+  cinco salen con su número y su nombre. Se descartó poner su Pokémon estrella
+  -el Lapras de Lorelei, el Dragonite de Lance- porque en una partida
+  aleatorizada llevan otra cosa y el dibujo estaría mintiendo.
+
+`test:fin:ui` vigila las tres cosas cargando las imágenes **desde la página** y
+no con una petición desde node: desde fuera las dos fuentes contestan igual de
+bien y el bloqueo no se notaría. Una de las comprobaciones es que Showdown
+**sigue** sin poderse usar; si algún día empieza a mandar la cabecera, esa
+comprobación falla y se puede reconsiderar.
 
 **Dos trampas que conviene ver antes de empezar**, porque las dos dan un fin de
 partida falso:

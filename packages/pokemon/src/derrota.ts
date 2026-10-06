@@ -18,7 +18,7 @@
 // Lo que NO es: una deteccion de combate. Esto solo sabe de una pantalla
 // concreta. Saber si hay un combate en marcha sigue pendiente.
 
-import { leerCabecera, region } from './savestate';
+import { codificar, diceEnPantalla } from './frases';
 
 /**
  * Trozos del mensaje de derrota, por idioma.
@@ -31,48 +31,13 @@ import { leerCabecera, region } from './savestate';
  */
 const FRASES: readonly string[] = ['corriendo a un', 'running to a'];
 
-const may = (c: string): number => 0xbb + c.charCodeAt(0) - 65;
-const min = (c: string): number => 0xd5 + c.charCodeAt(0) - 97;
-
-/** Pasa un trozo de texto normal a como lo guarda el juego. */
-const codificar = (texto: string): number[] =>
-  [...texto].map((c) => {
-    if (c >= 'A' && c <= 'Z') return may(c);
-    if (c >= 'a' && c <= 'z') return min(c);
-    if (c === ' ') return 0x00;
-    throw new Error(`no se sabe codificar "${c}"`);
-  });
-
 const PATRONES = FRASES.map(codificar);
 
-const contiene = (donde: Uint8Array, patron: readonly number[]): boolean => {
-  const tope = donde.length - patron.length;
-  for (let i = 0; i <= tope; i += 1) {
-    let cuadra = true;
-    for (let j = 0; j < patron.length; j += 1) {
-      if (donde[i + j] !== patron[j]) {
-        cuadra = false;
-        break;
-      }
-    }
-    if (cuadra) return true;
-  }
-  return false;
-};
-
 /**
- * Si el juego esta enseñando ahora mismo el mensaje de haber perdido.
+ * Si el juego esta ensenando ahora mismo el mensaje de haber perdido.
  *
  * Devuelve false ante cualquier duda -un estado de otra consola, un idioma que
  * no se conoce- porque equivocarse aqui significa darle a alguien una partida
  * por terminada sin estarlo.
  */
-export const enDerrota = (estado: Uint8Array): boolean => {
-  try {
-    leerCabecera(estado);
-    const memoria = region(estado, 'ewram');
-    return PATRONES.some((patron) => contiene(memoria, patron));
-  } catch {
-    return false;
-  }
-};
+export const enDerrota = (estado: Uint8Array): boolean => diceEnPantalla(estado, PATRONES);

@@ -17,6 +17,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EquipoResumen } from '@emupoke/protocol';
 import {
   enDerrota,
+  enSalonDeLaFama,
   leerMedallas,
   mismoEquipo,
   releerEquipo,
@@ -53,6 +54,14 @@ export type EstadoEquipo = {
    * lecturas.
    */
   derrota: boolean;
+  /**
+   * Si el juego esta enseñando el Salon de la Fama.
+   *
+   * Sale del mismo estado, igual que la derrota. Es la senal de reto
+   * completado, y a diferencia de la derrota no hay regla nuestra detras: esto
+   * lo dice el juego y punto.
+   */
+  victoria: boolean;
   /** Las medallas conseguidas, o "no se sabe" si de este juego aun no se leen. */
   medallas: Medallas;
   /**
@@ -80,6 +89,7 @@ export const useEquipo = (
   const [equipo, setEquipo] = useState<EquipoResumen | null>(null);
   const [disponible, setDisponible] = useState(true);
   const [derrota, setDerrota] = useState(false);
+  const [victoria, setVictoria] = useState(false);
   const [medallas, setMedallas] = useState<Medallas>(SIN_SABER);
 
   const direccionRef = useRef<number | null>(null);
@@ -137,6 +147,7 @@ export const useEquipo = (
 
       // Se mira en el mismo estado que acabamos de leer.
       setDerrota(enDerrota(estado));
+      setVictoria(enSalonDeLaFama(estado));
       setMedallas(leerMedallas(estado, juegoRef.current || leido?.juego || ''));
 
       setDisponible(true);
@@ -161,6 +172,7 @@ export const useEquipo = (
     setEquipo(null);
     setDisponible(true);
     setDerrota(false);
+    setVictoria(false);
     setMedallas(SIN_SABER);
 
     if (!jugando) return;
@@ -175,5 +187,5 @@ export const useEquipo = (
     };
   }, [jugando, romName, mirar]);
 
-  return { equipo, disponible, derrota, medallas };
+  return { equipo, disponible, derrota, victoria, medallas };
 };

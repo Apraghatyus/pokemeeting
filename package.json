@@ -58,6 +58,7 @@
     "test:fin": "npx tsx tools/tests/test-fin-partida.mjs",
     "test:orden": "npx tsx tools/tests/test-orden.mjs",
     "test:derrota": "npx tsx tools/tests/test-derrota.mjs",
+    "test:victoria": "npx tsx tools/tests/test-victoria.mjs",
     "test:medallas": "npx tsx tools/tests/test-medallas.mjs",
     "buscar:medallas": "node tools/buscar-medallas.mjs",
     "test:fin:ui": "node tools/tests/test-fin-ui.mjs",

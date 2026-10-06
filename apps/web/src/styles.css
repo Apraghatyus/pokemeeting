@@ -3698,10 +3698,46 @@ details.partidas[open] > summary::before {
 
 /* ---------- fin de partida ---------- */
 
+/* El cartel de fin necesita mas ancho que el resto de modales: ensena tres
+   tarjetas a la vez y en 460px le salen una debajo de otra, con la de equipo
+   fuera de pantalla. Se ensancha solo este, con :has(), para no tocar los
+   demas. */
+.modal:has(.fin) {
+  width: min(1040px, calc(100vw - 32px));
+}
+
 .fin {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  /* Un solo color por final, y de la paleta de siempre: el verde del "vivo"
+     para ganar y el rojo del "debilitado" para perder. Todo lo que se tiñe en
+     este cartel sale de aqui, asi que cambiar de final no toca ni una regla. */
+  --tono-fin: var(--rojo);
+}
+
+.fin--victoria {
+  --tono-fin: var(--ok);
+}
+
+/* El icono de la cabecera vive fuera de .fin, en el modal. Se alcanza con
+   :has() en vez de pasando una clase por media aplicacion. */
+.modal:has(.fin--victoria) .modal__icon {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+
+.modal:has(.fin--derrota) .modal__icon {
+  border-color: var(--rojo);
+  color: var(--rojo);
+}
+
+.modal:has(.fin--victoria) .modal__title {
+  color: var(--ok);
+}
+
+.modal:has(.fin--derrota) .modal__title {
+  color: var(--rojo);
 }
 
 .fin__resumen {
@@ -3714,26 +3750,81 @@ details.partidas[open] > summary::before {
   color: var(--text);
 }
 
+/* Medallas y Liga a un lado, equipo al otro. Si solo hay una de las dos cosas
+   -que es lo normal mientras no se sepan leer las medallas- la que quede ocupa
+   el ancho entero sola, sin dejar un hueco pidiendo explicaciones. */
+.fin__columnas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.fin__columna {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
 .fin__equipo {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.fin__equipo li {
+.fin__fila {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  align-items: center;
   gap: 10px;
-  padding: 5px 0;
+  padding: 6px 0;
   border-bottom: 1px solid var(--border);
 }
 
-.fin__equipo li:last-child {
+.fin__fila:last-child {
   border-bottom: 0;
+}
+
+/* El caido se apaga entero, sprite incluido: en una Nuzlocke no es un estado
+   mas, es que ese ya no vuelve. */
+.fin__fila--caido {
+  opacity: 0.5;
+}
+
+.fin__fila--caido .fin__sprite--imagen {
+  filter: grayscale(1);
+}
+
+.fin__sprite {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: hsl(var(--tono, 0) 60% 78%);
+}
+
+.fin__sprite--imagen {
+  object-fit: contain;
+  image-rendering: pixelated;
+  padding: 1px;
+}
+
+.fin__datos {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
 }
 
 .fin__mote {
@@ -3745,10 +3836,38 @@ details.partidas[open] > summary::before {
 }
 
 .fin__nivel {
-  flex: none;
   font-family: ui-monospace, Consolas, monospace;
   font-size: 11px;
   color: var(--muted);
+}
+
+/* El punto delante del texto es lo que hace que "vivo" y "caido" se distingan
+   de un vistazo sin depender solo del color. */
+.chip--vivo,
+.chip--caido {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.chip--vivo::before,
+.chip--caido::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.chip--vivo {
+  border-color: color-mix(in srgb, var(--ok) 45%, transparent);
+  color: var(--ok);
+}
+
+.chip--caido {
+  border-color: color-mix(in srgb, var(--rojo) 45%, transparent);
+  color: var(--rojo);
 }
 
 /* Reiniciar primero y seguir despues, en ese orden y no al reves: lo que cierra
@@ -3776,9 +3895,9 @@ details.partidas[open] > summary::before {
   list-style: none;
 }
 
-@media (max-width: 560px) {
+@media (max-width: 720px) {
   .medallas {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(4, 1fr);
   }
 }
 
@@ -3786,19 +3905,35 @@ details.partidas[open] > summary::before {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
-  padding: 8px 4px;
+  gap: 6px;
+  padding: 9px 4px;
   border-radius: 10px;
+  /* La que falta, con el borde punteado: se ve que ahi habia algo que
+     conseguir, que es justo lo que cuenta este cartel. */
+  border: 1px dashed var(--border);
+  background: transparent;
 }
 
-/* La que falta, apagada y con el borde punteado: se ve que ahi habia algo que
-   conseguir, que es justo lo que cuenta la pantalla de fin de partida. */
+.medalla__imagen,
 .medalla__marca {
-  width: 26px;
-  height: 26px;
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+/* El respaldo para cuando no hay internet: el hueco redondo de siempre. */
+.medalla__marca {
   border-radius: 50%;
   border: 1px dashed var(--border);
   background: transparent;
+}
+
+/* La que falta no se cambia por otro dibujo: es la misma medalla sin color.
+   Asi se lee como "esta, pero no la tienes" en vez de como un icono distinto. */
+.medalla:not(.medalla--tiene) .medalla__imagen {
+  filter: grayscale(1) brightness(1.25);
+  opacity: 0.3;
 }
 
 .medalla__nombre {
@@ -3811,13 +3946,80 @@ details.partidas[open] > summary::before {
   text-align: center;
 }
 
-.medalla--tiene .medalla__marca {
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  box-shadow: 0 0 12px -2px var(--accent);
+.medalla--tiene {
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
 }
 
 .medalla--tiene .medalla__nombre {
   color: var(--text);
   opacity: 1;
+}
+
+/* ---------- Alto Mando ---------- */
+
+.liga {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: none;
+}
+
+.liga__paso {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+}
+
+.liga__numero {
+  flex: none;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.liga__nombre {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.liga__estado {
+  flex: none;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.liga__paso--derrotado .liga__estado {
+  color: var(--ok);
+}
+
+/* Donde se acabo: con fondo y una barra al canto, que es lo que hace que el
+   ojo caiga ahi antes que en la lista entera. */
+.liga__paso--aqui {
+  border-color: color-mix(in srgb, var(--rojo) 45%, transparent);
+  background: color-mix(in srgb, var(--rojo) 12%, transparent);
+  box-shadow: inset 3px 0 0 0 var(--rojo);
+}
+
+.liga__paso--aqui .liga__nombre,
+.liga__paso--aqui .liga__estado {
+  color: var(--rojo);
+}
+
+.liga__paso--bloqueado {
+  opacity: 0.45;
 }

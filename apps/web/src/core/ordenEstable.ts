@@ -24,11 +24,13 @@ export type EquipoOrdenado = {
   /** Los mismos Pokémon, en el orden en que el jugador los conoce. */
   ranuras: PokemonResumen[];
   /**
-   * Qué ranura de memoria va al frente, o null si no hay equipo.
+   * **Quién** va al frente: la personalidad del que está en la ranura 0.
    *
-   * Es siempre 0: lo que cambia es quién está ahí. Se devuelve como número y no
-   * como booleano porque quien pinta compara contra `ranura`, que es la posición
-   * real en memoria y no la de la pantalla.
+   * Se devuelve la personalidad y no la ranura a propósito. La ranura siempre
+   * sería 0, y quien pinta ya no dibuja por ranura -ese era justo el fallo: el
+   * panel recolocaba por ranura y acababa iluminando siempre la primera ficha,
+   * estuviera quien estuviera en ella-. La personalidad no cambia nunca, así
+   * que señala a un Pokémon concreto y no a un sitio.
    */
   alFrente: number | null;
   /** El orden aprendido, para pasárselo a la siguiente lectura. */
@@ -73,7 +75,12 @@ export const ordenarEstable = (
     orden.push(ranura.personalidad);
   }
 
-  return { ranuras: ordenados, alFrente: 0, orden };
+  // El que pelea es el de la ranura 0, porque el juego lo mueve ahí al sacarlo.
+  // Si por lo que sea no hay nadie en la 0, no se ilumina nada: mejor ninguna
+  // marca que una marca en el que no es.
+  const enCabeza = equipo.ranuras.find((r) => r.ranura === 0) ?? null;
+
+  return { ranuras: ordenados, alFrente: enCabeza?.personalidad ?? null, orden };
 };
 
 /**

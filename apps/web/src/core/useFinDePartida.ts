@@ -30,6 +30,14 @@ import type { EquipoResumen } from '@emupoke/protocol';
 export type FinDePartida = {
   /** Si hay que enseñar el cartel ahora mismo. */
   terminada: boolean;
+  /**
+   * Como acabo: ganando o perdiendo.
+   *
+   * Por defecto 'derrota', que es el caso que se decide por regla nuestra. La
+   * victoria solo se pone cuando el propio juego la canta, asi que no se
+   * inventa nunca.
+   */
+  resultado: Resultado;
   /** El equipo tal y como quedó, para poder enseñarlo aunque luego cambie. */
   equipoFinal: EquipoResumen | null;
   /**
@@ -45,7 +53,11 @@ export type FinDePartida = {
   descartar: () => void;
 };
 
+export type Resultado = 'victoria' | 'derrota';
+
 type Guardado = {
+  /** Como acabo, si acabo. */
+  resultado: Resultado;
   /** Personalidades distintas vistas en el equipo. De aquí sale el mínimo. */
   vistos: number[];
   /** Si ya se dio por terminada, para no repetir el cartel en cada lectura. */
@@ -53,7 +65,7 @@ type Guardado = {
   continuada: boolean;
 };
 
-const VACIO: Guardado = { vistos: [], terminada: false, continuada: false };
+const VACIO: Guardado = { vistos: [], terminada: false, continuada: false, resultado: 'derrota' };
 
 const clave = (partida: string) => `emupoke.fin.${partida}`;
 
@@ -66,6 +78,7 @@ const leer = (partida: string): Guardado => {
       vistos: Array.isArray(guardado.vistos) ? guardado.vistos : [],
       terminada: guardado.terminada === true,
       continuada: guardado.continuada === true,
+      resultado: guardado.resultado === 'victoria' ? 'victoria' : 'derrota',
     };
   } catch {
     return { ...VACIO };
@@ -107,6 +120,13 @@ export const useFinDePartida = (
    * el momento exacto.
    */
   derrota = false,
+  /**
+   * Si el juego esta diciendo que has ganado.
+   *
+   * Esta no es una regla nuestra como la del equipo caido: es el juego
+   * ensenando el Salon de la Fama. Por eso manda sobre todo lo demas.
+   */
+  victoria = false,
 ): FinDePartida => {
   const [estado, setEstado] = useState<Guardado>(VACIO);
   const [equipoFinal, setEquipoFinal] = useState<EquipoResumen | null>(null);
@@ -137,10 +157,20 @@ export const useFinDePartida = (
         if (!ranura.huevo) vistos.add(ranura.personalidad);
       }
 
+      // La victoria manda: si el juego esta ensenando el Salon de la Fama, da
+      // igual como este el equipo. Y lo que ya se decidio no se cambia, para
+      // que una partida continuada no reescriba su propio final.
+      const acabaAhora = victoria || derrota || equipoCaido(equipo);
+
       const siguiente: Guardado = {
         ...previo,
         vistos: [...vistos],
-        terminada: previo.terminada || derrota || equipoCaido(equipo),
+        terminada: previo.terminada || acabaAhora,
+        resultado: previo.terminada
+          ? previo.resultado
+          : victoria
+            ? 'victoria'
+            : previo.resultado,
       };
 
       // Guardar el equipo del momento exacto: despues el jugador revive a
@@ -149,7 +179,7 @@ export const useFinDePartida = (
 
       return siguiente;
     });
-  }, [equipo, partida, derrota]);
+  }, [equipo, partida, derrota, victoria]);
 
   // Se guarda aqui y no dentro del updater: un updater tiene que ser puro, y
   // guardando desde fuera no hay forma de escribir un estado a medias.
@@ -196,6 +226,7 @@ export const useFinDePartida = (
     // Ya decidido, no se vuelve a preguntar: `continuada` sobrevive a recargar
     // la pagina, y sin mirarlo el cartel salia otra vez en cada arranque.
     terminada: estado.terminada && !estado.continuada && !descartada,
+    resultado: estado.resultado,
     equipoFinal,
     continuada: estado.continuada,
     continuar,

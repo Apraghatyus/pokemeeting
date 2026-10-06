@@ -50,7 +50,7 @@ const inicial = equipo(
 const primera = ordenarEstable(inicial, []);
 check('la primera vez manda la memoria', motes(primera.ranuras) === 'Noay,Juja,Pxndx,Huesitos',
   motes(primera.ranuras));
-check('y el que va al frente es el de la ranura 0', primera.alFrente === 0);
+check('y el que va al frente es el de la ranura 0', primera.alFrente === 101);
 
 // En combate sacas a Huesitos: el juego lo sube a la ranura 0 y baja a Noay.
 const enCombate = equipo(
@@ -65,16 +65,24 @@ check('al cambiar de Pokemon el panel NO se baraja',
   motes(segunda.ranuras) === 'Noay,Juja,Pxndx,Huesitos', motes(segunda.ranuras));
 
 // Y lo que se gana: quien esta peleando es quien ocupa la ranura 0.
-const alFrente = segunda.ranuras.find((r) => r.ranura === segunda.alFrente);
+const alFrente = segunda.ranuras.find((r) => r.personalidad === segunda.alFrente);
 check('y el iluminado es el que acaba de salir a pelear', alFrente?.mote === 'Huesitos',
   alFrente?.mote ?? 'ninguno');
+
+// La que destapo el fallo que veia el jugador: "se queda solo con el primero".
+// El panel pinta en este orden, asi que el iluminado tiene que ser el CUARTO
+// de la lista, no el primero. Mientras el frente se dijo como ranura -siempre
+// 0- y el panel recoloco por ranura, la marca no se movia nunca de arriba.
+const puestoIluminado = segunda.ranuras.findIndex((r) => r.personalidad === segunda.alFrente);
+check('y la marca se mueve de sitio en el panel, no se queda en la primera ficha',
+  puestoIluminado === 3, `estaba en el puesto ${puestoIluminado}`);
 
 // Volver al primero lo devuelve al frente, sin mover el panel.
 const tercera = ordenarEstable(inicial, segunda.orden);
 check('volver a cambiar tampoco baraja nada',
   motes(tercera.ranuras) === 'Noay,Juja,Pxndx,Huesitos', motes(tercera.ranuras));
 check('y el frente vuelve con el',
-  tercera.ranuras.find((r) => r.ranura === tercera.alFrente)?.mote === 'Noay');
+  tercera.ranuras.find((r) => r.personalidad === tercera.alFrente)?.mote === 'Noay');
 
 // --- uno nuevo entra por el final, no por donde diga la memoria ---
 const conCapturado = equipo(
@@ -113,6 +121,12 @@ check('pero no se olvida el orden aprendido', vacia.orden.join(',') === '101,102
 const sinNada = ordenarEstable(equipo(), []);
 check('un equipo vacio tampoco rompe nada',
   sinNada.ranuras.length === 0 && sinNada.alFrente === null);
+
+// --- si nadie ocupa la ranura 0, no se ilumina nada ---
+// Preferible ninguna marca a una marca en el que no es.
+const sinCabeza = ordenarEstable(equipo(pk('Juja', 1, 102)), []);
+check('sin nadie en la ranura 0 no se ilumina nadie', sinCabeza.alFrente === null,
+  String(sinCabeza.alFrente));
 
 console.log(fallos === 0 ? '\nEL PANEL NO SE BARAJA SOLO' : `\n${fallos} COMPROBACIONES FALLIDAS`);
 process.exit(fallos === 0 ? 0 : 1);

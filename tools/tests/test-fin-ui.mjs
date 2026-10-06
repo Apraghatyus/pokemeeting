@@ -52,14 +52,17 @@ const romName = await page.evaluate(() => globalThis.mGBAModule?.gameName?.split
 check('se sabe con que partida se asocia', romName !== null, romName ?? 'sin nombre');
 
 /** Escribe el estado que guarda el modulo y recarga para que lo lea. */
-const provocarFin = async () => {
-  await page.evaluate((nombre) => {
-    localStorage.setItem(
-      `emupoke.fin.${nombre}`,
-      // Un solo Pokemon: es el caso que fallaba, cuando la regla exigia dos.
-      JSON.stringify({ vistos: [111], terminada: true, continuada: false }),
-    );
-  }, romName);
+const provocarFin = async (resultado = 'derrota') => {
+  await page.evaluate(
+    ([nombre, comoAcabo]) => {
+      localStorage.setItem(
+        `emupoke.fin.${nombre}`,
+        // Un solo Pokemon: es el caso que fallaba, cuando la regla exigia dos.
+        JSON.stringify({ vistos: [111], terminada: true, continuada: false, resultado: comoAcabo }),
+      );
+    },
+    [romName, resultado],
+  );
   await cargar();
   await page.waitForTimeout(500);
 };
@@ -76,9 +79,11 @@ const leerGuardado = () =>
 // --- sale ---
 await provocarFin();
 check('con el equipo caido sale el cartel', (await page.locator('.modal[open] .fin').count()) === 1);
-check('y dice que el reto se acabo',
-  ((await page.locator('.modal[open] .modal__title').textContent()) ?? '').includes('acab'),
+check('y dice que es una derrota',
+  ((await page.locator('.modal[open] .modal__title').textContent()) ?? '').includes('Derrota'),
   (await page.locator('.modal[open] .modal__title').textContent()) ?? '');
+check('perdiendo no se ensena la Liga, porque no se sabe por donde ibas',
+  (await page.locator('.modal[open] .liga').count()) === 0);
 check('avisa de que el juego deja seguir pero el reto no',
   ((await page.locator('.fin__resumen').textContent()) ?? '').includes('reto se acaba'));
 check('ofrece las dos salidas',
@@ -86,6 +91,85 @@ check('ofrece las dos salidas',
     (await page.getByRole('button', { name: 'Seguir jugando' }).count()) === 1);
 check('y avisa de que seguir no cuenta',
   ((await page.locator('.fin .hint').textContent()) ?? '').includes('no cuenta'));
+
+// --- las imagenes ---
+// Esto es lo que de verdad hay que vigilar: la pagina corre con aislamiento
+// cross-origin por el emulador, y eso bloquea cualquier imagen de fuera que no
+// mande Cross-Origin-Resource-Policy. Si un dia se cambia de coleccion de
+// sprites sin mirar esa cabecera, los Pokemon desaparecen sin un solo error en
+// consola. Por eso no basta con que la etiqueta exista: tiene que haber cargado.
+//
+// Se prueban cargandolas desde la propia pagina, y no con una peticion desde
+// node, porque la cabecera solo estorba dentro del navegador: desde fuera las
+// dos fuentes contestan igual de bien y no se notaria nada.
+const cargaDesdeLaPagina = (url) =>
+  page.evaluate(
+    (donde) =>
+      new Promise((resolver) => {
+        const img = new Image();
+        img.onload = () => resolver(img.naturalWidth);
+        img.onerror = () => resolver(0);
+        img.src = donde;
+      }),
+    url,
+  );
+
+const BASE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites';
+const anchoPokemon = await cargaDesdeLaPagina(
+  `${BASE}/pokemon/versions/generation-iii/firered-leafgreen/6.png`,
+);
+check('los sprites de Pokemon cargan pese al aislamiento', anchoPokemon > 0, `${anchoPokemon}px`);
+
+const anchoMedalla = await cargaDesdeLaPagina(`${BASE}/badges/1.png`);
+check('y las medallas tambien', anchoMedalla > 0, `${anchoMedalla}px`);
+
+// Y la fuente que se descarto, para que conste por que: si algun dia empieza a
+// mandar la cabecera, esta comprobacion falla y se puede reconsiderar.
+const anchoShowdown = await cargaDesdeLaPagina(
+  'https://play.pokemonshowdown.com/sprites/trainers/lance.png',
+);
+check('Showdown sigue sin poderse usar, que es por lo que no hay retratos',
+  anchoShowdown === 0, `${anchoShowdown}px`);
+
+// El equipo de dentro del cartel solo se puede mirar si la partida tiene
+// Pokemon, y una ROM recien cargada no los tiene. No se da por bueno lo que no
+// se ha podido ver: o se comprueba, o se dice que no se comprobo.
+const conEquipo = (await page.locator('.modal[open] .fin__fila').count()) > 0;
+if (!conEquipo) {
+  console.log('SALTO  el equipo dentro del cartel: esta partida no tiene Pokemon que ensenar');
+} else {
+  const sprites = await page.evaluate(async () => {
+    const imgs = [...document.querySelectorAll('.modal[open] .fin__sprite--imagen')];
+    await Promise.all(
+      imgs.map((i) =>
+        i.complete ? null : new Promise((r) => i.addEventListener('load', r, { once: true })),
+      ),
+    );
+    return { cuantas: imgs.length, cargadas: imgs.filter((i) => i.naturalWidth > 0).length };
+  });
+  check('el equipo sale con sus sprites, y han cargado de verdad',
+    sprites.cuantas > 0 && sprites.cargadas === sprites.cuantas,
+    `${sprites.cargadas} de ${sprites.cuantas}`);
+}
+
+// --- el otro final ---
+await page.evaluate((nombre) => localStorage.removeItem(`emupoke.fin.${nombre}`), romName);
+await provocarFin('victoria');
+check('ganando sale el mismo cartel', (await page.locator('.modal[open] .fin').count()) === 1);
+check('pero dice Victoria',
+  ((await page.locator('.modal[open] .modal__title').textContent()) ?? '').includes('Victoria'),
+  (await page.locator('.modal[open] .modal__title').textContent()) ?? '');
+if (conEquipo) {
+  check('con el equipo presentado como ganador',
+    (await page.locator('.modal[open] .tarjeta__titulo h2', { hasText: 'Equipo ganador' }).count()) === 1);
+}
+check('y la Liga entera, que llegar al Salon de la Fama ya la implica',
+  (await page.locator('.modal[open] .liga__paso').count()) === 5 &&
+    (await page.locator('.modal[open] .liga__paso--derrotado').count()) === 5,
+  `${await page.locator('.modal[open] .liga__paso--derrotado').count()} de 5`);
+
+await page.evaluate((nombre) => localStorage.removeItem(`emupoke.fin.${nombre}`), romName);
+await provocarFin();
 
 // --- seguir jugando: se cierra y queda marcada ---
 await page.getByRole('button', { name: 'Seguir jugando' }).click();

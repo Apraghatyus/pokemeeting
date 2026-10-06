@@ -15,5 +15,7 @@ export * from './intercambio';
 export * from './lectores';
 export * from './resumen';
 export * from './soullink';
+export * from './frases';
 export * from './derrota';
+export * from './victoria';
 export * from './medallas';
