@@ -39,6 +39,7 @@
     "test:audio": "node tools/tests/test-audio.mjs",
     "test:volumen": "node tools/tests/test-volumen.mjs",
     "test:reconexion": "node tools/tests/test-reconexion.mjs",
+    "test:enlace": "npx tsx tools/tests/test-enlace-estable.mjs",
     "tunnel": "node tools/tunnel.mjs",
     "test:partidas": "node tools/tests/test-randomizer-limpio.mjs",
     "test:gen3": "npx tsx tools/tests/test-gen3.mjs",

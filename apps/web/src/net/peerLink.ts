@@ -35,10 +35,42 @@ type SignalPayload =
   | { kind: 'description'; description: RTCSessionDescriptionInit }
   | { kind: 'candidate'; candidate: RTCIceCandidateInit };
 
+/**
+ * Cuanto se aguanta un parpadeo antes de dar la conexion por perdida.
+ *
+ * `disconnected` NO quiere decir que se haya caido: quiere decir que ahora
+ * mismo no llegan paquetes. WebRTC se recupera solo de eso muy a menudo -un
+ * salto de wifi a datos, un segundo de mala cobertura- y vuelve a `connected`
+ * sin que nadie haga nada.
+ *
+ * Antes se trataba igual que `failed`, asi que un parpadeo de un segundo tiraba
+ * el enlace entero y obligaba a rehacer la sala. Eso es lo que se veia como
+ * "caidas repentinas del host".
+ *
+ * Ocho segundos: mas de lo que tarda ICE en recuperarse cuando va a hacerlo, y
+ * poco para no dejar a nadie mirando una imagen congelada sin saber que pasa.
+ * Mientras tanto se dice "conectando" y no "perdida", asi que la pantalla del
+ * companero se queda puesta en vez de desaparecer.
+ */
+export const GRACIA_ANTES_DE_RENDIRSE_MS = 8000;
+
+/**
+ * Si ese estado es el final de verdad o solo un parpadeo.
+ *
+ * Esta aparte, y exportado, porque es LA decision que estaba mal: antes
+ * `disconnected` contaba como caida y tiraba el enlace a la primera mala racha.
+ * Una funcion suelta se puede probar sin montar una conexion de verdad, y por
+ * tanto se puede fijar para que no vuelva a cambiarse sin querer.
+ */
+export const esCaidaDefinitiva = (estado: RTCPeerConnectionState): boolean =>
+  estado === 'failed' || estado === 'closed';
+
 export class PeerLink {
   readonly #pc: RTCPeerConnection;
   readonly #handlers: PeerHandlers;
   #channel: RTCDataChannel | null = null;
+  /** Temporizador del parpadeo, si hay uno en marcha. */
+  #gracia: ReturnType<typeof setTimeout> | null = null;
 
   constructor(handlers: PeerHandlers, localStream: MediaStream | null) {
     this.#handlers = handlers;
@@ -74,15 +106,33 @@ export class PeerLink {
     this.#pc.addEventListener('connectionstatechange', () => {
       switch (this.#pc.connectionState) {
         case 'connected':
+          // Si venia de un parpadeo, se recupero sola y no se entero nadie.
+          this.#cancelarGracia();
           handlers.onState('conectada');
           break;
         case 'connecting':
         case 'new':
+          this.#cancelarGracia();
           handlers.onState('conectando');
           break;
-        case 'failed':
+
+        // Un parpadeo: se le da tiempo a recuperarse antes de tirar nada.
         case 'disconnected':
+          if (this.#gracia === null) {
+            handlers.onState('conectando');
+            this.#gracia = setTimeout(() => {
+              this.#gracia = null;
+              // Si en todo este rato no ha vuelto, ya no vuelve.
+              if (this.#pc.connectionState !== 'connected') handlers.onState('perdida');
+            }, GRACIA_ANTES_DE_RENDIRSE_MS);
+          }
+          break;
+
+        // Estas dos si son el final: `failed` no se arregla sin renegociar y
+        // `closed` es que la hemos cerrado nosotros. Ver `esCaidaDefinitiva`.
+        case 'failed':
         case 'closed':
+          this.#cancelarGracia();
           handlers.onState('perdida');
           break;
       }
@@ -106,6 +156,12 @@ export class PeerLink {
    * dejaba al que responde con un transceptor huerfano, y su microfono no
    * llegaba a ninguna parte.
    */
+  #cancelarGracia(): void {
+    if (this.#gracia === null) return;
+    clearTimeout(this.#gracia);
+    this.#gracia = null;
+  }
+
   #voiceTransceiver(): RTCRtpTransceiver | undefined {
     return this.#pc
       .getTransceivers()
@@ -171,6 +227,18 @@ export class PeerLink {
   async accept(payload: unknown): Promise<void> {
     const signal = payload as SignalPayload;
     if (signal?.kind === 'description') {
+      // Una respuesta solo vale si estamos esperando una. Al reconectar puede
+      // llegar la respuesta a una oferta que ya no existe -la hizo el enlace
+      // anterior-, y aplicarla reventaba la negociacion entera con un "Called
+      // in wrong state: stable". Se ignora, igual que ya se ignoraba un
+      // candidato que llega a destiempo: no es un fallo nuestro, es que ese
+      // mensaje llego tarde.
+      if (
+        signal.description.type === 'answer' &&
+        this.#pc.signalingState !== 'have-local-offer'
+      ) {
+        return;
+      }
       await this.#pc.setRemoteDescription(new RTCSessionDescription(signal.description));
       if (signal.description.type === 'offer') {
         // Sin esto el audio quedaria en un solo sentido: ante una oferta
@@ -202,6 +270,9 @@ export class PeerLink {
   }
 
   close(): void {
+    // Sin esto, un enlace cerrado a proposito podia anunciarse como perdido
+    // ocho segundos despues, ya con otro enlace en marcha.
+    this.#cancelarGracia();
     this.#channel?.close();
     this.#pc.close();
   }

@@ -154,6 +154,25 @@ causa no era la que parecía. Guardar el porqué ahorra volver a investigarlo.
   al lado con sus 23.623 bytes sin tocar. Ahora se renombra al subirlo.
   `test:importar` comprueba el sistema de ficheros del nucleo, que es donde
   estaba el fallo, y sin el arreglo ve cero bytes con contenido.
+- **Al anfitrion se le caia la sala de repente.** Dos causas, y las dos reales.
+  La primera: `disconnected` se trataba igual que `failed`, y no son lo mismo.
+  `disconnected` quiere decir "ahora mismo no llegan paquetes" y WebRTC se
+  recupera solo de eso continuamente -un salto de wifi a datos, un segundo de
+  mala cobertura-, asi que un parpadeo de un segundo tiraba el enlace entero y
+  obligaba a rehacer la sala. Ahora se le dan ocho segundos: si vuelve, no se
+  entera nadie; si no vuelve, entonces si se da por perdida. Mientras tanto se
+  dice "conectando" y la pantalla del companero se queda puesta.
+  La segunda: **no habia latido en el socket de senalizacion**. Una sala pasa
+  casi todo el rato callada -la senalizacion sirve para presentarse y despues
+  hablan directos- y un WebSocket callado lo cierra cualquier intermediario
+  **sin avisar**: no llega un `close`, deja de funcionar y punto. Medido: con la
+  red cortada, a los 21 segundos la barra seguia diciendo "Conectados". Con un
+  ping cada 25 segundos el socket nunca esta callado, y ademas se nota si murio:
+  medido, ahora se entera a los 42.
+  De camino salio un tercero: al reconectar podia llegar la respuesta a una
+  oferta que ya no existia, y aplicarla reventaba la negociacion con un "Called
+  in wrong state: stable". Ahora se ignora, igual que ya se ignoraba un
+  candidato a destiempo. `test:enlace` fija la decision de fondo.
 - **En un movil alto, los botones quedaban flotando con un agujero debajo.** La
   partida y el mando tenian altura fija, asi que el sitio que sobraba no lo usaba
   nadie. Medido: en 360x640 sobraban 35 pixeles -justo cabia, y por eso no se
@@ -408,6 +427,27 @@ partidas de alguien: se pasan por línea de órdenes.
 Lo que esto **no** resuelve y sigue pendiente: la pantalla de fin de partida
 podría usarlo para distinguir "se te cayó el equipo" de "estás a mitad de un
 combate", y las medallas y la Liga siguen sin medir.
+
+---
+
+## Reconectar despues de una caida larga
+
+`test:reconexion` deja una comprobacion en rojo, y venia asi de antes: tras
+agotar los tres intentos automaticos, el boton de "Reintentar ahora" no rehace
+el enlace aunque la red haya vuelto. Se comprobo que falla **igual sin los
+arreglos del latido y la gracia**, asi que no es una regresion de aquello.
+
+Lo que se sabe: el anfitrion vuelve a entrar en la sala y el invitado deberia
+recibir `peer-joined` y ofrecer. Falta averiguar si lo que falla es el reenganche
+en el servidor -la sala quizas ya no le reconoce- o la negociacion en el
+navegador que acaba de volver.
+
+Y una advertencia para quien lo mire: **cortar la red con `setOffline` no cierra
+una conexion ya establecida**. Los dos navegadores estan en la misma maquina, asi
+que el enlace directo sigue vivo. Quien acaba notandolo es el latido del
+servidor, a los 42 segundos medidos. Por eso ese banco de pruebas no sirve para
+comprobar cosas rapidas de reconexion, y la comprobacion del aviso se dejo como
+salto explicito en vez de como un fallo permanente.
 
 ---
 

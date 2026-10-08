@@ -21,6 +21,25 @@ import { MAX_JOIN_ATTEMPTS, RoomRegistry } from './rooms.ts';
 const PORT = Number(process.env.PORT ?? 8787);
 const SWEEP_INTERVAL_MS = 60_000;
 
+/**
+ * Cada cuanto se le da un toque a cada socket para que no se duerma.
+ *
+ * Una sala pasa casi todo el rato callada: la senalizacion sirve para
+ * presentarse y despues los dos hablan directamente. Pero un WebSocket que no
+ * dice nada durante un rato lo cierra cualquier cosa que haya por el camino
+ * -un proxy, un router, el operador del movil- y lo cierra **sin avisar a
+ * nadie**: no llega un `close`, simplemente deja de funcionar.
+ *
+ * Eso se veia como que al host se le caia la sala de repente. Con un ping
+ * periodico el socket nunca esta callado, y ademas se nota si murio: el que no
+ * conteste al siguiente toque se da por muerto y se recoge su sala, en vez de
+ * dejarla ocupada por alguien que ya no esta.
+ *
+ * Veinticinco segundos porque los intermediarios que cierran por inactividad
+ * suelen hacerlo al minuto, y conviene pasar dos veces antes de eso.
+ */
+const LATIDO_MS = 25_000;
+
 const rooms = new RoomRegistry<WebSocket>();
 
 const send = (socket: WebSocket, message: ServerMessage): void => {
@@ -120,7 +139,18 @@ const server = createServer((req, res) => {
 
 const wss = new WebSocketServer({ server });
 
+/**
+ * Quien ha contestado al ultimo toque.
+ *
+ * En un WeakSet y no en una propiedad del socket para no tener que ensanchar el
+ * tipo de la libreria: si el socket se va, su entrada se va sola.
+ */
+const vivos = new WeakSet<WebSocket>();
+
 wss.on('connection', (socket) => {
+  vivos.add(socket);
+  socket.on('pong', () => vivos.add(socket));
+
   socket.on('message', (raw) => {
     let message: ClientMessage;
     try {
@@ -159,6 +189,18 @@ wss.on('connection', (socket) => {
     if (left.remaining) send(left.remaining.socket, { type: 'peer-left' });
   });
 });
+
+setInterval(() => {
+  for (const socket of wss.clients) {
+    // No contesto al toque anterior: no hay nadie al otro lado.
+    if (!vivos.has(socket)) {
+      socket.terminate();
+      continue;
+    }
+    vivos.delete(socket);
+    socket.ping();
+  }
+}, LATIDO_MS).unref();
 
 setInterval(() => {
   const removed = rooms.sweep();
