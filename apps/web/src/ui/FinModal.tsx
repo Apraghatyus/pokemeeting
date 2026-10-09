@@ -14,7 +14,7 @@
 // **fuera de concurso**. Esa diferencia hay que decirla aqui y no esconderla en
 // los ajustes, porque es lo que decide si la partida cuenta.
 
-import { parseGameCode } from '@emupoke/pokemon';
+import { parejaCaida, parseGameCode } from '@emupoke/pokemon';
 import type { EquipoResumen, PokemonResumen } from '@emupoke/protocol';
 import type { Especies } from '../core/useEspecies';
 import { Liga, type PasoLiga } from './Liga';
@@ -35,6 +35,10 @@ type Props = {
   medallas: readonly boolean[];
   /** Como quedo el Alto Mando. Vacio si no se sabe. */
   liga: readonly PasoLiga[];
+  /** Motes caidos en el equipo del companero, para marcar las parejas rotas. */
+  caidosDelCompanero: ReadonlySet<string>;
+  /** Si lo que acabo el reto fue el Soul Link y no tu propia partida. */
+  porElEnlace: boolean;
   onContinuar: () => void;
   onReiniciar: () => void;
   onDescartar: () => void;
@@ -50,13 +54,19 @@ const Fila = ({
   pokemon,
   especies,
   generacion,
+  caidosDelCompanero,
 }: {
   pokemon: PokemonResumen;
   especies: Especies;
   generacion: number;
+  caidosDelCompanero: ReadonlySet<string>;
 }) => {
   const nombre = especies.nombre(pokemon.especie);
-  const caido = pokemon.estado === 'debilitado';
+  const debilitado = pokemon.estado === 'debilitado';
+  // Vivo en tu partida, pero su pareja cayo en la del companero: para el reto
+  // esta tan muerto como el otro, y decir "Vivo" aqui era lo que no cuadraba.
+  const sinPareja = !debilitado && parejaCaida(pokemon.mote, caidosDelCompanero);
+  const caido = debilitado || sinPareja;
 
   return (
     <li className={`fin__fila${caido ? ' fin__fila--caido' : ''}`}>
@@ -73,7 +83,9 @@ const Fila = ({
           {pokemon.huevo ? 'sin eclosionar' : `Nv. ${pokemon.nivel}`}
         </span>
       </span>
-      <span className={`chip chip--${caido ? 'caido' : 'vivo'}`}>{caido ? 'Caído' : 'Vivo'}</span>
+      <span className={`chip chip--${caido ? 'caido' : 'vivo'}`}>
+        {sinPareja ? 'Su pareja cayó' : caido ? 'Caído' : 'Vivo'}
+      </span>
     </li>
   );
 };
@@ -86,6 +98,8 @@ export const FinModal = ({
   nombrePartida,
   medallas,
   liga,
+  caidosDelCompanero,
+  porElEnlace,
   onContinuar,
   onReiniciar,
   onDescartar,
@@ -96,7 +110,9 @@ export const FinModal = ({
   // es lo que ya hace el panel. Asi no hay dos sitios que puedan discrepar.
   const generacion = equipo ? (parseGameCode(equipo.juego).game?.generacion ?? 3) : 3;
   const pelean = ranuras.filter((r) => !r.huevo);
-  const caidos = pelean.filter((r) => r.estado === 'debilitado').length;
+  const caidos = pelean.filter(
+    (r) => r.estado === 'debilitado' || parejaCaida(r.mote, caidosDelCompanero),
+  ).length;
   const vivos = pelean.length - caidos;
 
   return (
@@ -115,10 +131,19 @@ export const FinModal = ({
               hagas a partir de aquí ya no puede quitártelo.
             </>
           ) : (
-            <>
-              Tu equipo ha caído al completo. En una Nuzlocke eso es el final:{' '}
-              <strong>el juego te deja seguir, pero el reto se acaba aquí.</strong>
-            </>
+            porElEnlace ? (
+              <>
+                No te queda ningún Pokémon con el que seguir:{' '}
+                <strong>a los que te quedaban se les cayó la pareja</strong> en la partida de tu
+                compañero. En tu juego siguen en pie, pero en un Soul Link esa pareja se acabó, y
+                con ella el reto.
+              </>
+            ) : (
+              <>
+                Tu equipo ha caído al completo. En una Nuzlocke eso es el final:{' '}
+                <strong>el juego te deja seguir, pero el reto se acaba aquí.</strong>
+              </>
+            )
           )}
         </p>
 
@@ -152,6 +177,7 @@ export const FinModal = ({
                     pokemon={ranura}
                     especies={especies}
                     generacion={generacion}
+                    caidosDelCompanero={caidosDelCompanero}
                   />
                 ))}
               </ul>

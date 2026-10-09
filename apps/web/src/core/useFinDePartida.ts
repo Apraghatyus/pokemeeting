@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EquipoResumen } from '@emupoke/protocol';
+import { parejaCaida } from '@emupoke/pokemon';
 
 // ESTA REGLA SE HA EQUIVOCADO DOS VECES, UNA EN CADA DIRECCIÓN. Las dos están
 // aquí porque la forma de la regla de ahora es la consecuencia de las dos, y sin
@@ -52,6 +53,13 @@ export type FinDePartida = {
   /** Si hay que enseñar el cartel ahora mismo. */
   terminada: boolean;
   /**
+   * Si se acabo por el Soul Link y no por tu propia partida.
+   *
+   * Importa para contarlo: en ese caso tus Pokemon siguen vivos en el juego, y
+   * un cartel que diga "se te cayo el equipo" no cuadra con lo que ves.
+   */
+  porElEnlace: boolean;
+  /**
    * Como acabo: ganando o perdiendo.
    *
    * Por defecto 'derrota', que es el caso que se decide por regla nuestra. La
@@ -79,6 +87,8 @@ export type Resultado = 'victoria' | 'derrota';
 type Guardado = {
   /** Como acabo, si acabo. */
   resultado: Resultado;
+  /** Si lo que lo acabo fue el Soul Link y no tu propia partida. */
+  porElEnlace: boolean;
   /** Personalidades distintas vistas en el equipo. De aquí sale el mínimo. */
   vistos: number[];
   /** Si ya se dio por terminada, para no repetir el cartel en cada lectura. */
@@ -86,7 +96,13 @@ type Guardado = {
   continuada: boolean;
 };
 
-const VACIO: Guardado = { vistos: [], terminada: false, continuada: false, resultado: 'derrota' };
+const VACIO: Guardado = {
+  vistos: [],
+  terminada: false,
+  continuada: false,
+  resultado: 'derrota',
+  porElEnlace: false,
+};
 
 const clave = (partida: string) => `emupoke.fin.${partida}`;
 
@@ -100,6 +116,7 @@ const leer = (partida: string): Guardado => {
       terminada: guardado.terminada === true,
       continuada: guardado.continuada === true,
       resultado: guardado.resultado === 'victoria' ? 'victoria' : 'derrota',
+      porElEnlace: guardado.porElEnlace === true,
     };
   } catch {
     return { ...VACIO };
@@ -127,13 +144,38 @@ const escribir = (partida: string, estado: Guardado): void => {
 const MINIMO_PARA_DEDUCIRLO = 2;
 
 /** Si todos los que hay están debilitados. Sin Pokémon no hay nada que decidir. */
-const equipoCaido = (equipo: EquipoResumen | null): boolean => {
+/**
+ * Si no le queda a nadie en pie, contando a los que mato el Soul Link.
+ *
+ * En un Soul Link los Pokemon van emparejados: si al companero se le debilita
+ * el suyo, el tuyo tambien esta muerto para el reto **aunque en tu partida siga
+ * vivo**. Eso no era un fin de partida y deberia serlo: puedes quedarte sin
+ * nadie con quien seguir sin que tu juego se entere de nada.
+ *
+ * Se devuelve tambien POR QUE, porque el cartel tiene que explicarlo: decir
+ * "tu equipo ha caido al completo" mientras el panel ensena un Pokemon con
+ * todos sus PS es lo que confunde a quien lo ve.
+ */
+const equipoCaido = (
+  equipo: EquipoResumen | null,
+  caidosDelCompanero: ReadonlySet<string>,
+): { caido: boolean; porElEnlace: boolean } => {
   const vivos = equipo?.ranuras ?? [];
-  if (vivos.length === 0) return false;
   // Un huevo no cuenta ni a favor ni en contra: no pelea y no se debilita.
   const pelean = vivos.filter((r) => !r.huevo);
-  if (pelean.length === 0) return false;
-  return pelean.every((r) => r.estado === 'debilitado');
+  if (pelean.length === 0) return { caido: false, porElEnlace: false };
+
+  let porElEnlace = false;
+  const caido = pelean.every((ranura) => {
+    if (ranura.estado === 'debilitado') return true;
+    if (parejaCaida(ranura.mote, caidosDelCompanero)) {
+      porElEnlace = true;
+      return true;
+    }
+    return false;
+  });
+
+  return { caido, porElEnlace: caido && porElEnlace };
 };
 
 /**
@@ -159,6 +201,13 @@ export const useFinDePartida = (
    * ensenando el Salon de la Fama. Por eso manda sobre todo lo demas.
    */
   victoria = false,
+  /**
+   * Motes que han caido en el equipo del companero.
+   *
+   * Vacio cuando se juega solo, y entonces esto no cambia nada: sin companero
+   * no hay parejas que se puedan morir en otra partida.
+   */
+  caidosDelCompanero: ReadonlySet<string> = new Set(),
 ): FinDePartida => {
   const [estado, setEstado] = useState<Guardado>(VACIO);
   const [equipoFinal, setEquipoFinal] = useState<EquipoResumen | null>(null);
@@ -193,13 +242,23 @@ export const useFinDePartida = (
       // igual como este el equipo. Y lo que ya se decidio no se cambia, para
       // que una partida continuada no reescriba su propio final.
       // El respaldo pide dos Pokémon; el mensaje del juego no pide ninguno.
-      const loDeduzco = equipoCaido(equipo) && vistos.size >= MINIMO_PARA_DEDUCIRLO;
+      // El minimo de dos Pokemon guarda contra el combate del laboratorio, y eso
+      // es cosa de TU partida. Una pareja caida la reporta el companero desde la
+      // suya, y para que llegue tienen que coincidir el mote y que el suyo este
+      // de verdad debilitado: es una condicion mucho mas concreta que "mi unico
+      // Pokemon esta a cero", que en el tutorial pasa por guion. Asi que por ahi
+      // no se exige el minimo, o un Soul Link de un solo Pokemon no acabaria
+      // nunca, que es justo lo que se reporto.
+      const sinNadie = equipoCaido(equipo, caidosDelCompanero);
+      const loDeduzco =
+        sinNadie.caido && (sinNadie.porElEnlace || vistos.size >= MINIMO_PARA_DEDUCIRLO);
       const acabaAhora = victoria || derrota || loDeduzco;
 
       const siguiente: Guardado = {
         ...previo,
         vistos: [...vistos],
         terminada: previo.terminada || acabaAhora,
+        porElEnlace: previo.terminada ? previo.porElEnlace : sinNadie.porElEnlace,
         resultado: previo.terminada
           ? previo.resultado
           : victoria
@@ -261,6 +320,7 @@ export const useFinDePartida = (
     // la pagina, y sin mirarlo el cartel salia otra vez en cada arranque.
     terminada: estado.terminada && !estado.continuada && !descartada,
     resultado: estado.resultado,
+    porElEnlace: estado.porElEnlace,
     equipoFinal,
     continuada: estado.continuada,
     continuar,

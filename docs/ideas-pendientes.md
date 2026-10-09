@@ -154,6 +154,24 @@ causa no era la que parecía. Guardar el porqué ahorra volver a investigarlo.
   al lado con sus 23.623 bytes sin tocar. Ahora se renombra al subirlo.
   `test:importar` comprueba el sistema de ficheros del nucleo, que es donde
   estaba el fallo, y sin el arreglo ve cero bytes con contenido.
+- **En un Soul Link podias quedarte sin equipo sin que saltara nada.** Si a tus
+  Pokemon les caia la pareja en la partida del companero, para el reto estaban
+  muertos -esa es la regla- pero en tu juego seguian en pie, asi que no habia ni
+  mensaje de derrota ni nadie debilitado y el cartel no salia nunca. Ahora un
+  Pokemon cuenta como caido de dos formas: debilitado en tu partida, o con la
+  pareja caida en la del otro.
+  Y ahi **no se exige el minimo de dos Pokemon**, a diferencia del camino
+  normal. Ese minimo guarda contra el combate del laboratorio, que es cosa de TU
+  partida; una pareja caida la reporta el companero desde la suya y exige que
+  coincida el mote y que el suyo este de verdad debilitado, que es una condicion
+  mucho mas concreta que "mi unico Pokemon esta a cero". Sin eso, un Soul Link
+  de un solo Pokemon no acabaria nunca.
+  El cartel ademas lo explica: decia "tu equipo ha caido al completo" mientras
+  el panel ensenaba un Pokemon con todos sus PS y la etiqueta "Vivo", que es
+  justo lo que confundia. Ahora pone "Su pareja cayo" y cuenta lo que paso.
+- **"Empezar de nuevo" reiniciaba la misma ROM.** Eso devolvia a la MISMA
+  partida desde la pantalla de titulo, que no es empezar de nuevo: en una
+  Nuzlocke lo siguiente es otro mundo. Ahora lleva al aleatorizador.
 - **Al anfitrion se le caia la sala de repente.** Dos causas, y las dos reales.
   La primera: `disconnected` se trataba igual que `failed`, y no son lo mismo.
   `disconnected` quiere decir "ahora mismo no llegan paquetes" y WebRTC se

@@ -171,6 +171,21 @@ check('y la Liga entera, que llegar al Salon de la Fama ya la implica',
 await page.evaluate((nombre) => localStorage.removeItem(`emupoke.fin.${nombre}`), romName);
 await provocarFin();
 
+// --- "empezar de nuevo" lleva al aleatorizador ---
+//
+// Antes reiniciaba la ROM que estaba puesta, y eso devolvia a la MISMA partida
+// desde el titulo. En una Nuzlocke empezar de nuevo es empezar otro mundo, y
+// eso se hace en el aleatorizador.
+await page.getByRole('button', { name: 'Empezar de nuevo' }).click();
+await page.waitForTimeout(1200);
+check('empezar de nuevo abre el aleatorizador',
+  (await page.locator('.modal[open] .aleatorizar').count()) === 1);
+check('y cierra el cartel de fin', (await page.locator('.modal[open] .fin').count()) === 0);
+
+// Se vuelve a dejar como estaba para lo que viene despues.
+await page.evaluate((nombre) => localStorage.removeItem(`emupoke.fin.${nombre}`), romName);
+await provocarFin();
+
 // --- seguir jugando: se cierra y queda marcada ---
 await page.getByRole('button', { name: 'Seguir jugando' }).click();
 await page.waitForTimeout(400);

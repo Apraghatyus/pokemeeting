@@ -137,7 +137,20 @@ export const App = () => {
     session.escucharTrato,
   );
 
-  const fin = useFinDePartida(miEquipo.equipo, state.romName, miEquipo.derrota, miEquipo.victoria);
+  // Quien ha caido a cada lado. Va antes de la regla de fin de partida porque
+  // ahora forma parte de ella: en un Soul Link, una pareja caida cuenta.
+  const caidosMios = motesDebilitados(miEquipo.equipo);
+  const caidosSuyos = motesDebilitados(session.state.equipoCompanero);
+
+  const fin = useFinDePartida(
+    miEquipo.equipo,
+    state.romName,
+    miEquipo.derrota,
+    miEquipo.victoria,
+    // En un Soul Link, un Pokemon cuya pareja cayo esta muerto para el reto
+    // aunque en tu partida siga en pie.
+    caidosSuyos,
+  );
 
   // Mandarle el equipo al companero. Se hace desde un solo sitio y no al
   // leerlo, para que tambien salga cuando abre el canal: quien ya estaba
@@ -151,8 +164,6 @@ export const App = () => {
 
   // Soul Link: las parejas se reconocen por el mote, que es el mismo en las dos
   // partidas. Si a uno se le cae el suyo, al otro se le marca el emparejado.
-  const caidosMios = motesDebilitados(miEquipo.equipo);
-  const caidosSuyos = motesDebilitados(session.state.equipoCompanero);
 
   // En pantalla estrecha no caben las dos columnas, asi que se ve un equipo y
   // se cambia con un boton, igual que con las dos partidas.
@@ -312,11 +323,17 @@ export const App = () => {
              una derrota no se sabe por donde ibas -eso son banderas y hay que
              localizarlas-, y mientras no se sepa no se ensena. */
           liga={fin.resultado === 'victoria' ? LIGA_COMPLETA : []}
+          caidosDelCompanero={caidosSuyos}
+          porElEnlace={fin.porElEnlace}
           onContinuar={fin.continuar}
           onDescartar={fin.descartar}
+          /* "Empezar de nuevo" lleva al aleatorizador y no reinicia la ROM que
+             esta puesta. Reiniciarla devolvia a la misma partida desde el
+             titulo, que no es empezar de nuevo: en una Nuzlocke lo siguiente es
+             otro mundo, y ahi es donde se hace. */
           onReiniciar={() => {
             fin.continuar();
-            emulator.reset();
+            setRandomizerOpen(true);
           }}
         />
 
