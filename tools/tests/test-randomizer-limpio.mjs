@@ -200,7 +200,12 @@ await page.setInputFiles('input[type=file][accept*=".gba"]', ROM);
 const modal4 = page.locator('dialog.modal[open]');
 await modal4.locator('.hueco--partida').first().waitFor({ timeout: 30_000 });
 const antesDeBorrar = await modal4.locator('.hueco--partida').count();
+// Borrar pregunta antes: un clic abre la pregunta y el segundo la confirma.
+// Se cambio a proposito, porque ese boton esta a cinco pixeles del de descargar
+// y borrar una partida no se puede deshacer. Ver test-borrar-partida.mjs.
 await modal4.locator('.hueco__accion--borrar').first().click();
+await page.waitForTimeout(300);
+await modal4.locator('.hueco__accion--si').click();
 await page.waitForTimeout(500);
 check('borrar quita la partida de la lista',
   (await modal4.locator('.hueco--partida').count()) === antesDeBorrar - 1,

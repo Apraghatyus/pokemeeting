@@ -31,6 +31,7 @@
     "dev:randomizer": "npm run dev --workspace=@emupoke/randomizer",
     "test:randomizer": "node tools/tests/test-randomizer.mjs",
     "test:tiendas": "node tools/tests/test-tiendas.mjs",
+    "test:borrar": "node tools/tests/test-borrar-partida.mjs",
     "test:cola": "npx tsx tools/tests/test-cola.mjs",
     "test:cola:servicio": "node tools/tests/test-cola-servicio.mjs",
     "test:cola:ui": "node tools/tests/test-cola-ui.mjs",

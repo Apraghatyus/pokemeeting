@@ -3777,6 +3777,39 @@ details.partidas[open] > summary::before {
   color: var(--accent);
 }
 
+/* ---------- preguntar antes de borrar ----------
+
+   Borrar una partida no se puede deshacer: se va su copia y su guardado, y si
+   es una Soul Link se lleva por delante horas de dos personas. El boton esta a
+   cinco pixeles del de descargar, asi que un roce no puede bastar.
+
+   La pregunta sale DENTRO de la ficha y en el sitio de sus botones, no debajo:
+   asi la ficha no cambia de alto y las de abajo no dan un salto. */
+.hueco__acciones--seguro {
+  align-items: center;
+}
+
+.hueco__seguro {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--rojo);
+  white-space: nowrap;
+  margin-right: 1px;
+}
+
+/* El de confirmar es el unico de la fila que se pinta de rojo sin tocarlo: es
+   el que no tiene vuelta atras. */
+.hueco__accion--si {
+  border-color: var(--rojo);
+  color: var(--rojo);
+}
+
+.hueco__accion--si:hover {
+  background: var(--rojo);
+  border-color: var(--rojo);
+  color: #fff;
+}
+
 .hueco__accion--borrar:hover {
   border-color: var(--rojo);
   color: var(--rojo);

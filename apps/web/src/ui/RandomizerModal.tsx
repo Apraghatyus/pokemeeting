@@ -143,6 +143,40 @@ export const textoDeEspera = (cola: PuestoEnCola): string => {
   );
 };
 
+/*
+ * Los tres iconos de la fila de una partida.
+ *
+ * Dibujados y no con una letra: la equis que habia antes se leia como "cerrar"
+ * -es la misma que cierra el menu, dos centimetros mas arriba- y lo que hace es
+ * borrar una partida para siempre. Una papelera no se confunde con nada.
+ *
+ * `currentColor` para que hereden el color del boton, incluido el rojo que coge
+ * al pasar por encima.
+ */
+const IconoPapelera = () => (
+  <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none"
+    stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2.5 4h11" />
+    <path d="M6.5 4V2.5h3V4" />
+    <path d="M4 4l.7 9a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9L12 4" />
+    <path d="M6.6 6.8v4.6M9.4 6.8v4.6" />
+  </svg>
+);
+
+const IconoSi = () => (
+  <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3.5 8.5l3 3 6-7" />
+  </svg>
+);
+
+const IconoNo = () => (
+  <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <path d="M4 4l8 8M12 4l-8 8" />
+  </svg>
+);
+
 export const RandomizerModal = ({
   open,
   onClose,
@@ -171,6 +205,17 @@ export const RandomizerModal = ({
   const [partidas, setPartidas] = useState<PartidaGuardada[]>([]);
   const [otras, setOtras] = useState<PartidaGuardada[]>([]);
   const [semillaPegada, setSemillaPegada] = useState('');
+  /**
+   * La partida que esta preguntando si de verdad se borra, o null.
+   *
+   * Borrar una partida no se puede deshacer: se va su copia y su guardado, y si
+   * es una Soul Link se lleva por delante horas de dos personas. El boton esta
+   * a cinco pixeles del de descargar, asi que un roce no puede bastar.
+   *
+   * Se guarda el id y no un booleano porque hay hasta tres partidas en la
+   * lista: con un booleano, preguntar por una preguntaba por todas.
+   */
+  const [borrando, setBorrando] = useState<string | null>(null);
 
   // La lista se relee al abrir: puede haber cambiado desde la vez anterior.
   const releer = useCallback(() => {
@@ -184,6 +229,9 @@ export const RandomizerModal = ({
 
   useEffect(() => {
     if (open) releer();
+    // Una pregunta a medias no sobrevive a cerrar el menu: al volver, lo que
+    // habria es una ficha pidiendo confirmacion de algo que ya no se recuerda.
+    setBorrando(null);
   }, [open, releer]);
 
   useEffect(() => {
@@ -662,36 +710,68 @@ export const RandomizerModal = ({
                             </span>
                           </button>
 
-                          <div className="hueco__acciones">
-                            {mia && <BotonSemilla partida={partida} />}
-                            {mia && (
+                          {/* O las acciones, o la pregunta. En el mismo sitio y
+                              no debajo: asi la ficha no cambia de alto y las de
+                              abajo no dan un salto al preguntar. */}
+                          {borrando === partida.id ? (
+                            <div className="hueco__acciones hueco__acciones--seguro">
+                              <span className="hueco__seguro">¿Seguro?</span>
+                              <button
+                                type="button"
+                                className="hueco__accion hueco__accion--si"
+                                title="Si, borrarla"
+                                aria-label={`Confirmar que se borra ${nombreDePartida(partida)}`}
+                                onClick={() => {
+                                  setBorrando(null);
+                                  onBorrar(partida.fichero);
+                                  olvidar(partida.id);
+                                  releer();
+                                }}
+                              >
+                                <IconoSi />
+                              </button>
                               <button
                                 type="button"
                                 className="hueco__accion"
-                                onClick={() => exportarPartida(partida)}
-                                title={
-                                  'Descargar esta partida entera: el guardado y la semilla.\n' +
-                                  'Es lo que te llevas a otro aparato para seguir ahi.'
-                                }
-                                aria-label="Descargar esta partida para otro aparato"
+                                title="No, dejarla"
+                                aria-label="Dejar la partida como esta"
+                                /* Enfocado al aparecer: asi la tecla de espacio
+                                   -o un segundo toque sin mirar- cancela en vez
+                                   de borrar. */
+                                autoFocus
+                                onClick={() => setBorrando(null)}
                               >
-                                ⤓
+                                <IconoNo />
                               </button>
-                            )}
-                            <button
-                              type="button"
-                              className="hueco__accion hueco__accion--borrar"
-                              title="Borrar esta partida"
-                              aria-label={`Borrar ${nombreDePartida(partida)}`}
-                              onClick={() => {
-                                onBorrar(partida.fichero);
-                                olvidar(partida.id);
-                                releer();
-                              }}
-                            >
-                              ×
-                            </button>
-                          </div>
+                            </div>
+                          ) : (
+                            <div className="hueco__acciones">
+                              {mia && <BotonSemilla partida={partida} />}
+                              {mia && (
+                                <button
+                                  type="button"
+                                  className="hueco__accion"
+                                  onClick={() => exportarPartida(partida)}
+                                  title={
+                                    'Descargar esta partida entera: el guardado y la semilla.\n' +
+                                    'Es lo que te llevas a otro aparato para seguir ahi.'
+                                  }
+                                  aria-label="Descargar esta partida para otro aparato"
+                                >
+                                  ⤓
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                className="hueco__accion hueco__accion--borrar"
+                                title="Borrar esta partida"
+                                aria-label={`Borrar ${nombreDePartida(partida)}`}
+                                onClick={() => setBorrando(partida.id)}
+                              >
+                                <IconoPapelera />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
