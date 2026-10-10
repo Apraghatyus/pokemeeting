@@ -84,13 +84,46 @@ check('y dice que es una derrota',
   (await page.locator('.modal[open] .modal__title').textContent()) ?? '');
 check('perdiendo no se ensena la Liga, porque no se sabe por donde ibas',
   (await page.locator('.modal[open] .liga').count()) === 0);
+
+// --- las medallas, siempre ---
+//
+// Aqui no habia nada y se reporto: las medallas se leen del fichero de guardado
+// (ver `medallas.ts`), asi que una partida en la que nunca se guardo dentro del
+// juego -justo la de quien muere al principio- no tiene ninguna que leer, y el
+// cartel se quedaba sin la parte que cuenta hasta donde llegaste.
+//
+// Esta prueba carga una ROM recien puesta y nunca guarda dentro del juego, asi
+// que es exactamente ese caso.
+check('las medallas salen aunque mueras al principio',
+  (await page.locator('.modal[open] .medallas').count()) === 1);
+check('y estan las ocho, para ver las que te faltaron',
+  (await page.locator('.modal[open] .medalla').count()) === 8);
+check('ninguna encendida, que es lo que toca muriendo al principio',
+  (await page.locator('.modal[open] .medalla--tiene').count()) === 0);
+
+// Pero sin inventarse el numero. Ensenar "0 de 8" a quien consiguio cuatro y no
+// habia guardado seria mentir, y esa es la diferencia entre "no conseguiste
+// ninguna" y "no lo se".
+const marcador = await page.evaluate(() => {
+  const lista = document.querySelector('.modal[open] .medallas');
+  const tarjeta = lista?.closest('.tarjeta');
+  return {
+    cuenta: tarjeta?.querySelector('.cuenta')?.textContent?.trim() ?? null,
+    explica: tarjeta?.querySelector('.hint')?.textContent?.trim() ?? null,
+  };
+});
+check('no se pone una cuenta que no se sabe', marcador.cuenta === '\u2014 de 8', marcador.cuenta);
+check('y se dice por que no se sabe',
+  (marcador.explica ?? '').includes('partida guardada'), marcador.explica);
 check('avisa de que el juego deja seguir pero el reto no',
   ((await page.locator('.fin__resumen').textContent()) ?? '').includes('reto se acaba'));
 check('ofrece las dos salidas',
   (await page.getByRole('button', { name: 'Empezar de nuevo' }).count()) === 1 &&
     (await page.getByRole('button', { name: 'Seguir jugando' }).count()) === 1);
 check('y avisa de que seguir no cuenta',
-  ((await page.locator('.fin .hint').textContent()) ?? '').includes('no cuenta'));
+  // Hijo directo: dentro del cartel hay mas de un .hint desde que las
+  // medallas explican por que no se saben.
+  ((await page.locator('.fin > .hint').textContent()) ?? '').includes('no cuenta'));
 
 // --- las imagenes ---
 // Esto es lo que de verdad hay que vigilar: la pagina corre con aislamiento

@@ -149,9 +149,12 @@ export const FinModal = ({
 
         <div className="fin__columnas">
           <div className="fin__columna">
-            {/* Si de este juego todavia no se saben leer, no sale nada: un
-                marcador a cero para quien tiene cuatro medallas miente mas que
-                callarse. Lo mismo vale para la Liga. */}
+            {/* Las medallas salen SIEMPRE, incluso muriendo al principio: las
+                que faltan son justo lo que cuenta la historia, y un cartel de
+                fin de partida sin esa parte se quedaba a medias. Si no se saben
+                cuales, se ensenan apagadas y sin cuenta, que es distinto de
+                ensenar un cero: un cero para quien consiguio cuatro y no habia
+                guardado miente mas que callarse. */}
             <Medallas conseguidas={medallas} />
             <Liga pasos={liga} />
           </div>
