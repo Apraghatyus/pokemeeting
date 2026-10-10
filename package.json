@@ -64,6 +64,7 @@
     "test:resumen": "npx tsx tools/tests/test-resumen.mjs",
     "test:texto": "npx tsx tools/tests/test-texto.mjs",
     "test:fin": "npx tsx tools/tests/test-fin-partida.mjs",
+    "test:historial": "npx tsx tools/tests/test-historial.mjs",
     "test:orden": "npx tsx tools/tests/test-orden.mjs",
     "test:bordes": "node tools/tests/test-bordes.mjs",
     "test:derrota": "npx tsx tools/tests/test-derrota.mjs",

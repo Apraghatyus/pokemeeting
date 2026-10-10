@@ -136,6 +136,18 @@ export type PokemonResumen = {
    * mismo Bulbasaur salio de Tierra en una y de Dragon en la otra.
    */
   tipos: readonly [number, number] | null;
+  /**
+   * Sus cuatro movimientos, como numeros, o ausente si no se han podido leer.
+   *
+   * NO SE ENSENAN EN NINGUN SITIO, y van aqui a proposito. Se guardan al
+   * terminar una partida para el historial que vendra con los perfiles: contar
+   * como se gano o se perdio sin saber con que se jugaba es contar la mitad.
+   *
+   * Numeros y no nombres, igual que la especie: el nombre lo pone quien mira,
+   * con su ROM. Un numero de movimiento sigue queriendo decir lo mismo en las
+   * dos copias aunque esten aleatorizadas por separado.
+   */
+  movimientos?: readonly number[];
   /** Un huevo no enseña especie ni nivel, y conviene saberlo antes de pintarlo. */
   huevo: boolean;
   /**
@@ -253,6 +265,16 @@ const esOferta = (valor: unknown): valor is OfertaIntercambio => {
   );
 };
 
+/** Cuantos movimientos lleva un Pokemon, y hasta donde llegan sus numeros. */
+const MOVIMIENTOS_POR_POKEMON = 4;
+const MOVIMIENTO_MAXIMO = 511;
+
+const sonMovimientos = (valor: unknown): valor is number[] =>
+  valor === undefined ||
+  (Array.isArray(valor) &&
+    valor.length <= MOVIMIENTOS_POR_POKEMON &&
+    valor.every((m) => typeof m === 'number' && m >= 0 && m <= MOVIMIENTO_MAXIMO));
+
 export { BYTES_DE_UN_POKEMON };
 
 /**
@@ -292,17 +314,22 @@ export const parsePeerMessage = (crudo: string): PeerMessage | null => {
   // Seis es el tamano de un equipo. Mas que eso no es un equipo, es otra cosa.
   if (equipo.ranuras.length > 6) return null;
 
-  const ranuras = equipo.ranuras.filter(
-    (r): r is PokemonResumen =>
-      typeof r === 'object' &&
-      r !== null &&
-      typeof r.ranura === 'number' &&
-      typeof r.especie === 'number' &&
-      typeof r.nivel === 'number' &&
-      typeof r.mote === 'string' &&
-      // Un mote de veinte caracteres no cabe en el juego: viene de fuera.
-      r.mote.length <= 20,
-  );
+  const ranuras = equipo.ranuras
+    .filter(
+      (r): r is PokemonResumen =>
+        typeof r === 'object' &&
+        r !== null &&
+        typeof r.ranura === 'number' &&
+        typeof r.especie === 'number' &&
+        typeof r.nivel === 'number' &&
+        typeof r.mote === 'string' &&
+        // Un mote de veinte caracteres no cabe en el juego: viene de fuera.
+        r.mote.length <= 20,
+    )
+    // Los movimientos se quedan solo si son cuatro numeros de movimiento. Vienen
+    // de un navegador que no controlamos y acaban guardados en el historial: una
+    // lista de mil elementos ahi dentro se queda para siempre.
+    .map((r) => (sonMovimientos(r.movimientos) ? r : { ...r, movimientos: undefined }));
 
   return { type: 'equipo', equipo: { ...equipo, ranuras } };
 };

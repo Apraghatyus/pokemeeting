@@ -218,6 +218,9 @@ export const App = () => {
     // En un Soul Link, un Pokemon cuya pareja cayo esta muerto para el reto
     // aunque en tu partida siga en pie.
     caidosSuyos,
+    // Por donde iba la partida cuando se acabo. No se ensena: se guarda en el
+    // historial, para el dia que haya perfiles.
+    miEquipo.medallas.cuantas,
   );
 
   // Mandarle el equipo al companero. Se hace desde un solo sitio y no al

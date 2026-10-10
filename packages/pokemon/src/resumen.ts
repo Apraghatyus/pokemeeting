@@ -57,6 +57,8 @@ const resumirBloque = (bloque: Uint8Array, ranura: number): PokemonResumen => {
     // El tipo no esta en la partida sino en la ROM, que este lector no tiene.
     // Lo rellena quien si la tiene, antes de enseñarlo o de enviarlo.
     tipos: null,
+    // No se ensenan: se guardan al terminar la partida, para el historial.
+    movimientos: p.movimientos,
     huevo: p.esHuevo,
     personalidad: p.personalidad,
   };

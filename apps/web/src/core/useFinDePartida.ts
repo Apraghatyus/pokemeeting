@@ -11,6 +11,7 @@
 // precauciones de abajo.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { apuntarPartidaTerminada } from './historial';
 import type { EquipoResumen } from '@emupoke/protocol';
 import { parejaCaida } from '@emupoke/pokemon';
 
@@ -208,6 +209,13 @@ export const useFinDePartida = (
    * no hay parejas que se puedan morir en otra partida.
    */
   caidosDelCompanero: ReadonlySet<string> = new Set(),
+  /**
+   * Cuantas medallas llevaba, para apuntarlo en el historial.
+   *
+   * No cambia nada de lo que se ensena: es por donde iba la partida cuando se
+   * acabo, que es la mitad de lo que hace interesante un historial.
+   */
+  medallas: number | null = null,
 ): FinDePartida => {
   const [estado, setEstado] = useState<Guardado>(VACIO);
   const [equipoFinal, setEquipoFinal] = useState<EquipoResumen | null>(null);
@@ -273,6 +281,49 @@ export const useFinDePartida = (
       return siguiente;
     });
   }, [equipo, partida, derrota, victoria]);
+
+  // El historial, que no se ensena en ningun sitio todavia.
+  //
+  // Se recoge ahora para que el dia que haya cuentas y perfiles exista algo que
+  // contar: una partida terminada no se vuelve a jugar, asi que lo que no se
+  // apunte hoy se pierde. Ver `historial.ts`.
+  //
+  // Va atado a `equipoFinal`, que es la foto del momento exacto en que se
+  // acabo: despues el jugador revive a alguno en el Centro Pokemon y lo que se
+  // guardaria ya no seria lo que paso.
+  const apuntado = useRef<string | null>(null);
+  useEffect(() => {
+    if (!partida || !estado.terminada) return;
+    // Una vez por partida y por sesion. `apuntarPartidaTerminada` ademas no
+    // repite lo que ya tenga apuntado, asi que recargar tampoco duplica.
+    if (apuntado.current === partida) return;
+
+    // La foto si la hay, y si no el equipo de ahora. La foto solo existe cuando
+    // la partida se acaba con la pagina abierta; quien la termino ayer y vuelve
+    // hoy no tiene ninguna, y sin esto su partida no se apuntaria nunca.
+    const foto = equipoFinal ?? equipo;
+    // Pero no se apunta un equipo vacio. Al abrir, el juego esta en su pantalla
+    // de titulo unos segundos: apuntarlo ahi dejaria guardada para siempre una
+    // partida sin Pokemon, porque esto solo escribe una vez.
+    if (!foto || foto.ranuras.length === 0) return;
+
+    apuntado.current = partida;
+    apuntarPartidaTerminada(
+      partida,
+      estado.resultado ?? 'derrota',
+      estado.porElEnlace === true,
+      medallas,
+      foto,
+    );
+  }, [
+    partida,
+    equipo,
+    equipoFinal,
+    estado.terminada,
+    estado.resultado,
+    estado.porElEnlace,
+    medallas,
+  ]);
 
   // Se guarda aqui y no dentro del updater: un updater tiene que ser puro, y
   // guardando desde fuera no hay forma de escribir un estado a medias.
