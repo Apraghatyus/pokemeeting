@@ -23,6 +23,7 @@ import { spawn } from 'node:child_process';
 import { gunzip as gunzipCallback, gzip as gzipCallback } from 'node:zlib';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { aleatorizarTiendas, tocoLasTiendas } from './tiendas.ts';
 import { existsSync, readdirSync } from 'node:fs';
 import { cpus, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -748,6 +749,37 @@ const handleRandomize = async (req: IncomingMessage, res: ServerResponse): Promi
     }
 
     const randomized = await readFile(output);
+
+    // Las tiendas que el randomizer se salta.
+    //
+    // En Rojo Fuego su base de datos deja fuera veinte de las veintitres, y
+    // entre ellas estan todas las del principio: se marcaba "Objetos de tienda"
+    // y la primera tienda del juego seguia vendiendo lo mismo de siempre. Ver
+    // `tiendas.ts`, que explica como se encontro y de donde salen las
+    // direcciones.
+    //
+    // Va DESPUES del randomizer y sobre lo que el deja, asi que lo suyo manda:
+    // las tres que si toca se quedan como las puso.
+    //
+    // Y si hay que hacerlo se le pregunta a la ROM, no a la peticion: al rehacer
+    // una partida desde su semilla no llega ninguna lista de opciones, solo los
+    // ajustes ya resueltos. Mirando `chosen`, la copia original salia con las
+    // tiendas cambiadas y la rehecha no, y al compararlas byte a byte la rehecha
+    // se rechazaba. Ver `tocoLasTiendas`.
+    if (seed) {
+      try {
+        const jarBuf = await readFile(jarPath());
+        if (tocoLasTiendas(jarBuf, await readFile(input), randomized)) {
+          const extra = aleatorizarTiendas(jarBuf, randomized, seed);
+          if (extra) console.log(`  tiendas extra: ${extra.tiendas} (${extra.plazas} plazas)`);
+          else console.log('  tiendas extra: de esta ROM no se sabe donde estan, no se tocan');
+        }
+      } catch (error) {
+        // Que esto falle no puede llevarse por delante una copia que ya esta
+        // hecha: se devuelve como la dejo el randomizer.
+        console.log(`  tiendas extra: no se pudo (${String(error).slice(0, 120)})`);
+      }
+    }
     // Se devuelve comprimida por el mismo motivo: la vuelta gasta la subida de
     // esta maquina, que suele ser lo mas escaso de las dos.
     const payload = await gzip(randomized, { level: 6 });

@@ -97,18 +97,11 @@ const SUPPORTED = new Set([
 /**
  * Lo que viene marcado al abrir.
  *
- * Son las cuatro de siempre mas las tiendas. Las tiendas se anadieron porque se
- * reporto que "no funcionaban", y lo que pasaba es que no estaban: la casilla
- * existia, el servicio las aleatoriza -comprobado, cambia las listas de objetos
- * de los centros comerciales- y nadie la marcaba, porque para verla hay que
- * bajar por una lista de quince.
- *
- * Las que siguen apagadas lo estan a proposito: MTs, objetos del mapa,
- * estadisticas, tipos y habilidades cambian como se juega de formas que conviene
- * elegir a mano. Las tiendas no: cambian lo que te venden, y eso es justo lo que
- * la gente espera de una copia aleatorizada.
+ * Las cuatro de siempre. Las demas se marcan a mano a proposito: cambian como
+ * se juega -que te venden, que ensena cada MT, que estadisticas tiene cada
+ * especie- y eso conviene elegirlo, no encontrarselo.
  */
-const DEFAULT_SELECTION = ['salvajes', 'iniciales', 'entrenadores', 'movimientos', 'tiendas'];
+const DEFAULT_SELECTION = ['salvajes', 'iniciales', 'entrenadores', 'movimientos'];
 
 /**
  * Se abre al cargar una ROM y pregunta como se quiere jugar.

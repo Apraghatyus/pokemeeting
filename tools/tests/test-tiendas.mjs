@@ -1,19 +1,24 @@
 // El aleatorizado de los objetos de tienda.
 //
-// Se reporto que "no funcionaba". Y funcionaba: lo que pasaba es que la casilla
-// venia desmarcada, y para verla hay que bajar por una lista de quince
-// opciones. O sea que el fallo no estaba en generar nada, estaba en que nadie
-// lo pedia nunca.
+// Se reporto que "no funcionaba", y era verdad a medias: el randomizer decia
+// que las habia cambiado y la primera tienda del juego seguia vendiendo Poke
+// Ball, Pocion, Antidoto y Antiparaliz.
 //
-// Por eso esta prueba mira las dos cosas por separado, que es lo que habria
-// ahorrado el viaje:
+// La causa estaba en SU base de datos, no en nuestro codigo: trae una lista
+// `SkipShops` con las tiendas que no va a tocar, y en Rojo Fuego se come veinte
+// de las veintitres. La de Ciudad Verde -0x16A330 en la ROM espanola- es una de
+// ellas. Por eso las otras veinte se aleatorizan por nuestra cuenta despues;
+// ver `apps/randomizer/src/tiendas.ts`.
 //
-//   1. Que el servicio cambia de verdad las listas de objetos de las tiendas.
-//      No vale con que diga que lo ha hecho: se miran los bytes y se comprueba
-//      que donde habia una lista de objetos seguidos -como la pone el juego-
-//      ahora hay otra cosa, y que sigue siendo objetos que existen.
-//   2. Que la casilla viene marcada. Una opcion que funciona y que nadie marca
-//      es, para quien juega, una opcion que no funciona.
+// Lo que se comprueba, por orden de lo que mas duele si se rompe:
+//
+//   1. Que la primera tienda del juego cambia. Es la que se miro para reportarlo.
+//   2. Que se puede seguir comprando balls y pociones donde se podia. Una
+//      Nuzlocke sin forma de comprar balls no es mas dificil: es imposible.
+//   3. Que lo que aparece en los escaparates son objetos que esa ROM ya vendia.
+//      Repartir numeros al azar meteria objetos clave y MOs donde no van.
+//   4. Que la misma semilla da la misma ROM. Si no, una partida no se puede
+//      rehacer y el enlace de invitacion deja de valer.
 //
 // Lo primero necesita el servicio de aleatorizacion (npm run dev:all). Lo
 // segundo, ademas, la aplicacion levantada.
@@ -63,6 +68,8 @@ const aleatorizar = async (options) => {
     resumen: JSON.parse(
       Buffer.from(r.headers.get('x-summary') ?? '', 'base64').toString('utf8') || '{}',
     ),
+    semilla: r.headers.get('x-seed'),
+    ajustes: r.headers.get('x-settings'),
   };
 };
 
@@ -74,6 +81,103 @@ const hecha = await aleatorizar(['tiendas']).catch((e) => {
 
 check('pedir solo las tiendas devuelve solo eso',
   hecha.resumen.changed?.join() === 'Objetos de tienda', JSON.stringify(hecha.resumen.changed));
+
+/** La lista de una tienda: objetos seguidos hasta un cero. */
+const listaEn = (buf, donde) => {
+  const ids = [];
+  for (let i = 0; i < 24; i += 1) {
+    const id = buf.readUInt16LE(donde + i * 2);
+    if (id === 0) break;
+    ids.push(id);
+  }
+  return ids;
+};
+
+/**
+ * Las tiendas de la ROM espanola de Rojo Fuego, de la base de datos del propio
+ * randomizer. La 5 es la primera del juego, la de Ciudad Verde: es la que se
+ * miro para reportar que esto no funcionaba.
+ */
+const TIENDAS = [
+  0x164a4c, 0x167778, 0x167790, 0x1677ac, 0x1677cc, 0x16a330, 0x16a7a0, 0x16ad70,
+  0x16b428, 0x16b724, 0x16bbd0, 0x16bc0c, 0x16bcc8, 0x16bd1c, 0x16bd54, 0x16d5b0,
+  0x16eae0, 0x16eb8c, 0x16f074, 0x170bf4, 0x171950, 0x171d70, 0x171f28,
+];
+const CIUDAD_VERDE = 0x16a330;
+
+// --- 1. la tienda que se miro ---
+const antesVerde = listaEn(rom, CIUDAD_VERDE);
+const ahoraVerde = listaEn(hecha.rom, CIUDAD_VERDE);
+check('la primera tienda del juego vendia lo de siempre',
+  antesVerde.join() === '4,13,14,18', antesVerde.join());
+check('y ahora vende otra cosa', ahoraVerde.join() !== antesVerde.join(),
+  `${antesVerde.join()} -> ${ahoraVerde.join()}`);
+check('sin cambiar de tamano, que la lista la lee el juego',
+  ahoraVerde.length === antesVerde.length, `${antesVerde.length} -> ${ahoraVerde.length}`);
+
+// --- 2. lo que no se puede perder ---
+const esBall = (id) => id >= 1 && id <= 12;
+const POCION = 13;
+let sinSuBall = 0;
+let sinSuPocion = 0;
+for (const donde of TIENDAS) {
+  const antes = listaEn(rom, donde);
+  const ahora = listaEn(hecha.rom, donde);
+  for (const id of antes) {
+    if (esBall(id) && !ahora.includes(id)) sinSuBall += 1;
+    if (id === POCION && !ahora.includes(id)) sinSuPocion += 1;
+  }
+}
+check('donde se vendian balls se siguen vendiendo', sinSuBall === 0,
+  `${sinSuBall} tiendas se quedaron sin la suya`);
+check('y donde se vendian pociones tambien', sinSuPocion === 0,
+  `${sinSuPocion} tiendas se quedaron sin la suya`);
+
+// --- 3. nada que la ROM no vendiera ya ---
+const catalogo = new Set(TIENDAS.flatMap((d) => listaEn(rom, d)));
+const nuevos = TIENDAS.flatMap((d) => listaEn(hecha.rom, d));
+const intrusos = nuevos.filter((id) => !catalogo.has(id));
+// Las tres que toca el randomizer pueden traer objetos suyos; las nuestras no.
+const nuestras = TIENDAS.filter((_, i) => ![12, 13, 14].includes(i));
+const intrusosNuestros = nuestras
+  .flatMap((d) => listaEn(hecha.rom, d))
+  .filter((id) => !catalogo.has(id));
+check('lo que ponemos nosotros sale del catalogo de la propia ROM',
+  intrusosNuestros.length === 0, intrusosNuestros.slice(0, 8).join(','));
+check('y todo lo que hay en los escaparates es un objeto que existe',
+  nuevos.every((id) => id > 0 && id <= 377), `${intrusos.length} de fuera del catalogo`);
+
+// --- 4. la misma semilla, la misma ROM ---
+const otraVez = await aleatorizar(['tiendas']);
+check('la misma semilla da exactamente la misma copia',
+  otraVez.rom.equals(hecha.rom),
+  'si no, una partida no se puede rehacer desde su semilla');
+
+// Y por el camino de verdad: rehacerla como la rehace el programa, con los
+// ajustes ya resueltos y la semilla, SIN la lista de opciones.
+//
+// Es la comprobacion que de verdad protege algo. Por ahi no llega ningun
+// 'tiendas' que mirar, asi que decidir por la peticion dejaba la copia rehecha
+// sin tiendas cambiadas; y como se comparan byte a byte, el enlace de
+// invitacion y el boton de rehacer partida habrian dejado de funcionar en
+// cuanto alguien marcara esta casilla.
+const rehecha = await fetch(`${SERVICIO}/randomize`, {
+  method: 'POST',
+  headers: { 'content-type': 'application/octet-stream', 'x-body-encoding': 'gzip' },
+  body: gzipSync(
+    empaquetar({
+      settingsString: Buffer.from(hecha.ajustes ?? '', 'base64').toString('utf8'),
+      seed: hecha.semilla ?? undefined,
+    }),
+    { level: 6 },
+  ),
+});
+const brutoRehecho = Buffer.from(await rehecha.arrayBuffer());
+const romRehecha =
+  rehecha.headers.get('x-body-encoding') === 'gzip' ? gunzipSync(brutoRehecho) : brutoRehecho;
+check('y rehacerla desde su semilla da la misma, tambien las tiendas',
+  romRehecha.equals(hecha.rom),
+  'si no, el enlace de invitacion y rehacer partida dejan de valer');
 
 /**
  * Los tramos de la ROM que cambian, juntando los que estan pegados.
@@ -169,26 +273,32 @@ const marcadas = await page.evaluate(() =>
     .map((l) => l.querySelector('.interruptor__nombre')?.textContent?.trim() ?? ''),
 );
 
-check('la opcion de las tiendas viene marcada', marcadas.some((n) => /tienda/i.test(n)),
+// No viene marcada, y es a proposito: cambia lo que te venden, y eso conviene
+// elegirlo. Lo que no puede pasar es que marcarla no sirva de nada, que es lo
+// que se reporto.
+check('la opcion no viene marcada por defecto', !marcadas.some((n) => /tienda/i.test(n)),
   marcadas.join(' / '));
-// Las cuatro de siempre siguen ahi: esto no venia a cambiar lo que ya habia.
-for (const nombre of ['salvajes', 'iniciales', 'entrenadores', 'aprenden']) {
-  check(`y siguen marcadas las de siempre (${nombre})`,
-    marcadas.some((n) => new RegExp(nombre, 'i').test(n)));
-}
 
-// Y lo que se genera por defecto las lleva. Es la comprobacion que de verdad
-// cierra el reporte: no que la casilla este marcada, sino que llegan al mundo.
+const laDeTiendas = page
+  .locator('.interruptor')
+  .filter({ has: page.locator('.interruptor__nombre', { hasText: 'Objetos de tienda' }) });
+check('pero la opcion esta ahi', (await laDeTiendas.count()) === 1);
+
+await laDeTiendas.click();
+await page.waitForTimeout(200);
+check('y se puede marcar',
+  (await laDeTiendas.locator('input').isChecked()) === true);
+
 await page.getByRole('button', { name: 'Aleatorizar y jugar' }).click({ timeout: 20_000 });
 await page.locator('.hecha__cambios, .hecha .warn').first().waitFor({ timeout: 180_000 });
 const cambios = ((await page.locator('.hecha__cambios').textContent()) ?? '').toLowerCase();
-check('y una partida hecha con lo de por defecto trae las tiendas aleatorizadas',
+check('y marcandola, la partida sale con las tiendas aleatorizadas',
   cambios.includes('objetos de tienda'), cambios.trim());
 
 await navegador.close();
 console.log(
   fallos === 0
-    ? '\nLAS TIENDAS SE ALEATORIZAN Y ADEMAS SE PIDEN SOLAS'
+    ? '\nLAS TIENDAS SE ALEATORIZAN DE VERDAD, TAMBIEN LA PRIMERA'
     : `\n${fallos} COMPROBACIONES FALLIDAS`,
 );
 process.exit(fallos === 0 ? 0 : 1);
