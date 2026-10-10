@@ -1030,8 +1030,45 @@ nivel máximo de los líderes no afecta a nada. Es lo que hay hoy.
   Centro Pokémon ni curar** sin haber sacado antes del equipo a todos los
   debilitados.
 
-**Nuzlocke nivelada.** Lo anterior más el tope de nivel por gimnasio: un Pokémon
-por encima del tope del líder que toca **no se puede usar**.
+**Nuzlocke nivelada**, la más dura. Lo anterior más dos reglas:
+
+- **El tope de nivel por gimnasio**: un Pokémon por encima del tope del líder
+  que toca **no se puede usar**.
+- **Sin repetir tipo primario**, y esto cuenta para los dos jugadores a la vez.
+
+### Sin repetir tipo primario
+
+La regla: **en el equipo no puede haber dos Pokémon con el mismo tipo primario**,
+y en cooperativo tampoco entre los dos equipos. Si tú llevas uno de Agua
+primario, tu compañero no puede llevar otro de Agua primario, aunque sean
+especies distintas. Uno de los dos se queda en la computadora.
+
+**Solo cuenta el PRIMERO.** Un Roca/Agua tiene de primario Roca, así que no
+choca con el Agua de tu compañero: no están compartiendo tipo primario. Es la
+diferencia entre que la regla sea jugable o que deje medio equipo fuera.
+
+**Esto está más cerca de lo que parece.** Los tipos ya se leen de la ROM y, lo
+que es más importante aquí, **ya viajan por el cable**: cada lado manda los de su
+propia copia (`PokemonResumen.tipos`), y eso no es un detalle de implementación
+sino lo único que hace que la regla se pueda comprobar. En dos copias
+aleatorizadas por separado la misma especie tiene tipos distintos, así que el
+tipo primario del Pokémon de tu compañero solo lo sabe su ROM. Ya está resuelto;
+comparar `tipos[0]` de los dos equipos es casi todo el trabajo.
+
+Dos cosas a tener en cuenta al escribirlo:
+
+- **Un tipo repetido no es doble.** Cuando los dos valores son iguales el juego
+  está diciendo "mono-tipo", y el panel ya lo trata así. Para esta regla da
+  igual: el primario es `tipos[0]` en los dos casos.
+- **Basta con mirar el equipo**, no el PC. La regla habla de lo que llevas
+  encima y la solución es justamente dejar uno en la computadora, así que leer
+  solo las seis ranuras -que es lo que ya se hace- es exactamente lo que hace
+  falta.
+
+Y la parte difícil es la misma que la de los debilitados: **no poder salir del
+Centro Pokémon hasta haberlo arreglado**. Vale lo que se dice más abajo sobre
+vigilar e impedir; no es un problema distinto, es el mismo, y conviene
+resolverlo una vez para las dos reglas.
 
 ### Lo que ya está hecho de esto
 
@@ -1043,6 +1080,9 @@ Más de lo que parece, y conviene saberlo antes de empezar de cero:
   pasa. Hoy es solo un aviso. `test:tope:ui`.
 - **Los debilitados se detectan** en cada lectura del equipo, y en un Soul Link
   ya se marca la pareja al otro lado. `test:soullink`.
+- **Los tipos de los dos equipos ya están a mano**, cada uno leído de su propia
+  ROM y enviados por el canal de datos. Es lo que hace comprobable la regla de
+  no repetir tipo primario. `test:paneles`, `test:estadisticas`.
 - **Las medallas se leen en vivo**, de la memoria, así que el tope que toca
   cambia en cuanto ganas la medalla. `medallas.ts`, `test:medallas`.
 - **Se sabe escribir en la memoria del juego**: los intercambios meten los cien
