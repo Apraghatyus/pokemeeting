@@ -9,6 +9,7 @@ import { useTopeDeNivel } from './core/useTopeDeNivel';
 import { useFinDePartida } from './core/useFinDePartida';
 import { useEquipoOrdenado } from './core/ordenEquipo';
 import { useEsEstrecha } from './core/useEsEstrecha';
+import { usePantallaCompleta } from './core/usePantallaCompleta';
 import { useEspecies } from './core/useEspecies';
 import { useMandoTactil } from './core/useMandoTactil';
 import { codificarSemilla, type Semilla } from './core/semilla';
@@ -248,7 +249,16 @@ export const App = () => {
    * deslizabas a su partida y seguias viendo tu equipo.
    */
   const [verSuEquipo, setVerSuEquipo] = useState(false);
-  const unoSolo = estrecha && conCompanero;
+
+  // A pantalla completa pasa lo mismo que en una pantalla estrecha: cabe UNA
+  // columna de equipo, no dos, porque todo el sitio es para la partida. Asi que
+  // se ve un equipo y se cambia, con las dos pestanas de la cabecera o con el
+  // mismo boton que cambia de partida.
+  //
+  // Y cambia las dos cosas a la vez a proposito: si te pasas a su pantalla y
+  // sigues viendo tu equipo, lo que hay debajo de su partida no es suyo.
+  const enCompleta = usePantallaCompleta();
+  const unoSolo = (estrecha || enCompleta) && conCompanero;
 
   return (
     // Jugando en una pantalla estrecha, la barra se encoge a una sola fila: los
@@ -271,7 +281,11 @@ export const App = () => {
 
       <main className="app__main">
        <div className="juego" ref={marcoDeJuego}>
-        <div className={`mesa${conCompanero ? '' : ' mesa--solo'}`}>
+        {/* Con una sola columna de equipo -pantalla completa, o estrecha- la mesa
+            es la de jugar solo: si no, se quedaba reservada la columna del
+            companero, vacia, y la partida perdia 230 pixeles de ancho por un
+            hueco que no pintaba nada. */}
+        <div className={`mesa${conCompanero && !unoSolo ? '' : ' mesa--solo'}`}>
           {/* Con sitio, los dos equipos a los lados. En pantalla estrecha solo
               cabe uno, asi que se enseña ese y se cambia con el boton. */}
           <EquipoPanel

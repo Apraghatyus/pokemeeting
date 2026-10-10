@@ -387,7 +387,7 @@ body {
      el lado, que es como se ve en una videollamada.
      La esquina concreta la elige quien juega arrastrandola; estas reglas valen
      para la de partida y las sobrescriben las de abajo. */
-  right: -11%;
+  right: var(--asoma-x);
   bottom: -2%;
   width: 26%;
   min-width: 120px;
@@ -535,10 +535,36 @@ body {
 /* Cada esquina fija dos lados y suelta los otros dos. Hace falta el "auto"
    explicito: sin el, los valores de la regla general seguirian aplicando y la
    ventana se quedaria estirada entre dos esquinas. */
-.pantalla--pequena.pantalla--abajo-der { right: -11%; bottom: -9%; left: auto; top: auto; }
-.pantalla--pequena.pantalla--abajo-izq { left: -11%; bottom: -9%; right: auto; top: auto; }
-.pantalla--pequena.pantalla--arriba-der { right: -11%; top: -9%; left: auto; bottom: auto; }
-.pantalla--pequena.pantalla--arriba-izq { left: -11%; top: -9%; right: auto; bottom: auto; }
+/*
+ * CUANTO ASOMA POR FUERA, y por que es una variable.
+ *
+ * Asoma un porcentaje de la partida para que se vea igual de suelta sea cual
+ * sea el tamano. Con la partida pequena eso son veinte pixeles y se mete por
+ * encima de la columna del equipo, que es justo el efecto que se busca.
+ *
+ * A pantalla completa la partida llena la ventana, y entonces ese mismo 11% son
+ * ciento veinte pixeles: lo medido fue que la ventana del companero se salia 64
+ * pixeles POR FUERA de la pantalla, con su boton de cambiar entero fuera. O sea
+ * que no habia forma de volver a tu partida desde ahi.
+ *
+ * Asi que ahi se le pone tope en pixeles. Sigue asomando, pero dentro.
+ */
+.pantallas {
+  --asoma-x: -11%;
+  --asoma-y: -9%;
+}
+
+/* El hueco que se le reserva al lado es de 48 y 26 pixeles (ver `.mesa__centro`
+   mas arriba), asi que el tope va por debajo de eso. */
+.juego:fullscreen .pantallas {
+  --asoma-x: max(-11%, -40px);
+  --asoma-y: max(-9%, -22px);
+}
+
+.pantalla--pequena.pantalla--abajo-der { right: var(--asoma-x); bottom: var(--asoma-y); left: auto; top: auto; }
+.pantalla--pequena.pantalla--abajo-izq { left: var(--asoma-x); bottom: var(--asoma-y); right: auto; top: auto; }
+.pantalla--pequena.pantalla--arriba-der { right: var(--asoma-x); top: var(--asoma-y); left: auto; bottom: auto; }
+.pantalla--pequena.pantalla--arriba-izq { left: var(--asoma-x); top: var(--asoma-y); right: auto; bottom: auto; }
 
 /* Mientras se arrastra va pegada al puntero, sin transicion de sitio: animar
    la posicion y seguir al raton a la vez se ve a tirones. */
@@ -2993,6 +3019,90 @@ details.partidas[open] > summary::before {
   border-color: var(--accent-dim);
 }
 
+/* ---------- los dos equipos, en dos pestanas ----------
+
+   Cuando solo cabe una columna -pantalla estrecha o pantalla completa- los dos
+   equipos comparten sitio. Antes habia un boton de "ver el suyo": decia a donde
+   ibas pero no donde estabas, y con dos equipos que se parecen -los dos con sus
+   seis fichas- eso se pierde enseguida. */
+.equipo__pestanas {
+  display: flex;
+  gap: 2px;
+  width: 100%;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+}
+
+.equipo__pestana {
+  flex: 1;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.equipo__pestana:hover:not(.is-activa) {
+  color: var(--text);
+}
+
+.equipo__pestana.is-activa {
+  background: var(--accent);
+  color: var(--accent-ink);
+  /* La activa no se pulsa: ya estas ahi. Y que no parezca que si. */
+  cursor: default;
+}
+
+/* ---------- el cambio de equipo, visible ----------
+
+   Al cambiar, la lista entra desde el lado del que viene. Sin esto el cambio
+   era instantaneo: dos columnas de seis fichas parecidas se sustituian sin que
+   el ojo registrara que habia cambiado algo, y mirabas el equipo del otro
+   creyendo que era el tuyo.
+
+   Es corta a proposito: esto se usa en mitad de una partida. */
+@keyframes equipo-entra-propio {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+}
+
+@keyframes equipo-entra-companero {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+}
+
+.equipo__lista--entra-propio {
+  animation: equipo-entra-propio 220ms ease-out;
+}
+
+.equipo__lista--entra-companero {
+  animation: equipo-entra-companero 220ms ease-out;
+}
+
+/* Quien pide menos movimiento no lo recibe: el cambio sigue estando, pero sin
+   deslizamiento. */
+@media (prefers-reduced-motion: reduce) {
+  .equipo__lista--entra-propio,
+  .equipo__lista--entra-companero {
+    animation: none;
+  }
+}
+
 /* Pasado del tope del gimnasio que toca: queda fuera del reto.
  *
  * Se apaga como un debilitado, porque para el reto viene a ser lo mismo: no se
@@ -3102,6 +3212,14 @@ details.partidas[open] > summary::before {
   .app--jugando .equipo__titulo {
     font-size: 10px;
     margin-bottom: 2px;
+  }
+
+  /* Las pestanas tambien adelgazan: jugando en un telefono lo que escasea es
+     alto y esto va justo encima de la tira de fichas. */
+  .app--jugando .equipo__pestana {
+    font-size: 9px;
+    padding: 3px 4px;
+    letter-spacing: 0.04em;
   }
 
   .app--jugando .equipo {
@@ -3286,9 +3404,13 @@ details.partidas[open] > summary::before {
      de un vistazo quien sigue en pie. */
   .app--jugando .equipo .equipo__titulo,
   .app--jugando .equipo .ficha__datos,
+  .app--jugando .equipo .equipo__pestanas,
   .app--jugando .equipo .equipo__cambiar {
     display: none;
   }
+
+  /* Sin pestanas, el cambio de equipo se hace deslizando la partida, que aqui
+     cambia las dos cosas a la vez. */
 
   .app--jugando .equipo .equipo__lista .ficha {
     width: auto;

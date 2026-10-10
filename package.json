@@ -76,6 +76,7 @@
     "test:invitacion": "npx tsx tools/tests/test-invitacion.mjs",
     "test:invitacion:ui": "node tools/tests/test-invitacion-ui.mjs",
     "test:tipografia": "node tools/tests/test-tipografia.mjs",
+    "test:completa": "node tools/tests/test-completa-equipos.mjs",
     "test:tope:ui": "node tools/tests/test-tope-ui.mjs",
     "buscar:medallas": "node tools/buscar-medallas.mjs",
     "test:fin:ui": "node tools/tests/test-fin-ui.mjs",

@@ -265,19 +265,44 @@ export const EquipoPanel = ({
 
   return (
     <aside className={`equipo equipo--${lado}`} aria-label={titulo}>
+      {/* Cuando solo cabe una columna, los dos equipos son dos pestanas y no un
+          boton de "ver el otro". El boton decia a donde ibas pero no donde
+          estabas, y con dos equipos que se parecen -los dos con sus seis
+          fichas- eso se pierde enseguida. Dos pestanas dicen las dos cosas. */}
       <div className="equipo__cabecera">
-        <h2 className="equipo__titulo">{titulo}</h2>
-        {onCambiar && (
-          <button type="button" className="equipo__cambiar" onClick={onCambiar}>
-            {lado === 'propio' ? 'Ver el suyo' : 'Ver el tuyo'}
-          </button>
+        {onCambiar ? (
+          <div className="equipo__pestanas" role="tablist" aria-label="Que equipo se ve">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={lado === 'propio'}
+              className={`equipo__pestana${lado === 'propio' ? ' is-activa' : ''}`}
+              onClick={lado === 'propio' ? undefined : onCambiar}
+            >
+              Tu equipo
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={lado === 'companero'}
+              className={`equipo__pestana${lado === 'companero' ? ' is-activa' : ''}`}
+              onClick={lado === 'companero' ? undefined : onCambiar}
+            >
+              Tu companero
+            </button>
+          </div>
+        ) : (
+          <h2 className="equipo__titulo">{titulo}</h2>
         )}
       </div>
 
       {ranuras.length === 0 && motivo ? (
         <p className="equipo__vacio">{motivo}</p>
       ) : (
-        <ul className="equipo__lista">
+        /* La `key` cambia al cambiar de equipo, asi que React rehace la lista y
+           la animacion de entrada vuelve a correr. Sin eso el cambio era
+           instantaneo y no se veia de donde venia lo que acababa de aparecer. */
+        <ul className={`equipo__lista equipo__lista--entra-${lado}`} key={lado}>
           {huecos.map((pokemon, i) =>
             pokemon ? (
               // La personalidad no cambia nunca, asi que cambiar dos Pokemon de

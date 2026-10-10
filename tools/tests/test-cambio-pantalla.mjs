@@ -133,9 +133,16 @@ const conMiPantallaVisible = await fpsQueLlegan(5);
 check('mientras se ve tu partida, al otro le llega en movimiento',
   conMiPantallaVisible >= MINIMO, `${conMiPantallaVisible.toFixed(1)} fps`);
 
-// Que equipo se esta ensenando, por su titulo.
+// Que equipo se esta ensenando. Con un solo equipo a la vista lo dice la pestana
+// marcada: el titulo dejo de pintarse cuando los dos equipos pasaron a ser
+// pestanas, y preguntar por el devolvia siempre vacio.
 const tituloDelEquipo = () =>
-  movil.evaluate(() => document.querySelector('.equipo__titulo')?.textContent?.trim() ?? '');
+  movil.evaluate(
+    () =>
+      document.querySelector('.equipo__pestana.is-activa')?.textContent?.trim() ??
+      document.querySelector('.equipo__titulo')?.textContent?.trim() ??
+      '',
+  );
 
 // --- se cambia de pantalla deslizando ---
 await deslizar(-140, 0);
@@ -170,7 +177,12 @@ check('que sigue siendo movimiento y no una imagen quieta',
 const equipoVisible = () =>
   movil.evaluate(() => ({
     cuantos: document.querySelectorAll('.equipo').length,
-    titulo: document.querySelector('.equipo__titulo')?.textContent?.trim() ?? '',
+    // Con un solo equipo a la vista, cual se ve lo dice la pestana marcada: el
+    // titulo dejo de pintarse cuando los dos equipos pasaron a ser pestanas.
+    titulo:
+      document.querySelector('.equipo__pestana.is-activa')?.textContent?.trim() ??
+      document.querySelector('.equipo__titulo')?.textContent?.trim() ??
+      '',
   }));
 
 // Venimos del tercer deslizamiento, asi que lo que se ve es lo suyo.
@@ -180,14 +192,14 @@ check('y es el del lado que se esta mirando', /companero/i.test(equipoAntes.titu
   equipoAntes.titulo);
 
 // El boton hace lo mismo que el gesto: las dos formas mueven la misma decision.
-await movil.locator('.equipo__cambiar').click();
+await movil.locator('.equipo__pestana:not(.is-activa)').click();
 await movil.waitForTimeout(500);
 const equipoDespues = await equipoVisible();
 check('el boton te devuelve a lo tuyo', /Tu equipo/i.test(equipoDespues.titulo),
   equipoDespues.titulo);
 check('y la pantalla grande vuelve contigo', (await visible()).mia);
 
-await movil.locator('.equipo__cambiar').click();
+await movil.locator('.equipo__pestana:not(.is-activa)').click();
 await movil.waitForTimeout(500);
 check('y otra vez a lo suyo', /companero/i.test((await equipoVisible()).titulo));
 
