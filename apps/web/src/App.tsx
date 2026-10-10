@@ -5,6 +5,7 @@ import { useEmulator } from './core/useEmulator';
 import { useKeyboardOwnership } from './core/useKeyboardOwnership';
 import { useSession } from './net/useSession';
 import { useEquipo } from './core/useEquipo';
+import { useTopeDeNivel } from './core/useTopeDeNivel';
 import { useFinDePartida } from './core/useFinDePartida';
 import { useEquipoOrdenado } from './core/ordenEquipo';
 import { useEsEstrecha } from './core/useEsEstrecha';
@@ -126,6 +127,16 @@ export const App = () => {
   const equipoMio = useEquipoOrdenado(miEquipo.equipo);
   const equipoSuyo = useEquipoOrdenado(session.state.equipoCompanero);
 
+  // Hasta que nivel se puede subir antes del gimnasio que toca. El numero sale
+  // de TU ROM -en una aleatorizada los lideres llevan otra cosa- y cual toca,
+  // de las medallas que ya llevas.
+  const tope = useTopeDeNivel(
+    emulator.romBytesRef,
+    state.romName,
+    state.status === 'running',
+    miEquipo.medallas.cuantas,
+  );
+
   // El reto se acaba cuando cae el equipo entero. No lo dice el juego -ahi
   // pierdes, vuelves al Centro Pokemon y sigues-: es la regla de la Nuzlocke,
   // asi que se aplica aqui.
@@ -214,6 +225,11 @@ export const App = () => {
             activo={unoSolo && verSuEquipo ? equipoSuyo.alFrente : equipoMio.alFrente}
             especies={especies}
             caidosDelOtro={unoSolo && verSuEquipo ? caidosMios : caidosSuyos}
+            /* Solo en la columna propia: el tope del companero depende de SU
+               ROM y de SUS medallas, y ni una ni otras salen de su ordenador.
+               Ponerle el tuyo marcaria a sus Pokemon por una regla que no es la
+               suya. */
+            tope={unoSolo && verSuEquipo ? null : tope}
             onCambiar={unoSolo ? () => setVerSuEquipo((v) => !v) : undefined}
             motivo={unoSolo && verSuEquipo ? 'Todavia no ha mandado su equipo.' : undefined}
           />

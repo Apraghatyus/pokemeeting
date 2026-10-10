@@ -20,3 +20,4 @@ export * from './combate';
 export * from './derrota';
 export * from './victoria';
 export * from './medallas';
+export * from './lideres';

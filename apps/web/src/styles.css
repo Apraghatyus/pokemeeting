@@ -2887,6 +2887,50 @@ details.partidas[open] > summary::before {
   border-color: var(--accent-dim);
 }
 
+/* El tope de nivel del gimnasio que toca.
+   Va debajo del titulo del equipo y no dentro de cada ficha porque es un solo
+   numero para los seis. Lo que si va en la ficha es quien se lo ha pasado. */
+.equipo__tope {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 6px 0 0;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  line-height: 1.25;
+}
+
+.equipo__tope-nivel {
+  flex: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.equipo__tope-quien {
+  font-size: 10px;
+  color: var(--muted);
+  /* Dos lineas como mucho, y en movil cabe justo: el nombre del lider es lo
+     primero que se corta si hace falta. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Pasado del tope. El nivel se tiñe y al lado va cuanto se pasa.
+   Sin borde en la ficha: los bordes de ahi son box-shadow y ya se pisaron una
+   vez entre si. Ver `.ficha--activo:is(...)`. */
+.ficha__nivel--pasado {
+  color: var(--rojo);
+  font-weight: 700;
+}
+
+.estado--pasado {
+  background: var(--rojo);
+  color: #fff;
+}
+
 /* ====================================================================
    Movil: que el mando quepa entero
    ====================================================================
@@ -2967,6 +3011,26 @@ details.partidas[open] > summary::before {
   .app--jugando .equipo__titulo {
     font-size: 10px;
     margin-bottom: 2px;
+  }
+
+  /* El tope, en una sola linea y sin caja.
+     Jugando en un telefono lo que escasea es el alto -es lo que empujaba el
+     mando fuera de la pantalla-, asi que aqui el aviso adelgaza en vez de
+     desaparecer: el numero es justo lo que se mira de reojo antes de seguir
+     subiendo niveles. */
+  .app--jugando .equipo__tope {
+    margin-top: 2px;
+    padding: 1px 5px;
+    gap: 4px;
+    white-space: nowrap;
+  }
+
+  .app--jugando .equipo__tope-nivel {
+    font-size: 10px;
+  }
+
+  .app--jugando .equipo__tope-quien {
+    font-size: 9px;
   }
 
   .app--jugando .equipo {
@@ -3151,6 +3215,7 @@ details.partidas[open] > summary::before {
      de un vistazo quien sigue en pie. */
   .app--jugando .equipo .equipo__titulo,
   .app--jugando .equipo .ficha__datos,
+  .app--jugando .equipo .equipo__tope,
   .app--jugando .equipo .equipo__cambiar {
     display: none;
   }

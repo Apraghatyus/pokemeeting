@@ -72,6 +72,8 @@
     "buscar:combate": "node tools/buscar-combate.mjs",
     "test:victoria": "npx tsx tools/tests/test-victoria.mjs",
     "test:medallas": "npx tsx tools/tests/test-medallas.mjs",
+    "test:lideres": "npx tsx tools/tests/test-lideres.mjs",
+    "test:tope:ui": "node tools/tests/test-tope-ui.mjs",
     "buscar:medallas": "node tools/buscar-medallas.mjs",
     "test:fin:ui": "node tools/tests/test-fin-ui.mjs",
     "test:gbc": "node tools/tests/test-gbc.mjs",

@@ -37,6 +37,8 @@ export const codificar = (texto: string): number[] =>
     if (c >= 'a' && c <= 'z') return min(c);
     if (c >= '0' && c <= '9') return 0xa1 + c.charCodeAt(0) - 48;
     if (c === ' ') return 0x00;
+    // El punto hace falta para nombres como "LT. SURGE".
+    if (c === '.') return 0xad;
     throw new Error(`no se sabe codificar "${c}"`);
   });
 

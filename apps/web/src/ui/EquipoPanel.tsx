@@ -12,7 +12,13 @@
 // una funcion que pone nombres, y con eso pinta igual una partida de Rojo
 // Fuego que, el dia que exista su lector, una de Oro.
 
-import { parejaCaida, parseGameCode, TAMANO_EQUIPO, TIPOS_GEN3 } from '@emupoke/pokemon';
+import {
+  parejaCaida,
+  parseGameCode,
+  TAMANO_EQUIPO,
+  TIPOS_GEN3,
+  type TopeDeNivel,
+} from '@emupoke/pokemon';
 import type { Especies } from '../core/useEspecies';
 import { SpriteEspecie } from './Sprite';
 import type { EquipoResumen, EstadoPokemon, PokemonResumen } from '@emupoke/protocol';
@@ -53,6 +59,17 @@ type Props = {
    * se ve un equipo y se cambia, igual que con las dos partidas.
    */
   onCambiar?: () => void;
+  /**
+   * Hasta que nivel se puede subir antes del proximo gimnasio.
+   *
+   * Es una regla que se pone la gente, no del juego, asi que esto AVISA y no
+   * impide nada: el Pokemon sigue jugando y quien decide es su dueño. Igual que
+   * con la pareja caida de un Soul Link.
+   *
+   * Solo se pasa para el equipo propio. Del companero no se sabe: su ROM y sus
+   * medallas estan en su ordenador, y es ahi donde las ve.
+   */
+  tope?: TopeDeNivel | null;
   /**
    * Por que no hay nada que enseñar.
    *
@@ -119,14 +136,19 @@ const Ficha = ({
   generacion,
   activo,
   parejaRota,
+  tope,
 }: {
   pokemon: PokemonResumen;
   especies: Especies;
   generacion: number;
   activo: boolean;
   parejaRota: boolean;
+  tope: TopeDeNivel | null;
 }) => {
   const nombre = pokemon.huevo ? 'Huevo' : especies.nombre(pokemon.especie);
+  // Cuantos niveles se ha pasado del tope, si se lo ha pasado. Un huevo no
+  // tiene nivel que comparar.
+  const sobra = tope && !pokemon.huevo ? pokemon.nivel - tope.nivel : 0;
   const clases = [
     'ficha',
     activo ? 'ficha--activo' : '',
@@ -160,9 +182,24 @@ const Ficha = ({
       <span className="ficha__datos">
         <strong className="ficha__nombre">{pokemon.mote || nombre}</strong>
         <span className="ficha__linea">
-          <span className="ficha__nivel">
+          <span className={`ficha__nivel${sobra > 0 ? ' ficha__nivel--pasado' : ''}`}>
             {pokemon.huevo ? 'sin eclosionar' : `Nv.${pokemon.nivel}`}
           </span>
+          {/* Pasado de nivel para el gimnasio que toca. Se marca con cuanto se
+              pasa, que es el dato util: por uno se aguanta, por ocho no.
+
+              Va como etiqueta y NO como borde a proposito: los bordes de la
+              ficha son box-shadow y ya se pisaron una vez entre si -el de
+              "esta peleando" y el de estado-. Una cuarta capa ahi volveria a
+              borrar alguna. */}
+          {sobra > 0 && tope && (
+            <span
+              className="estado estado--pasado"
+              title={`${sobra} por encima del tope: ${tope.lider} llega a Nv.${tope.nivel}`}
+            >
+              +{sobra}
+            </span>
+          )}
           {/* En un Soul Link un debilitado no es un detalle: suele ser el final
               de una pareja. Por eso el estado se ve antes que nada. */}
           {pokemon.estado && (
@@ -186,6 +223,7 @@ const Ficha = ({
       <span className="visually-hidden">
         {nombre}
         {pokemon.estado ? `, ${pokemon.estado}` : ''}
+        {sobra > 0 ? `, ${sobra} niveles por encima del tope` : ''}
       </span>
     </li>
   );
@@ -198,6 +236,7 @@ export const EquipoPanel = ({
   especies,
   activo = null,
   caidosDelOtro,
+  tope = null,
   onCambiar,
   motivo,
 }: Props) => {
@@ -227,6 +266,18 @@ export const EquipoPanel = ({
         )}
       </div>
 
+      {/* El tope del gimnasio que toca, con el nombre del lider: sin el nombre
+          el numero no se sabe de donde sale, y sabiendolo se puede comprobar
+          dentro del juego. */}
+      {tope && (
+        <p className="equipo__tope">
+          <span className="equipo__tope-nivel">Nv.{tope.nivel}</span>
+          <span className="equipo__tope-quien">
+            tope para el gimnasio {tope.gimnasio}, {tope.lider}
+          </span>
+        </p>
+      )}
+
       {ranuras.length === 0 && motivo ? (
         <p className="equipo__vacio">{motivo}</p>
       ) : (
@@ -244,6 +295,7 @@ export const EquipoPanel = ({
                 parejaRota={
                   caidosDelOtro !== undefined && parejaCaida(pokemon.mote, caidosDelOtro)
                 }
+                tope={tope}
               />
             ) : (
               <li key={`hueco-${i}`} className="ficha ficha--hueco" aria-hidden="true" />

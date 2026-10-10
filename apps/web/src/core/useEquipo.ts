@@ -19,6 +19,7 @@ import {
   enCombate,
   enDerrota,
   enSalonDeLaFama,
+  leerCabecera,
   quienPelea,
   leerMedallas,
   mismoEquipo,
@@ -153,6 +154,18 @@ export const useEquipo = (
         };
       }
 
+      // De que juego es esto. Se lee de la CABECERA del estado y no del equipo
+      // a proposito: antes salia de haber encontrado el equipo, y asi, nada mas
+      // empezar una partida -antes del primer Pokemon- no habia codigo y las
+      // medallas se quedaban en "no se sabe" aunque el guardado estuviera ahi.
+      let codigo = juegoRef.current || leido?.juego || '';
+      try {
+        codigo = leerCabecera(estado).codigoJuego || codigo;
+      } catch {
+        // Un estado que no sea de GBA no tiene esta cabecera. Se sigue con lo
+        // que diga el equipo, que es lo que habia antes.
+      }
+
       // Se mira en el mismo estado que acabamos de leer.
       setDerrota(enDerrota(estado));
       setVictoria(enSalonDeLaFama(estado));
@@ -168,7 +181,7 @@ export const useEquipo = (
               return null;
             }
           })(),
-          juegoRef.current || leido?.juego || '',
+          codigo,
         ),
       );
 
