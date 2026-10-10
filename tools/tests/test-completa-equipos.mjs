@@ -5,10 +5,14 @@
 // partida encogia. Ahora se ve UNO y se cambia, igual que en una pantalla
 // estrecha.
 //
-// Y el cambio es uno solo para las dos cosas: pasarse a la partida del
-// companero cambia tambien su equipo. Si no, lo que hay debajo de su partida no
-// es suyo, y eso se mira sin leer -son seis fichas que se parecen- asi que se
-// confunde enseguida.
+// Y la relacion entre las dos cosas NO es simetrica, a proposito:
+//
+//   - Cambiar de partida arrastra el equipo. Si te pasas a su partida y debajo
+//     sigue tu equipo, lo que hay debajo de su partida no es suyo, y eso se mira
+//     sin leer -son seis fichas que se parecen- asi que se confunde enseguida.
+//   - Cambiar de equipo NO arrastra la partida. Mirar como va su equipo es algo
+//     que se hace de reojo, a cada rato, y no tiene por que costarte perder de
+//     vista tu propia partida.
 //
 // Se comprueba con DOS navegadores de verdad y no con una pagina sola, porque
 // la segunda columna solo existe con alguien al otro lado.
@@ -93,6 +97,14 @@ const mirar = (page) =>
       activa: b.classList.contains('is-activa'),
     })),
     fichas: document.querySelectorAll('.equipo__lista > *').length,
+    // Donde empieza la lista: las dos tienen que empezar en el mismo sitio.
+    izquierda: Math.round(
+      document.querySelector('.equipo__lista')?.getBoundingClientRect().left ?? -1,
+    ),
+    // Lo ancha que esta la partida: cambiar de pestana no puede moverla.
+    anchoPartida: Math.round(
+      document.querySelector('.pantallas')?.getBoundingClientRect().width ?? 0,
+    ),
     miPartidaGrande:
       document.querySelector('.pantalla--grande')?.textContent?.includes('Tu partida') ?? null,
   }));
@@ -150,9 +162,14 @@ const ordenDe = (page, clases) =>
     }
     aside.append(ul);
     document.body.append(aside);
-    const hijos = [...ul.children].map((e) => Math.round(e.getBoundingClientRect().top));
+    const arriba = [...ul.children].map((e) => Math.round(e.getBoundingClientRect().top));
+    // Cuanto se mete la ficha hacia dentro de su columna, y lo ancha que queda.
+    const caja = aside.getBoundingClientRect();
+    const ficha = ul.children[0].getBoundingClientRect();
+    const sangria = Math.round(ficha.left - caja.left);
+    const ancho = Math.round(ficha.width);
     aside.remove();
-    return { primera: hijos[0], ultima: hijos[hijos.length - 1] };
+    return { primera: arriba[0], ultima: arriba[arriba.length - 1], sangria, ancho };
   }, clases);
 
 const delCompanero = await ordenDe(anfitrion, 'equipo equipo--companero');
@@ -164,10 +181,44 @@ const elTuyo = await ordenDe(anfitrion, 'equipo equipo--propio');
 check('y el tuyo de arriba abajo, como siempre',
   elTuyo.primera < elTuyo.ultima,
   `la primera en ${elTuyo.primera}, la ultima en ${elTuyo.ultima}`);
-// Y el cambio es uno solo: su equipo y su partida van juntos. Si no, lo que hay
-// debajo de su partida no es suyo.
-check('y pasarse a su equipo trae tambien su partida', suyo.miPartidaGrande === false,
+// Lo que se pidio: la pestana es solo para el equipo. Mirar como va el suyo no
+// puede costarte perder de vista tu propia partida.
+check('pero mirar su equipo NO te quita tu partida', suyo.miPartidaGrande === true,
   String(suyo.miPartidaGrande));
+
+// Ni mueve nada de sitio. Antes la tira de medallas desaparecia al cambiar de
+// pestana, la mesa encogia 62 pixeles y la partida se reescalaba de golpe.
+check('ni mueve la partida de sitio al cambiar de pestana',
+  suyo.anchoPartida === completa.anchoPartida,
+  `${completa.anchoPartida}px -> ${suyo.anchoPartida}px`);
+
+// Y su equipo empieza donde el tuyo. Antes empezaba veinte pixeles mas adentro
+// y se veia descolocado: su lista es una rejilla y llevaba un `justify-content`
+// de cuando era una fila, que encogia su unica columna en vez de colocar las
+// fichas dentro.
+// Su equipo empieza donde el tuyo. Antes empezaba veinte pixeles mas adentro y
+// se veia descolocado: su lista es una rejilla y llevaba un `justify-content`
+// de cuando era una fila, que encogia su unica columna en vez de colocar las
+// fichas dentro. Medido entonces: las tuyas en x=8 con 230 de ancho, las suyas
+// en x=28 con 210.
+//
+// Se comprueba con la lista pintada a proposito, como el orden: en esta prueba
+// los dos juegan una ROM recien puesta y su equipo todavia esta vacio.
+check('y su equipo empieza donde el tuyo, sin sangria',
+  delCompanero.sangria === elTuyo.sangria && delCompanero.ancho === elTuyo.ancho,
+  `el tuyo en ${elTuyo.sangria} con ${elTuyo.ancho} de ancho, ` +
+    `el suyo en ${delCompanero.sangria} con ${delCompanero.ancho}`);
+
+// --- y al cambiar de partida, el equipo si va detras ---
+// El de la ventana PEQUENA: el de la grande esta en el arbol pero escondido,
+// porque desde la grande ya estas viendo lo que quieres ver.
+await anfitrion.locator('.pantalla--pequena .pantalla__boton--intercambiar').click();
+await anfitrion.waitForTimeout(900);
+
+const suPartida = await mirar(anfitrion);
+check('cambiar de partida te lleva a la suya', suPartida.miPartidaGrande === false,
+  String(suPartida.miPartidaGrande));
+check('y el equipo de debajo es el suyo', suPartida.cual === 'companero', suPartida.cual);
 
 // --- y su ventana no se sale de la pantalla ---
 //
@@ -210,12 +261,16 @@ check('la ventana del companero asoma, pero dentro de la pantalla',
 // Y sobre todo su boton: sin el no hay forma de volver a tu partida.
 check('y su boton de cambiar se puede pulsar', dentro(asoma.boton), JSON.stringify(asoma.boton));
 
-// --- y al reves, desde la partida ---
-await anfitrion.locator('.pantalla__boton--intercambiar').first().click();
+// --- y se vuelve igual ---
+// El de la ventana PEQUENA: el de la grande esta en el arbol pero escondido,
+// porque desde la grande ya estas viendo lo que quieres ver.
+await anfitrion.locator('.pantalla--pequena .pantalla__boton--intercambiar').click();
 await anfitrion.waitForTimeout(900);
 
 const vuelta = await mirar(anfitrion);
-check('cambiar de partida cambia tambien de equipo', vuelta.cual === 'propio', vuelta.cual);
+check('y volver te devuelve a la tuya con tu equipo',
+  vuelta.cual === 'propio' && vuelta.miPartidaGrande === true,
+  `${vuelta.cual}, tu partida grande: ${vuelta.miPartidaGrande}`);
 // Y su equipo vacio lo dice en vez de enseñar seis huecos sin motivo.
 check('y mientras no mande equipo, se dice',
   suyo.fichas === 0, `${suyo.fichas} fichas`);

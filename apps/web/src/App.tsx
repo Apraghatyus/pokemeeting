@@ -242,13 +242,27 @@ export const App = () => {
   // navegador en pantalla completa pinta unicamente ese elemento.
   const marcoDeJuego = useRef<HTMLDivElement | null>(null);
   /**
-   * Si se esta mirando lo del companero: su partida y su equipo.
+   * Que se esta mirando de el: su partida y su equipo, por separado.
    *
-   * Es una sola decision y por eso es un solo estado. Antes la pantalla lo
-   * llevaba por su cuenta y el equipo por la suya, y se desincronizaban:
-   * deslizabas a su partida y seguias viendo tu equipo.
+   * Van en dos estados y la relacion entre ellos NO es simetrica, a proposito:
+   *
+   *   - Cambiar de partida arrastra el equipo. Si te pasas a su partida y
+   *     debajo sigue tu equipo, lo que hay debajo de su partida no es suyo, y
+   *     eso se mira sin leer -son seis fichas que se parecen- asi que se
+   *     confunde enseguida.
+   *   - Cambiar de equipo NO arrastra la partida. Mirar como va su equipo es
+   *     algo que se hace de reojo, a cada rato, y no tiene por que costarte
+   *     perder de vista tu propia partida.
    */
+  const [verSuPantalla, setVerSuPantalla] = useState(false);
   const [verSuEquipo, setVerSuEquipo] = useState(false);
+
+  /** Cambia de partida, y con ella de equipo. Ver arriba por que solo en ese sentido. */
+  const cambiarDePantalla = () => {
+    const suya = !verSuPantalla;
+    setVerSuPantalla(suya);
+    setVerSuEquipo(suya);
+  };
 
   // A pantalla completa pasa lo mismo que en una pantalla estrecha: cabe UNA
   // columna de equipo, no dos, porque todo el sitio es para la partida. Asi que
@@ -314,7 +328,10 @@ export const App = () => {
               de un vistazo sin mover los ojos por toda la ventana.
 
               Solo con partida en marcha; sin ella no hay nada que contar. */}
-          {hasRom && !(unoSolo && verSuEquipo) && (
+          {/* Se queda puesta aunque mires su equipo: son TUS medallas, no las de
+              la columna de al lado. Quitarlas al cambiar de pestana encogia la
+              mesa 62 pixeles y la partida se reescalaba de golpe cada vez. */}
+          {hasRom && (
             <Medallas
               variante="tira"
               conseguidas={miEquipo.medallas.conseguidas}
@@ -327,8 +344,8 @@ export const App = () => {
           marcoCompleto={marcoDeJuego}
           /* La pantalla y el equipo que se ensenan son la misma decision: al
              deslizar a su partida tiene que verse tambien su equipo. */
-          mirandoLoSuyo={verSuEquipo}
-          onCambiarPantalla={() => setVerSuEquipo((v) => !v)}
+          mirandoLoSuyo={verSuPantalla}
+          onCambiarPantalla={cambiarDePantalla}
           canvasRef={emulator.canvasRef}
           remoteStream={session.state.remoteStream}
           /* El nombre del fichero de su ROM no le dice nada a nadie, y ademas

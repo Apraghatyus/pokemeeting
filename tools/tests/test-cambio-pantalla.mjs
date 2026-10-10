@@ -191,13 +191,17 @@ check('en movil se enseña un equipo, no dos', equipoAntes.cuantos === 1, `${equ
 check('y es el del lado que se esta mirando', /companero/i.test(equipoAntes.titulo),
   equipoAntes.titulo);
 
-// El boton hace lo mismo que el gesto: las dos formas mueven la misma decision.
+// Las pestanas cambian el equipo y SOLO el equipo. Al reves si arrastra -ver
+// arriba, deslizar a su partida trae su equipo- pero no en este sentido: mirar
+// como va el suyo es algo que se hace de reojo, a cada rato, y no tiene por que
+// costarte perder de vista tu propia partida.
 await movil.locator('.equipo__pestana:not(.is-activa)').click();
 await movil.waitForTimeout(500);
 const equipoDespues = await equipoVisible();
-check('el boton te devuelve a lo tuyo', /Tu equipo/i.test(equipoDespues.titulo),
+check('la pestana te devuelve a tu equipo', /Tu equipo/i.test(equipoDespues.titulo),
   equipoDespues.titulo);
-check('y la pantalla grande vuelve contigo', (await visible()).mia);
+check('y la pantalla se queda donde estaba, que es la suya',
+  (await visible()).mia === false);
 
 await movil.locator('.equipo__pestana:not(.is-activa)').click();
 await movil.waitForTimeout(500);

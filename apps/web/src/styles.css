@@ -2411,13 +2411,23 @@ details.partidas[open] > summary::before {
   text-align: right;
 }
 
-/* La columna del companero crece de abajo hacia arriba: su primer Pokemon va
-   pegado a la esquina de abajo y los siguientes suben. Con el equipo a medias,
-   los huecos quedan arriba, hacia el centro de la pantalla. */
-.equipo--companero .equipo__lista {
-  flex-direction: column-reverse;
-  justify-content: flex-end;
-}
+/* AQUI HABIA UN DESAJUSTE QUE SE VEIA Y NO SE EXPLICABA.
+ *
+ * Esta regla decia `flex-direction: column-reverse; justify-content: flex-end`,
+ * de cuando la lista era una fila flexible. Ahora es una REJILLA, y en una
+ * rejilla `justify-content` no coloca el contenido dentro de cada celda: coloca
+ * la rejilla entera dentro de su caja. Al empujarla al final, su unica columna
+ * dejaba de ocupar el ancho y se ajustaba al contenido.
+ *
+ * Medido: las fichas del companero empezaban en x=28 y median 210 pixeles,
+ * mientras que las tuyas empezaban en x=8 y median 230. Veinte pixeles de
+ * sangria que no venian de ningun sitio, y que es lo que hacia que su equipo se
+ * viera descolocado al lado del tuyo.
+ *
+ * De abajo hacia arriba se sigue haciendo, pero donde se hacia de verdad: con
+ * la fila de cada ranura, unas lineas mas arriba. Y pegado a la esquina de
+ * abajo, con el `justify-content` de la COLUMNA, que ahi si es flex.
+ */
 
 .equipo__lista {
   list-style: none;
