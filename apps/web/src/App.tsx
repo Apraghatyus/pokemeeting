@@ -290,22 +290,25 @@ export const App = () => {
             motivo={unoSolo && verSuEquipo ? 'Todavia no ha mandado su equipo.' : undefined}
           />
 
+          {/* Por donde va la partida, en una columna pegada al equipo: las ocho
+              medallas -a color las que lleva, apagadas las que no- y debajo de
+              cada una el nivel mas alto del lider de ese gimnasio.
+
+              Al lado del equipo y no sobre la pantalla porque es ahi donde se
+              compara: el tope de la medalla que toca es el que deja a un Pokemon
+              fuera por pasado de nivel, y las dos cosas tienen que poder mirarse
+              de un vistazo sin mover los ojos por toda la ventana.
+
+              Solo con partida en marcha; sin ella no hay nada que contar. */}
+          {hasRom && !(unoSolo && verSuEquipo) && (
+            <Medallas
+              variante="tira"
+              conseguidas={miEquipo.medallas.conseguidas}
+              topes={topes.todos}
+            />
+          )}
+
           <div className="mesa__centro">
-        {/* Por donde va la partida, encima de la pantalla: las ocho medallas
-            -a color las que lleva, apagadas las que no- y debajo de cada una el
-            nivel mas alto de su lider, que es el tope que se pone la gente.
-
-            Va aqui y no en un menu porque es justo lo que se mira de reojo
-            mientras se juega: cuanto queda y hasta donde se puede subir. Solo
-            con partida en marcha; sin ella no hay nada que contar. */}
-        {hasRom && !(unoSolo && verSuEquipo) && (
-          <Medallas
-            variante="tira"
-            conseguidas={miEquipo.medallas.conseguidas}
-            topes={topes.todos}
-          />
-        )}
-
         <Stage
           marcoCompleto={marcoDeJuego}
           /* La pantalla y el equipo que se ensenan son la misma decision: al

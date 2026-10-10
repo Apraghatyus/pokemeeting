@@ -189,6 +189,8 @@ const fichas = await page.evaluate(() => {
       tope,
       pasado: nivel > tope,
       tenido: f.querySelector('.ficha__nivel--pasado') !== null,
+      // Y la ficha entera apagada: para el reto ese Pokemon no se puede usar.
+      fuera: f.classList.contains('ficha--pasado'),
       etiqueta: (f.querySelector('.estado--pasado')?.textContent ?? '').trim(),
     };
   });
@@ -202,6 +204,13 @@ if (fichas.length === 0) {
   check('solo se marca a quien se ha pasado del tope',
     fichas.every((f) => f.tenido === f.pasado),
     JSON.stringify(fichas));
+
+  // Lo que se pidio: al que se pasa del tope del gimnasio que toca se le
+  // deshabilita, no solo se le pone una etiqueta. Se apaga como un debilitado,
+  // porque para el reto viene a ser lo mismo.
+  check('al que se pasa se le apaga la ficha entera',
+    fichas.every((f) => f.fuera === f.pasado),
+    fichas.map((f) => `Nv.${f.nivel}${f.fuera ? ' apagado' : ''}`).join(', '));
 
   const pasados = fichas.filter((f) => f.pasado);
   check('y hay alguno pasado, que es el caso que importa', pasados.length > 0,

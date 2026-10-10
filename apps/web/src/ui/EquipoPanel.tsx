@@ -154,6 +154,10 @@ const Ficha = ({
     activo ? 'ficha--activo' : '',
     pokemon.estado ? `ficha--${pokemon.estado}` : '',
     parejaRota ? 'ficha--pareja-caida' : '',
+    // Pasado del tope del gimnasio que toca. Se apaga como un debilitado,
+    // porque para el reto es lo mismo: no se puede usar. Lo que no se toca es
+    // la partida: ahi sigue vivo y quien decide es su dueno.
+    sobra > 0 ? 'ficha--pasado' : '',
   ]
     .filter(Boolean)
     .join(' ');

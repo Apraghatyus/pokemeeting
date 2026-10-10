@@ -2271,8 +2271,30 @@ details.partidas[open] > summary::before {
   grid-template-columns: var(--columna-equipo) minmax(0, 1fr);
 }
 
+/* Con medallas, una columna estrecha mas entre el equipo y la partida.
+ *
+ * Va pegada al equipo y no sobre la pantalla porque es ahi donde se compara: el
+ * tope de la medalla que toca es el que deja a un Pokemon fuera por pasado de
+ * nivel, y las dos cosas tienen que poder mirarse sin mover los ojos por toda
+ * la ventana.
+ *
+ * Con :has() y no con una clase en la mesa para que la columna aparezca y
+ * desaparezca sola: sin partida no hay medallas que ensenar y ese hueco se lo
+ * queda la pantalla. Las dos reglas llevan dos clases, asi que ganan a las de
+ * arriba; y el orden entre ellas importa, porque valen lo mismo. */
+.mesa:has(.medallas-tira) {
+  grid-template-columns:
+    var(--columna-equipo) var(--columna-medallas) minmax(0, 1fr)
+    var(--columna-equipo);
+}
+
+.mesa--solo:has(.medallas-tira) {
+  grid-template-columns: var(--columna-equipo) var(--columna-medallas) minmax(0, 1fr);
+}
+
 :root {
   --columna-equipo: 230px;
+  --columna-medallas: 62px;
   /* Lo que ocupa todo lo que no es la partida: barra de arriba, margenes y la
      barra de voz. De aqui sale cuanto alto le queda al escenario. */
   --cromo: 150px;
@@ -2628,7 +2650,12 @@ details.partidas[open] > summary::before {
   }
 
   .mesa,
-  .mesa--solo {
+  .mesa--solo,
+  /* Con la misma especificidad que las de arriba: si no, la columna de las
+     medallas sobreviviria en el movil y la partida se quedaria sin ancho. Las
+     @media no suman especificidad, y esto ya ha mordido tres veces. */
+  .mesa:has(.medallas-tira),
+  .mesa--solo:has(.medallas-tira) {
     grid-template-columns: minmax(0, 1fr);
     gap: 10px;
     /* Apilado, cada cosa ocupa lo suyo y todo se va arriba. Heredado del
@@ -2990,9 +3017,25 @@ details.partidas[open] > summary::before {
   text-overflow: ellipsis;
 }
 
-/* Pasado del tope. El nivel se tiñe y al lado va cuanto se pasa.
-   Sin borde en la ficha: los bordes de ahi son box-shadow y ya se pisaron una
-   vez entre si. Ver `.ficha--activo:is(...)`. */
+/* Pasado del tope del gimnasio que toca: queda fuera del reto.
+ *
+ * Se apaga como un debilitado, porque para el reto viene a ser lo mismo: no se
+ * puede usar. Lo que NO se toca es la partida -ahi sigue vivo y quien decide es
+ * su dueno-, igual que con la pareja caida de un Soul Link: se marca, no se
+ * impone.
+ *
+ * Con opacidad y filtro y no con otro box-shadow: los bordes de la ficha ya se
+ * pisaron una vez entre si, y una capa mas ahi volveria a borrar alguna. */
+.ficha--pasado {
+  opacity: 0.45;
+}
+
+.ficha--pasado .ficha__sprite--imagen {
+  filter: grayscale(1) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
+}
+
+/* El nivel se tiñe y al lado va cuanto se pasa. Esto SI se queda a pleno color
+   dentro de la ficha apagada: es lo que explica por que esta apagada. */
 .ficha__nivel--pasado {
   color: var(--rojo);
   font-weight: 700;
@@ -4376,10 +4419,13 @@ details.partidas[open] > summary::before {
 .medallas-tira {
   display: flex;
   justify-content: center;
-  /* Si no caben las ocho, se desplazan en vez de encogerse hasta no verse. */
-  overflow-x: auto;
+  /* Desde arriba, como el equipo de al lado, y sin estirarse a todo el alto. */
+  align-items: flex-start;
+  /* Si las ocho no caben de alto -una ventana baja-, se desplazan en vez de
+     encogerse hasta no verse. */
+  min-height: 0;
+  overflow: auto;
   scrollbar-width: none;
-  padding-bottom: 2px;
 }
 
 .medallas-tira::-webkit-scrollbar {
@@ -4389,8 +4435,8 @@ details.partidas[open] > summary::before {
 /* Dos clases contra una: gana a la rejilla de cuatro columnas del cartel de
    fin, tambien dentro de sus @media, que no suman especificidad. */
 .medallas-tira .medallas {
-  grid-template-columns: repeat(8, auto);
-  gap: 4px;
+  grid-template-columns: 1fr;
+  gap: 3px;
 }
 
 .medallas-tira .medalla {
@@ -4405,8 +4451,18 @@ details.partidas[open] > summary::before {
   height: 22px;
 }
 
-/* Jugando en un telefono se encoge mas: ahi la pantalla y el mando mandan. */
+/* Jugando en un telefono se encoge mas: ahi la pantalla y el mando mandan.
+   Y vuelve a ser una fila, porque lo que falta en un telefono es alto. */
 @media (max-width: 860px) {
+  .medallas-tira {
+    align-items: center;
+  }
+
+  .medallas-tira .medallas {
+    grid-template-columns: repeat(8, auto);
+    gap: 4px;
+  }
+
   .medallas-tira .medalla {
     padding: 2px 4px;
   }
