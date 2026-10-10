@@ -21,6 +21,7 @@
     "test:mobile": "node tools/tests/test-mobile.mjs",
     "test:mando": "node tools/tests/test-mando.mjs",
     "test:controles": "node tools/tests/test-controles.mjs",
+    "test:flotantes": "node tools/tests/test-controles-flotantes.mjs",
     "test:movil:mando": "node tools/tests/test-movil-mando.mjs",
     "test:movil:colocacion": "node tools/tests/test-movil-colocacion.mjs",
     "test:sin:video": "node tools/tests/test-sin-video.mjs",

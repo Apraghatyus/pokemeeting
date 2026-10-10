@@ -154,6 +154,16 @@ causa no era la que parecía. Guardar el porqué ahorra volver a investigarlo.
   al lado con sus 23.623 bytes sin tocar. Ahora se renombra al subirlo.
   `test:importar` comprueba el sistema de ficheros del nucleo, que es donde
   estaba el fallo, y sin el arreglo ve cero bytes con contenido.
+- **Silenciar y el volumen tapaban el juego.** Flotan sobre la partida, y en un
+  movil acababan justo encima de lo que hay que mirar: con el teclado para poner
+  un mote, sobre las letras. Pero no pueden desaparecer del todo o no habria
+  forma de silenciar. Ahora se portan como los mandos de un video: aparecen al
+  pulsar sobre la partida y se van solos a los cinco segundos. Se pidio para
+  movil y despues para escritorio, asi que vale en los dos. Pulsar uno cuenta
+  como tocar la partida, de modo que no se esconden mientras los estas usando.
+  `test:flotantes` lo mide en las dos medidas leyendo lo que calcula el
+  navegador, porque el elemento sigue en el documento todo el rato: lo que
+  cambia es si se ve y si se puede pulsar.
 - **En un Soul Link podias quedarte sin equipo sin que saltara nada.** Si a tus
   Pokemon les caia la pareja en la partida del companero, para el reto estaban
   muertos -esa es la regla- pero en tu juego seguian en pie, asi que no habia ni

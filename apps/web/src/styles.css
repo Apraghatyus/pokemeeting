@@ -513,6 +513,30 @@ body {
   pointer-events: auto;
 }
 
+/*
+ * Se esconden solos.
+ *
+ * Flotan sobre la partida, y eso acaba tapando justo lo que hay que mirar: en
+ * un movil, con el teclado para poner un mote, quedan encima de las letras.
+ * Pero no pueden desaparecer del todo o no habria forma de silenciar, asi que
+ * se comportan como los mandos de un video: aparecen al tocar o pulsar sobre la
+ * partida y se van solos a los cinco segundos.
+ */
+.pantalla__controles {
+  opacity: 0;
+  /* Invisible, no solo transparente: un boton que no se ve no tiene que poder
+     pulsarse sin querer. */
+  visibility: hidden;
+  transition:
+    opacity 180ms ease,
+    visibility 180ms;
+}
+
+.pantalla__controles.is-despiertos {
+  opacity: 1;
+  visibility: visible;
+}
+
 .flotante {
   display: grid;
   place-items: center;

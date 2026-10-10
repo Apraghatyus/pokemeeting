@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useEsEstrecha } from '../core/useEsEstrecha';
 
 type Props = {
@@ -145,6 +145,20 @@ const useArrastre = (marcoRef: { current: HTMLDivElement | null }) => {
  * primer movimiento y, si va hacia abajo, se suelta el gesto y no se vuelve a
  * mirar hasta el siguiente.
  */
+/**
+ * Cuanto se quedan a la vista los controles flotantes tras tocar la partida.
+ *
+ * En un movil estorban: flotan sobre el juego y en una pantalla pequena acaban
+ * justo encima de donde hay que mirar -el teclado para poner un mote, por
+ * ejemplo-. Pero tampoco pueden desaparecer del todo, porque entonces no hay
+ * forma de silenciar.
+ *
+ * Asi que se comportan como los mandos de un video: aparecen al tocar y se van
+ * solos. Cinco segundos es lo que se pidio, y da para verlos y pulsarlos sin
+ * tener que correr.
+ */
+const CONTROLES_VISIBLES_MS = 5000;
+
 const ARRASTRE_MINIMO = 10;
 /** Cuanto hay que recorrer para que el cambio se dé por hecho. */
 const PARA_CAMBIAR = 60;
@@ -256,6 +270,33 @@ export const Stage = ({
   const [fullscreen, setFullscreen] = useState(false);
 
   /**
+   * Si los controles flotantes estan a la vista ahora mismo.
+   *
+   * Empezo siendo cosa de moviles y se pidio tambien para escritorio: flotando
+   * sobre la partida estorban en los dos sitios.
+   */
+  const [controlesDespiertos, setControlesDespiertos] = useState(false);
+  const relojDeControles = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const despertarControles = useCallback(() => {
+    if (relojDeControles.current) clearTimeout(relojDeControles.current);
+    setControlesDespiertos(true);
+    relojDeControles.current = setTimeout(
+      () => setControlesDespiertos(false),
+      CONTROLES_VISIBLES_MS,
+    );
+  }, []);
+
+  // Al irse, que no quede un temporizador apuntando a un componente que ya no
+  // esta.
+  useEffect(
+    () => () => {
+      if (relojDeControles.current) clearTimeout(relojDeControles.current);
+    },
+    [],
+  );
+
+  /**
    * Si el navegador le ha quitado al lienzo su contexto de video.
    *
    * Pasa de verdad y se reporto tres veces: en un telefono justo de memoria, el
@@ -319,7 +360,13 @@ export const Stage = ({
         fullscreen ? ' pantallas--completa' : ''
       }${puedeDeslizar ? ' pantallas--deslizable' : ''}${deslizando ? ' pantallas--deslizando' : ''}`}
       ref={marcoRef}
-      onPointerDown={puedeDeslizar ? alDeslizar : undefined}
+      /* Un toque en la partida despierta los controles. Va aqui, en el
+         contenedor, y no en cada boton: asi pulsar uno tambien cuenta como
+         toque y no se esconden en mitad de un gesto. */
+      onPointerDown={(evento) => {
+        despertarControles();
+        if (puedeDeslizar) alDeslizar(evento);
+      }}
       style={
         {
           '--proporcion': proporcion,
@@ -361,7 +408,11 @@ export const Stage = ({
 
         {/* Los controles flotan sobre la partida en vez de ocupar una barra
             aparte: asi la pantalla se lleva todo el sitio que hay. */}
-        {hasRom && controles && <div className="pantalla__controles">{controles}</div>}
+        {hasRom && controles && (
+          <div className={`pantalla__controles${controlesDespiertos ? ' is-despiertos' : ''}`}>
+            {controles}
+          </div>
+        )}
 
         <button
           type="button"
