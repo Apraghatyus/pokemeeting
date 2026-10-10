@@ -23,6 +23,71 @@
   box-sizing: border-box;
 }
 
+/* ====================================================================
+   La letra de los juegos
+   ====================================================================
+
+   La pagina escribe con letra de pixeles, como los propios juegos. No es
+   decoracion: la mitad de la pantalla es una Game Boy Advance de verdad, y con
+   una tipografia de sistema alrededor las dos mitades parecian dos programas
+   distintos pegados.
+
+   POR QUE ESTA Y NO LA DEL JUEGO. La de los juegos de Pokemon no se puede usar:
+   las que circulan son recreaciones de aficionados y ninguna tiene una licencia
+   que permita repartirla dentro de una pagina -la mayoria dicen "solo uso
+   personal"-. Asi que se usa Pixelify Sans, que si tiene licencia para esto (la
+   SIL Open Font License, copiada entera en `public/fuentes/OFL.txt`) y se lee
+   como la del juego a los tamanos que aqui se usan.
+
+   Si algun dia aparece una con licencia buena, se cambia en un sitio: el
+   fichero del @font-face y la variable `--tipo`. Todo lo demas hereda.
+
+   SE SIRVE DESDE AQUI Y NO DESDE UN CDN, por una razon que ya nos costo una
+   tarde con las imagenes: la pagina corre con aislamiento cross-origin por el
+   emulador, y eso bloquea cualquier cosa de fuera que no mande las cabeceras
+   justas. Sirviendola nosotros no hay cabecera que negociar, y ademas funciona
+   sin internet.
+
+   El fichero es uno solo para todos los grosores: es una fuente variable de 400
+   a 700. Y van dos trozos porque el acentuado del espanol cabe en el primero;
+   el segundo solo se descarga si hace falta un caracter que no este ahi. */
+
+@font-face {
+  font-family: 'Pixelify Sans';
+  font-style: normal;
+  font-weight: 400 700;
+  /* Que el texto se vea desde el primer momento con la letra del sistema y
+     cambie al llegar la buena. Lo contrario -esperar- deja la pagina en blanco,
+     y aqui lo primero que hay que ver es la zona para soltar la ROM. */
+  font-display: swap;
+  src: url('/fuentes/pixelify-sans-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Pixelify Sans';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fuentes/pixelify-sans-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root {
+  /* La letra del juego, para todo lo que es pantalla: titulos, botones,
+     etiquetas, numeros. */
+  --tipo: 'Pixelify Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* Y la del sistema para los parrafos que hay que LEER, no mirar: avisos,
+     explicaciones, el aviso legal. Una letra de pixeles a once pixeles de alto
+     se mira bien y se lee mal, y justo esos parrafos son los que dicen lo que
+     no se puede adivinar. */
+  --tipo-texto: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
 body {
   margin: 0;
   /* Sin rebote elastico ni seleccion accidental al arrastrar sobre el mando. */
@@ -30,11 +95,18 @@ body {
   -webkit-text-size-adjust: 100%;
   background: var(--bg);
   color: var(--text);
-  font:
-    14px/1.5 system-ui,
-    -apple-system,
-    Segoe UI,
-    sans-serif;
+  font: 14px/1.5 var(--tipo);
+}
+
+/* Los parrafos largos, con la letra del sistema. Ver `--tipo-texto`. */
+.hint,
+.alert,
+.warn,
+.compat__note,
+.dropzone__legal,
+.fin__resumen,
+.modal__subtitle {
+  font-family: var(--tipo-texto);
 }
 
 .app {
@@ -4260,6 +4332,107 @@ details.partidas[open] > summary::before {
 .medalla--tiene .medalla__nombre {
   color: var(--text);
   opacity: 1;
+}
+
+/* El nivel mas alto del lider de ese gimnasio, debajo de su medalla.
+   Es la regla que se pone la gente -no subir por encima del que toca- puesta
+   donde se puede mirar de reojo. El numero sale de TU ROM: en una copia
+   aleatorizada el de siempre seria mentira. Ver `lideres.ts`. */
+.medalla__tope {
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--muted);
+  opacity: 0.6;
+}
+
+.medalla--tiene .medalla__tope {
+  color: var(--text);
+  opacity: 0.85;
+}
+
+/* El gimnasio que toca ahora. Entre ocho medallas apagadas todas iguales, la
+   siguiente no se distingue de la octava, y es la unica que importa. */
+.medalla--siguiente {
+  border-style: solid;
+  border-color: var(--accent-dim);
+}
+
+.medalla--siguiente .medalla__tope {
+  color: var(--accent);
+  opacity: 1;
+}
+
+/* ---------- la tira de medallas, sobre la partida ----------
+
+   La misma fila de ocho que el cartel de fin, pero para mirarla de reojo
+   mientras se juega: sin titulo, sin cuenta y sin nombres. Lo que se quiere ver
+   es por donde va la partida y cuanto queda, y eso ya lo dicen el color y el
+   numero de debajo.
+
+   Va encima de la pantalla y dentro de su columna, asi que lo que gasta es alto
+   -lo unico que escasea de verdad en un telefono-. De ahi que la tira sea lo mas
+   baja que se puede leer y que a pantalla completa desaparezca. */
+.medallas-tira {
+  display: flex;
+  justify-content: center;
+  /* Si no caben las ocho, se desplazan en vez de encogerse hasta no verse. */
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+
+.medallas-tira::-webkit-scrollbar {
+  display: none;
+}
+
+/* Dos clases contra una: gana a la rejilla de cuatro columnas del cartel de
+   fin, tambien dentro de sus @media, que no suman especificidad. */
+.medallas-tira .medallas {
+  grid-template-columns: repeat(8, auto);
+  gap: 4px;
+}
+
+.medallas-tira .medalla {
+  gap: 3px;
+  padding: 4px 6px;
+  border-radius: 8px;
+}
+
+.medallas-tira .medalla__imagen,
+.medallas-tira .medalla__marca {
+  width: 22px;
+  height: 22px;
+}
+
+/* Jugando en un telefono se encoge mas: ahi la pantalla y el mando mandan. */
+@media (max-width: 860px) {
+  .medallas-tira .medalla {
+    padding: 2px 4px;
+  }
+
+  .medallas-tira .medalla__imagen,
+  .medallas-tira .medalla__marca {
+    width: 18px;
+    height: 18px;
+  }
+
+  .medallas-tira .medalla__tope {
+    font-size: 8px;
+  }
+}
+
+/* Cuando no se sabe cuales lleva, la tira entera baja de tono. Apagadas por no
+   tenerlas y apagadas por no saberlo se ven igual, y no es lo mismo: a quien
+   lleva cuatro y no ha guardado, ocho grises le dirian que no tiene ninguna. */
+.medallas-tira--sin-saber {
+  opacity: 0.45;
+}
+
+/* A pantalla completa no: ahi todo el alto es para la partida y el mando, que
+   es justo por lo que se entra en pantalla completa. */
+.juego:fullscreen .medallas-tira {
+  display: none;
 }
 
 /* ---------- Alto Mando ---------- */

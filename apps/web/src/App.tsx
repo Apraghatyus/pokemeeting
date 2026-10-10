@@ -22,6 +22,7 @@ import { useIntercambio } from './core/useIntercambio';
 import { FinModal } from './ui/FinModal';
 import { TOTAL_LIGA, type PasoLiga } from './ui/Liga';
 import { InvitacionModal } from './ui/InvitacionModal';
+import { Medallas } from './ui/Medallas';
 import { RandomizerModal } from './ui/RandomizerModal';
 import { RomDropZone, RoomDropZoneHint } from './ui/RomDropZone';
 import { RoomModal } from './ui/RoomModal';
@@ -53,6 +54,23 @@ export const App = () => {
     // Solo al arrancar: si se pusiera `invitacion` como dependencia, cerrar el
     // cartel volveria a ejecutarlo para nada.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Y tambien si llega una invitacion con la pagina YA abierta.
+  //
+  // Es el caso normal del segundo dia: tienes la pestana puesta de ayer, tu
+  // amigo te reenvia el enlace y lo pulsas. El navegador no recarga nada -solo
+  // cambia lo que va detras del #- asi que sin esto no pasaba absolutamente
+  // nada: ni cartel, ni sala, ni aviso.
+  useEffect(() => {
+    const alCambiar = () => {
+      const llega = leerInvitacion();
+      if (!llega) return;
+      setInvitacion(llega);
+      olvidarInvitacion();
+    };
+    globalThis.addEventListener('hashchange', alCambiar);
+    return () => globalThis.removeEventListener('hashchange', alCambiar);
   }, []);
 
   const [roomOpen, setRoomOpen] = useState(false);
@@ -168,7 +186,7 @@ export const App = () => {
   // Hasta que nivel se puede subir antes del gimnasio que toca. El numero sale
   // de TU ROM -en una aleatorizada los lideres llevan otra cosa- y cual toca,
   // de las medallas que ya llevas.
-  const tope = useTopeDeNivel(
+  const topes = useTopeDeNivel(
     emulator.romBytesRef,
     state.romName,
     state.status === 'running',
@@ -267,12 +285,27 @@ export const App = () => {
                ROM y de SUS medallas, y ni una ni otras salen de su ordenador.
                Ponerle el tuyo marcaria a sus Pokemon por una regla que no es la
                suya. */
-            tope={unoSolo && verSuEquipo ? null : tope}
+            tope={unoSolo && verSuEquipo ? null : topes.siguiente}
             onCambiar={unoSolo ? () => setVerSuEquipo((v) => !v) : undefined}
             motivo={unoSolo && verSuEquipo ? 'Todavia no ha mandado su equipo.' : undefined}
           />
 
           <div className="mesa__centro">
+        {/* Por donde va la partida, encima de la pantalla: las ocho medallas
+            -a color las que lleva, apagadas las que no- y debajo de cada una el
+            nivel mas alto de su lider, que es el tope que se pone la gente.
+
+            Va aqui y no en un menu porque es justo lo que se mira de reojo
+            mientras se juega: cuanto queda y hasta donde se puede subir. Solo
+            con partida en marcha; sin ella no hay nada que contar. */}
+        {hasRom && !(unoSolo && verSuEquipo) && (
+          <Medallas
+            variante="tira"
+            conseguidas={miEquipo.medallas.conseguidas}
+            topes={topes.todos}
+          />
+        )}
+
         <Stage
           marcoCompleto={marcoDeJuego}
           /* La pantalla y el equipo que se ensenan son la misma decision: al
@@ -446,7 +479,7 @@ export const App = () => {
         onClose={() => setInvitacion(null)}
         baseRom={emulator.baseRomRef}
         gameCode={state.header?.gameCode ?? null}
-        romCrc32={state.header?.crc32 ?? null}
+        romName={state.romName}
         nucleoListo={state.status === 'ready'}
         hint={RoomDropZoneHint(state.status)}
         onRom={emulator.openRom}

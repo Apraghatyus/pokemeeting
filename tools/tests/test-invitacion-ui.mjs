@@ -11,6 +11,12 @@
 // mundos distintos y tardaban un rato en entender por que los Pokemon de cada
 // ruta no cuadraban.
 //
+// Y se prueba tambien EL SEGUNDO DIA, que es distinto del primero y se paso por
+// alto al principio: el lunes se quedan en el segundo gimnasio y el jueves
+// vuelven con el mismo enlace. Entonces ese mundo ya esta aqui, con su guardado
+// dentro, y lo que hace falta es poder ELEGIR entre seguir esa partida o empezar
+// otra en el mismo mundo. Adivinarlo por el jugador es meterle en la que no era.
+//
 // Por eso se comprueban dos cosas que son faciles de pasar por alto:
 //
 //   - Que a quien llega por un enlace NO se le pregunta que quiere aleatorizar.
@@ -197,6 +203,88 @@ check('y queda apuntado para poder continuarlo manana',
 // cartel sin enseñar nada mas le dejaria sin saber si entro o no.
 check('y se le ensena la sala en la que esta',
   ((await invitado.locator('.field__value.room-code').textContent()) ?? '').trim() === sala);
+
+// ---------- con la pagina ya abierta ----------
+//
+// El caso de verdad del segundo dia: tienes la pestana puesta de ayer y tu amigo
+// te reenvia el enlace. El navegador no recarga nada -solo cambia lo que va
+// detras del #- asi que sin escuchar ese cambio no pasaba absolutamente nada:
+// ni cartel, ni sala, ni aviso. Se descubrio aqui, intentando escribir esta
+// misma prueba.
+await invitado.evaluate((url) => { globalThis.location.hash = url; }, datos.toString());
+await invitado.waitForTimeout(1500);
+check('con la pagina ya abierta, el enlace tambien abre el cartel',
+  (await invitado.locator('.modal[open] .elegir, .modal[open] .dropzone').count()) >= 1);
+// Se cierra solo el de la invitacion: el de la sala tambien esta abierto por
+// detras, de cuando entro.
+await invitado
+  .locator('.modal[open]')
+  .filter({ hasText: 'Te han invitado a jugar' })
+  .locator('.modal__close')
+  .click();
+
+// ---------- y el jueves, abriendolo de cero ----------
+//
+// Pestana nueva pero el MISMO navegador, a proposito: lo que hace distinto al
+// segundo dia es justo lo que quedo guardado del primero, y eso vive aqui -la
+// copia en el sistema de ficheros del nucleo y su ficha en localStorage-.
+//
+// Y la pestana del lunes se cierra primero: en la sala solo caben dos, y la de
+// ayer sigue dentro. Esto es del montaje de la prueba, no del programa.
+const mismoNavegador = invitado.context();
+await invitado.close();
+await anfitrion.waitForTimeout(2500);
+
+const jueves = await mismoNavegador.newPage();
+await jueves.goto(`${URL}#${datos.toString()}`, { waitUntil: 'load' });
+await esperarElNucleo(jueves);
+// Vuelve a hacer falta su copia del juego: el enlace sigue sin traerla.
+await jueves.setInputFiles('input[type=file][accept*=".gba"]', ROM);
+await jueves.waitForTimeout(3000);
+
+const eleccion = jueves.locator('.modal[open] .elegir');
+check('al volver con el mismo enlace se puede elegir que hacer',
+  (await eleccion.count()) === 1);
+
+const opciones = await jueves.evaluate(() =>
+  [...document.querySelectorAll('.modal[open] .elegir__opcion')].map((l) => ({
+    texto: (l.textContent ?? '').replace(/\s+/g, ' ').trim(),
+    marcada: l.querySelector('input')?.checked === true,
+  })),
+);
+check('se ofrece seguir la partida que quedo a medias',
+  opciones.some((o) => o.texto.startsWith('Seguir')),
+  opciones.map((o) => o.texto).join(' / '));
+check('y tambien empezar una nueva en el mismo mundo',
+  opciones.some((o) => o.texto.includes('Empezar una partida nueva')));
+// Quien vuelve a abrir el enlace dias despues viene a seguir, no a empezar de
+// cero. Que sea lo marcado por defecto es la diferencia entre un clic y ninguno.
+check('y viene marcada la de seguir, que es a lo que se vuelve',
+  opciones[0]?.marcada === true && opciones[0]?.texto.startsWith('Seguir'),
+  opciones[0]?.texto);
+// Que no se pierde nada es lo que hay que decir: empezar otra es la opcion que
+// da miedo pulsar.
+check('y se dice que empezar otra no toca lo que ya tienes',
+  opciones.some((o) => o.texto.includes('sin tocar lo que ya tienes')));
+
+// Seguir no genera nada: se abre lo que ya estaba.
+const antesDeSeguir = await jueves.evaluate(
+  () => JSON.parse(globalThis.localStorage.getItem('emupoke.partidas') ?? '[]').length,
+);
+await jueves.getByRole('button', { name: 'Seguir y unirme a la sala' }).click();
+await jueves.locator('.field__value.room-code').waitFor({ timeout: 120_000 }).catch(() => {});
+const despuesDeSeguir = await jueves.evaluate(() => ({
+  cuantas: JSON.parse(globalThis.localStorage.getItem('emupoke.partidas') ?? '[]').length,
+  corriendo: (globalThis.mGBAModule?.gameName ?? '').split('/').pop() ?? '',
+}));
+check('seguir abre la de siempre y no crea otra partida',
+  despuesDeSeguir.cuantas === antesDeSeguir,
+  `${antesDeSeguir} antes, ${despuesDeSeguir.cuantas} despues`);
+check('y es el mismo fichero que se jugaba', despuesDeSeguir.corriendo === suMundo.corriendo,
+  despuesDeSeguir.corriendo);
+check('y vuelve a estar en la sala',
+  ((await jueves.locator('.field__value.room-code').textContent()) ?? '').trim() === sala);
+
 
 await navegador.close();
 console.log(

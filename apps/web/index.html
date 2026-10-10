@@ -9,6 +9,17 @@
     <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/icono-192.png" />
 
+    <!-- La letra de la pagina, pedida antes de que el navegador la descubra en
+         la hoja de estilos. Sin esto el primer dibujado sale con la del sistema
+         y cambia a la vista, que en la pantalla de carga se nota. -->
+    <link
+      rel="preload"
+      href="/fuentes/pixelify-sans-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+
     <title>Pokemeeting</title>
     <meta
       name="description"

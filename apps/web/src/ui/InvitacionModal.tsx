@@ -7,15 +7,22 @@
 // copia del juego.
 //
 // Y despues un solo boton. Detras de ese boton pasan tres cosas que antes habia
-// que hacer a mano y en orden: se rehace el mundo que juega quien invita a
-// partir de su semilla, se carga, y se entra en la sala. Hacerlas por separado
-// era lo que hacia que la gente acabara en dos mundos distintos sin entender
-// por que.
+// que hacer a mano y en orden: se prepara el mundo que juega quien invita, se
+// carga, y se entra en la sala. Hacerlas por separado era lo que hacia que la
+// gente acabara en dos mundos distintos sin entender por que.
+//
+// LA SEGUNDA VEZ NO ES COMO LA PRIMERA, y esto se paso por alto al principio.
+// El mismo enlace se reenvia dias despues para seguir la partida de siempre: el
+// lunes se quedaron en el segundo gimnasio y el jueves vuelven. Entonces el
+// mundo ya esta aqui, con su guardado dentro, y lo que hace falta es ELEGIR:
+// seguir esa partida o empezar otra en el mismo mundo. Las dos cosas son
+// normales -se vuelve a quedar, o cayo el equipo y se repite- y adivinarla por
+// el jugador es meterle en la que no era.
 
-import { useEffect, useState, type RefObject } from 'react';
+import { useState, type RefObject } from 'react';
 import { parseGameCode } from '@emupoke/pokemon';
 import type { Invitacion } from '../core/invitacion';
-import { partidasDe, type PartidaGuardada } from '../core/partidas';
+import { cuando, nombreDePartida, partidasDe, tocar, type PartidaGuardada } from '../core/partidas';
 import { rehacerDesdeSemilla, type BaseRom } from '../core/rehacer';
 import type { PuestoEnCola } from '../net/randomizer';
 import { Modal } from './Modal';
@@ -30,8 +37,8 @@ type Props = {
   baseRom: RefObject<BaseRom | null>;
   /** Codigo del juego que esta cargado, para saber de que juego es la partida. */
   gameCode: string | null;
-  /** CRC de la copia que corre ahora mismo, si hay alguna. */
-  romCrc32: string | null;
+  /** Nombre del fichero que corre ahora mismo, si hay alguno. */
+  romName: string | null;
   /** Si el nucleo ya puede recibir una ROM. */
   nucleoListo: boolean;
   /** Que decir mientras el nucleo arranca. */
@@ -39,7 +46,7 @@ type Props = {
   onRom: (file: File) => void;
   /** Carga una copia recien generada. */
   onRandomized: (bytes: Uint8Array, fileName: string) => Promise<void>;
-  /** Abre una copia que ya estaba en este navegador. */
+  /** Abre una partida que ya estaba en este navegador, con su guardado. */
   onContinuar: (fichero: string) => Promise<void>;
   /** Si la copia de una partida sigue estando. */
   existeGuardada: (fichero: string) => boolean;
@@ -49,16 +56,19 @@ type Props = {
 
 type Fase =
   | { nombre: 'esperando' }
-  | { nombre: 'rehaciendo'; cola?: PuestoEnCola | null }
+  | { nombre: 'preparando'; cola?: PuestoEnCola | null }
   | { nombre: 'entrando' }
   | { nombre: 'error'; mensaje: string };
+
+/** Lo que se elige hacer cuando ese mundo ya esta aqui: empezar otra partida. */
+const NUEVA = 'nueva';
 
 export const InvitacionModal = ({
   invitacion,
   onClose,
   baseRom,
   gameCode,
-  romCrc32,
+  romName,
   nucleoListo,
   hint,
   onRom,
@@ -68,13 +78,7 @@ export const InvitacionModal = ({
   onUnirse,
 }: Props) => {
   const [fase, setFase] = useState<Fase>({ nombre: 'esperando' });
-
-  // Poner una ROM despues de un error limpia el error: si no, el aviso de "esa
-  // semilla es de otra copia" se quedaba en pantalla sobre la ROM nueva, que es
-  // justo cuando deja de ser verdad.
-  useEffect(() => {
-    if (romCrc32) setFase((actual) => (actual.nombre === 'error' ? { nombre: 'esperando' } : actual));
-  }, [romCrc32]);
+  const [elegido, setElegido] = useState<string | null>(null);
 
   if (!invitacion) return null;
 
@@ -88,43 +92,54 @@ export const InvitacionModal = ({
   const otraRom = base !== null && semilla !== null && semilla.baseCrc32 !== base.crc32;
 
   /**
-   * La copia que pide la semilla, si ya esta en este navegador.
+   * Las partidas que ya hay de ESE mundo, de la mas reciente a la mas vieja.
    *
-   * Vale la pena mirarlo: rehacer un mundo son minutos, y quien vuelve a abrir
-   * el enlace al dia siguiente -o se recarga la pagina- ya lo tiene hecho.
+   * Se exige que su copia siga estando. Si el navegador tiro sus datos, la copia
+   * se puede rehacer pero el guardado no: ofrecer "seguir" ahi seria prometer una
+   * partida que ya no existe. Ese caso cae solo en empezar otra.
+   *
+   * Y solo de ese mundo. Seguir una partida de otro seria volver justo al
+   * problema que el enlace vino a resolver: dos amigos en dos mundos distintos.
    */
-  const yaHecha: PartidaGuardada | null =
+  const guardadas: PartidaGuardada[] =
     semilla === null
-      ? null
-      : (partidasDe(semilla.baseCrc32).find(
+      ? []
+      : partidasDe(semilla.baseCrc32).filter(
           (p) => p.crc32 === semilla.crc32 && existeGuardada(p.fichero),
-        ) ?? null);
+        );
 
-  /** Si lo que corre ahora ya es el mundo del enlace, no hay nada que generar. */
-  const yaPuesta = semilla !== null && romCrc32 === semilla.crc32;
+  // Por defecto, la ultima que se jugo: quien vuelve a abrir el enlace dias
+  // despues viene a seguir donde lo dejo, no a empezar de cero.
+  const eleccion = elegido ?? guardadas[0]?.id ?? NUEVA;
+  const seguir = guardadas.find((p) => p.id === eleccion) ?? null;
 
-  const trabajando = fase.nombre === 'rehaciendo' || fase.nombre === 'entrando';
+  const trabajando = fase.nombre === 'preparando' || fase.nombre === 'entrando';
   const sePuede = base !== null && !otraRom && !trabajando;
 
   const entrar = async () => {
     try {
-      // 1. El mismo mundo que juega quien invita. Sin semilla no hay nada que
-      //    rehacer: quien invita juega su ROM tal cual.
-      if (semilla && !yaPuesta) {
-        if (yaHecha) {
-          setFase({ nombre: 'rehaciendo' });
-          await onContinuar(yaHecha.fichero);
-        } else if (base) {
-          setFase({ nombre: 'rehaciendo' });
-          await rehacerDesdeSemilla({
-            base,
-            semilla,
-            juego: { label: juego?.label ?? null, generacion: juego?.generacion ?? null },
-            cargar: onRandomized,
-            alEsperar: (cola) =>
-              setFase((actual) => (actual.nombre === 'rehaciendo' ? { nombre: 'rehaciendo', cola } : actual)),
-          });
+      // 1. El mundo. Sin semilla no hay nada que preparar: quien invita juega su
+      //    ROM tal cual, y entonces basta con que este la suya.
+      if (semilla && seguir) {
+        // Si ya esta puesta, no se recarga: le costaria a quien juega todo lo
+        // que no haya guardado dentro del juego desde la ultima vez.
+        if (romName !== seguir.fichero) {
+          setFase({ nombre: 'preparando' });
+          await onContinuar(seguir.fichero);
         }
+        tocar(seguir.id);
+      } else if (semilla && base) {
+        setFase({ nombre: 'preparando' });
+        await rehacerDesdeSemilla({
+          base,
+          semilla,
+          juego: { label: juego?.label ?? null, generacion: juego?.generacion ?? null },
+          cargar: onRandomized,
+          alEsperar: (cola) =>
+            setFase((actual) =>
+              actual.nombre === 'preparando' ? { nombre: 'preparando', cola } : actual,
+            ),
+        });
       }
 
       // 2. Y a la sala. El codigo y la contrasena venian en el enlace, asi que
@@ -148,8 +163,6 @@ export const InvitacionModal = ({
       title="Te han invitado a jugar"
       subtitle={`Sala ${invitacion.sala}`}
     >
-      {/* Lo primero, porque es lo unico que se le pide y lo unico que el enlace
-          no puede traer. La ley es la ley: aqui no se reparten juegos. */}
       {base && (
         <div className="invite">
           <span className="invite__label">Tu copia</span>
@@ -161,12 +174,15 @@ export const InvitacionModal = ({
 
       {otraRom && (
         <p className="alert" role="alert">
-          Tu copia del juego no es la misma con la que se creo este mundo, asi que la semilla
-          daria algo distinto. Hace falta exactamente la misma ROM original.
+          Tu copia del juego no es la misma con la que se creó este mundo, así que la semilla daría
+          algo distinto. Hace falta exactamente la misma ROM original.
         </p>
       )}
 
-      {/* La zona de carga vuelve a salir si la copia puesta no sirve. Sin esto
+      {/* Lo primero, porque es lo unico que se le pide y lo unico que el enlace
+          no puede traer. La ley es la ley: aqui no se reparten juegos.
+
+          La zona de carga vuelve a salir si la copia puesta no sirve. Sin esto
           quedaba un callejon sin salida: el aviso decia que hacia falta otra ROM
           y no habia por donde ponerla. */}
       {!base || otraRom ? (
@@ -175,22 +191,62 @@ export const InvitacionModal = ({
             {otraRom
               ? 'Prueba con otra copia del juego.'
               : semilla
-                ? 'Pon tu propia copia del juego. Con ella se rehace exactamente el mismo mundo que esta jugando quien te invita.'
+                ? 'Pon tu propia copia del juego. Con ella se prepara exactamente el mismo mundo que está jugando quien te invita.'
                 : 'Pon tu propia copia del juego para entrar en la sala.'}
           </p>
           <RomDropZone onRom={onRom} disabled={!nucleoListo} hint={hint} />
         </>
       ) : (
         <>
-          <p className="hint">
+          {/* El caso de volver dias despues: ese mundo ya esta aqui, con lo que
+              se jugo dentro. Se elige, no se adivina. */}
+          {guardadas.length > 0 ? (
+            <fieldset className="elegir">
+              <legend className="elegir__titulo">Ya tienes ese mundo. ¿Qué hacemos?</legend>
+
+              {guardadas.map((partida) => (
+                <label key={partida.id} className="elegir__opcion">
+                  <input
+                    type="radio"
+                    name="que-partida"
+                    checked={eleccion === partida.id}
+                    onChange={() => setElegido(partida.id)}
+                    disabled={trabajando}
+                  />
+                  <span className="elegir__texto">
+                    <strong>Seguir «{nombreDePartida(partida)}»</strong>
+                    <span className="elegir__nota">
+                      donde la dejaste · jugada {cuando(partida.jugada)}
+                    </span>
+                  </span>
+                </label>
+              ))}
+
+              <label className="elegir__opcion">
+                <input
+                  type="radio"
+                  name="que-partida"
+                  checked={eleccion === NUEVA}
+                  onChange={() => setElegido(NUEVA)}
+                  disabled={trabajando}
+                />
+                <span className="elegir__texto">
+                  <strong>Empezar una partida nueva</strong>
+                  {/* Que no se pierde nada es justo lo que hay que decir: esta
+                      es la opcion que da miedo pulsar. */}
+                  <span className="elegir__nota">
+                    el mismo mundo desde el principio, sin tocar lo que ya tienes
+                  </span>
+                </span>
+              </label>
+            </fieldset>
+          ) : (
+            <p className="hint">
               {!semilla
-                ? 'Quien te invita juega su ROM tal cual, asi que no hay nada que generar.'
-                : yaPuesta
-                  ? 'Ya tienes puesto ese mundo: se entra directamente.'
-                  : yaHecha
-                    ? 'Ese mundo ya esta en este navegador, asi que no hay que volver a generarlo.'
-                    : 'Se va a generar el mismo mundo que juega quien te invita. Tarda un rato y puedes dejar la pestana abierta.'}
-          </p>
+                ? 'Quien te invita juega su ROM tal cual, así que no hay nada que preparar.'
+                : 'Se va a generar el mismo mundo que juega quien te invita. Tarda un rato y puedes dejar la pestaña abierta.'}
+            </p>
+          )}
 
           <button
             type="button"
@@ -198,14 +254,18 @@ export const InvitacionModal = ({
             disabled={!sePuede}
             onClick={() => void entrar()}
           >
-            {fase.nombre === 'rehaciendo'
-              ? 'Preparando el mundo...'
+            {fase.nombre === 'preparando'
+              ? seguir
+                ? 'Abriendo tu partida...'
+                : 'Preparando el mundo...'
               : fase.nombre === 'entrando'
                 ? 'Entrando...'
-                : 'Unirme a la sala'}
+                : seguir
+                  ? 'Seguir y unirme a la sala'
+                  : 'Unirme a la sala'}
           </button>
 
-          {fase.nombre === 'rehaciendo' && fase.cola && (
+          {fase.nombre === 'preparando' && fase.cola && (
             <p className="hint" role="status">
               {textoDeEspera(fase.cola)}
             </p>

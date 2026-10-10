@@ -116,6 +116,41 @@ check('y diciendo que gimnasio es', /gimnasio 2/i.test(conUna), conUna);
 // numero seria que se esta leyendo el gimnasio equivocado.
 check('no el de Brock, que ya esta ganado', !/Nv\.14/.test(conUna), conUna);
 
+// --- 1b. la tira de medallas sobre la partida ---
+//
+// Es lo que se mira de reojo mientras se juega: por donde va la partida y
+// cuanto queda. Las conseguidas a color, las que faltan apagadas, y debajo de
+// cada una el tope de su gimnasio.
+const tira = await page.evaluate(() => {
+  const caja = document.querySelector('.medallas-tira');
+  if (!caja) return null;
+  return {
+    cuantas: caja.querySelectorAll('.medalla').length,
+    aColor: caja.querySelectorAll('.medalla--tiene').length,
+    // Cual esta marcada como "la que toca".
+    siguiente: [...caja.querySelectorAll('.medalla')].findIndex((m) =>
+      m.classList.contains('medalla--siguiente'),
+    ),
+    topes: [...caja.querySelectorAll('.medalla__tope')].map((e) => (e.textContent ?? '').trim()),
+    sinSaber: caja.classList.contains('medallas-tira--sin-saber'),
+  };
+});
+
+check('sobre la partida se ve la tira de medallas', tira !== null);
+check('con las ocho, tambien las que faltan', tira?.cuantas === 8, String(tira?.cuantas));
+// Una medalla: la de Brock. Y las otras siete apagadas, que es lo que cuenta
+// cuanto queda.
+check('solo la conseguida va a color', tira?.aColor === 1, `${tira?.aColor} a color`);
+check('y se marca el gimnasio que toca, que si no no se distingue de la octava',
+  tira?.siguiente === 1, `la ${(tira?.siguiente ?? -1) + 1}`);
+// Los topes de Rojo Fuego, leidos de la ROM. En una copia aleatorizada serian
+// otros, que es justo por lo que no se escriben en una lista.
+check('debajo de cada una, el nivel mas alto de su lider',
+  tira?.topes.join(' ') === 'Nv.14 Nv.21 Nv.24 Nv.29 Nv.43 Nv.43 Nv.47 Nv.50',
+  tira?.topes.join(' '));
+check('y no se marca como dudosa, porque esta partida si tiene guardado',
+  tira?.sinSaber === false);
+
 // --- 2. sigue a las medallas ---
 await page.setInputFiles('input[type=file][accept*=".sav"]', SAV_SIN);
 await page.waitForTimeout(6000);
