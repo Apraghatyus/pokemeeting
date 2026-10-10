@@ -1,4 +1,4 @@
-// Borrar una partida pregunta antes.
+// Los botones de una partida guardada: cambiarle el nombre, y borrarla.
 //
 // Borrar no se puede deshacer: se va la copia y su guardado, y si es una Soul
 // Link se lleva por delante horas de DOS personas. El boton esta a cinco
@@ -16,6 +16,11 @@
 //
 // Necesita la aplicacion levantada (npm run dev:all) y el servicio de
 // aleatorizacion, porque primero hay que crear una partida que borrar.
+//
+// Y lo otro que se prueba aqui, porque vive en la misma fila: cambiarle el
+// nombre. El nombre se ponia al crear la partida y no habia forma de tocarlo
+// despues; con tres partidas de la misma ROM es lo unico que las distingue, asi
+// que una mal puesta se quedaba asi para siempre.
 //
 // Uso: node tools/tests/test-borrar-partida.mjs <rom.gba>
 import { chromium } from 'playwright';
@@ -83,6 +88,49 @@ check('el boton de borrar es una papelera, no una equis',
     ((await borrar.textContent()) ?? '').trim() === '',
   JSON.stringify((await borrar.textContent()) ?? ''));
 
+// --- cambiarle el nombre ---
+const nombres = () =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('.modal[open] .hueco__nombre')].map((e) => e.textContent?.trim()),
+  );
+
+await page.locator('.modal[open] .hueco__accion[title="Cambiarle el nombre"]').first().click();
+await page.waitForTimeout(300);
+
+const campo = page.locator('.modal[open] .hueco__nombre-campo');
+check('el lapiz abre el nombre para escribir', (await campo.count()) === 1);
+check('y viene con el que ya tenia, para retocarlo',
+  ((await campo.inputValue()) ?? '').length > 0, await campo.inputValue());
+// Mientras se escribe, los botones de la fila se quitan: la papelera esta a
+// cinco pixeles y escribiendo no se mira donde se pulsa.
+check('y mientras se escribe no hay papelera que rozar',
+  (await page.locator('.modal[open] .hueco--partida .hueco__accion--borrar').count()) === 0);
+
+await campo.fill('Nuestra Soullink');
+await campo.press('Enter');
+await page.waitForTimeout(500);
+check('se guarda el nombre nuevo', (await nombres()).includes('Nuestra Soullink'),
+  (await nombres()).join(' / '));
+
+// Y se queda: se apunta donde se apuntan las partidas, no solo en la pantalla.
+await page.reload({ waitUntil: 'load' });
+await page.waitForFunction(() => !document.querySelector('.dropzone button')?.disabled, null, {
+  timeout: 30_000,
+});
+await page.setInputFiles('input[type=file][accept*=".gba"]', ROM);
+await page.waitForSelector('.hueco--partida', { timeout: 30_000 });
+check('y sigue puesto al volver', (await nombres()).includes('Nuestra Soullink'),
+  (await nombres()).join(' / '));
+
+// Dejarlo no cambia nada, que es la otra mitad.
+await page.locator('.modal[open] .hueco__accion[title="Cambiarle el nombre"]').first().click();
+await page.waitForTimeout(300);
+await page.locator('.modal[open] .hueco__nombre-campo').fill('No quiero esto');
+await page.locator('.modal[open] .hueco__accion[title="Dejarlo como estaba"]').click();
+await page.waitForTimeout(400);
+check('y dejarlo lo deja como estaba', (await nombres()).includes('Nuestra Soullink'),
+  (await nombres()).join(' / '));
+
 // --- 1. un clic no borra ---
 await borrar.click();
 await page.waitForTimeout(400);
@@ -122,6 +170,6 @@ check('y decir que si la borra de verdad', (await cuantas()) === alPrincipio - 1
 
 await navegador.close();
 console.log(
-  fallos === 0 ? '\nBORRAR UNA PARTIDA PREGUNTA ANTES' : `\n${fallos} COMPROBACIONES FALLIDAS`,
+  fallos === 0 ? '\nLOS BOTONES DE UNA PARTIDA HACEN LO QUE DICEN' : `\n${fallos} COMPROBACIONES FALLIDAS`,
 );
 process.exit(fallos === 0 ? 0 : 1);

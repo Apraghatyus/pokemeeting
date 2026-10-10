@@ -3797,6 +3797,50 @@ details.partidas[open] > summary::before {
   margin-right: 1px;
 }
 
+/* ---------- cambiarle el nombre a una partida ----------
+
+   Se edita en el sitio del nombre y no en una ventana aparte: lo que se esta
+   cambiando es esa linea, y ahi se ve en el mismo sitio donde va a quedar. */
+.hueco__renombrar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+}
+
+.hueco__nombre-campo {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.hueco__nombre-campo:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* El de guardar se pinta del color de lo que se toca, no del de borrar: aqui
+   confirmar no se lleva nada por delante. */
+.hueco__accion--guardar {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.hueco__accion--guardar:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
 /* El de confirmar es el unico de la fila que se pinta de rojo sin tocarlo: es
    el que no tiene vuelta atras. */
 .hueco__accion--si {

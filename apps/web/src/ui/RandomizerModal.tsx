@@ -156,6 +156,14 @@ const IconoPapelera = () => (
   </svg>
 );
 
+const IconoLapiz = () => (
+  <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none"
+    stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11.2 2.3l2.5 2.5-8 8-3.2.7.7-3.2z" />
+    <path d="M10 3.5l2.5 2.5" />
+  </svg>
+);
+
 const IconoSi = () => (
   <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none"
     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -209,6 +217,16 @@ export const RandomizerModal = ({
    * lista: con un booleano, preguntar por una preguntaba por todas.
    */
   const [borrando, setBorrando] = useState<string | null>(null);
+  /**
+   * La partida a la que se le esta cambiando el nombre, y el nombre a medias.
+   *
+   * El nombre se pone al crearla, en la pantalla de resultado, y hasta ahora no
+   * habia forma de cambiarlo despues: una partida mal nombrada se quedaba asi
+   * para siempre, y con tres partidas de la misma ROM el nombre es lo unico que
+   * las distingue.
+   */
+  const [renombrando, setRenombrando] = useState<string | null>(null);
+  const [nombreNuevo, setNombreNuevo] = useState('');
 
   // La lista se relee al abrir: puede haber cambiado desde la vez anterior.
   const releer = useCallback(() => {
@@ -225,6 +243,7 @@ export const RandomizerModal = ({
     // Una pregunta a medias no sobrevive a cerrar el menu: al volver, lo que
     // habria es una ficha pidiendo confirmacion de algo que ya no se recuerda.
     setBorrando(null);
+    setRenombrando(null);
   }, [open, releer]);
 
   useEffect(() => {
@@ -669,6 +688,49 @@ export const RandomizerModal = ({
                           className={`hueco hueco--partida${mia ? '' : ' hueco--ajena'}`}
                           key={partida.id}
                         >
+                          {renombrando === partida.id ? (
+                            /* El nombre se edita en el sitio del nombre, no en
+                               una ventana aparte: lo que se esta cambiando es
+                               esa linea y ahi se ve lo que queda. */
+                            <form
+                              className="hueco__renombrar"
+                              onSubmit={(event) => {
+                                event.preventDefault();
+                                renombrar(partida.id, nombreNuevo);
+                                setRenombrando(null);
+                                releer();
+                              }}
+                            >
+                              <input
+                                className="hueco__nombre-campo"
+                                value={nombreNuevo}
+                                maxLength={40}
+                                autoFocus
+                                aria-label={`Nombre de ${nombreDePartida(partida)}`}
+                                onChange={(event) => setNombreNuevo(event.target.value)}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Escape') setRenombrando(null);
+                                }}
+                              />
+                              <button
+                                type="submit"
+                                className="hueco__accion hueco__accion--guardar"
+                                title="Guardar el nombre"
+                                aria-label="Guardar el nombre"
+                              >
+                                <IconoSi />
+                              </button>
+                              <button
+                                type="button"
+                                className="hueco__accion"
+                                title="Dejarlo como estaba"
+                                aria-label="Dejar el nombre como estaba"
+                                onClick={() => setRenombrando(null)}
+                              >
+                                <IconoNo />
+                              </button>
+                            </form>
+                          ) : (
                           <button
                             type="button"
                             className="hueco__abrir"
@@ -702,11 +764,12 @@ export const RandomizerModal = ({
                               <span>{cuando(partida.creada)}</span>
                             </span>
                           </button>
+                          )}
 
                           {/* O las acciones, o la pregunta. En el mismo sitio y
                               no debajo: asi la ficha no cambia de alto y las de
                               abajo no dan un salto al preguntar. */}
-                          {borrando === partida.id ? (
+                          {renombrando === partida.id ? null : borrando === partida.id ? (
                             <div className="hueco__acciones hueco__acciones--seguro">
                               <span className="hueco__seguro">¿Seguro?</span>
                               <button
@@ -739,6 +802,24 @@ export const RandomizerModal = ({
                             </div>
                           ) : (
                             <div className="hueco__acciones">
+                              {/* Cambiar el nombre vale para cualquiera, tambien
+                                  para las de otra ROM: un nombre es una
+                                  etiqueta tuya, no algo del juego. */}
+                              <button
+                                type="button"
+                                className="hueco__accion"
+                                title="Cambiarle el nombre"
+                                aria-label={`Cambiar el nombre de ${nombreDePartida(partida)}`}
+                                onClick={() => {
+                                  // Con el nombre que ya tiene dentro, para
+                                  // retocarlo en vez de escribirlo entero.
+                                  setNombreNuevo(partida.nombre ?? nombreDePartida(partida));
+                                  setBorrando(null);
+                                  setRenombrando(partida.id);
+                                }}
+                              >
+                                <IconoLapiz />
+                              </button>
                               {mia && <BotonSemilla partida={partida} />}
                               {mia && (
                                 <button
