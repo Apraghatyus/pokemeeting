@@ -7,9 +7,21 @@
 // que para jugar juntos habia que pasarse DOS cosas por separado -credenciales
 // y semilla- y entender para que servia cada una.
 //
-// Asi que van las dos en el enlace. Quien lo abre solo tiene que poner su copia
-// del juego y pulsar un boton: con la semilla se le rehace el mismo mundo y
-// entra en la sala.
+// Asi que el enlace lleva a las dos. Quien lo abre solo tiene que poner su
+// copia del juego y pulsar un boton: se le prepara el mismo mundo y entra en la
+// sala.
+//
+// LA SEMILLA YA NO VIAJA DENTRO DEL ENLACE. Iba, y eran cien caracteres de
+// base64 en medio de un mensaje de WhatsApp: el enlace ocupaba tres lineas y
+// parecia cualquier cosa menos algo en lo que pulsar. Ahora la guarda la sala y
+// quien abre el enlace la pide con el codigo.
+//
+// Lo que queda es "https://.../#SRVHXT:1": el codigo, dos puntos y la
+// contrasena. Se parte por el PRIMER dos puntos y la contrasena va escapada, asi
+// que una que lleve dos puntos dentro tampoco rompe nada.
+//
+// Los enlaces de antes se siguen entendiendo, con sus nombres y su semilla
+// dentro: alguien puede tener uno guardado en el chat.
 //
 // LO QUE EL ENLACE NO LLEVA, Y ES LO IMPORTANTE: la ROM. Una semilla sin la ROM
 // original no vale para nada, que es justo lo que se quiere. Cada uno tiene que
@@ -27,7 +39,7 @@
 // asi que quien lo tenga puede entrar. Es lo mismo que pasa con un enlace de
 // reunion, pero mas vale saberlo.
 
-import { codificarSemilla, descodificarSemilla, type Semilla } from './semilla';
+import { descodificarSemilla, type Semilla } from './semilla';
 
 /** Como se llama cada cosa dentro del fragmento. */
 const SALA = 'sala';
@@ -60,11 +72,9 @@ export type Invitacion = {
  */
 export const enlaceDeInvitacion = (invitacion: Invitacion): string => {
   const { origin, pathname } = globalThis.location;
-  const datos = new URLSearchParams();
-  datos.set(SALA, invitacion.sala);
-  datos.set(CLAVE, invitacion.clave);
-  if (invitacion.semilla) datos.set(SEMILLA, codificarSemilla(invitacion.semilla));
-  return `${origin}${pathname}#${datos.toString()}`;
+  // La semilla no se mete: la guarda la sala y se pide con el codigo. Ver la
+  // cabecera de este fichero.
+  return `${origin}${pathname}#${invitacion.sala}:${encodeURIComponent(invitacion.clave)}`;
 };
 
 /**
@@ -83,6 +93,22 @@ export const leerInvitacion = (hash = globalThis.location?.hash ?? ''): Invitaci
   const crudo = hash.startsWith('#') ? hash.slice(1) : hash;
   if (!crudo) return null;
 
+  // La forma corta: SALA:clave. Se mira primero y por el primer dos puntos.
+  const corte = crudo.indexOf(':');
+  if (corte > 0 && !crudo.includes('=')) {
+    const sala = crudo.slice(0, corte).toUpperCase();
+    let clave = '';
+    try {
+      clave = decodeURIComponent(crudo.slice(corte + 1));
+    } catch {
+      // Un enlace cortado por el chat puede dejar un % a medias.
+      return null;
+    }
+    if (!CODIGO_VALIDO.test(sala) || clave === '') return null;
+    return { sala, clave, semilla: null };
+  }
+
+  // Y la de antes, con nombres y a veces con la semilla dentro.
   const datos = new URLSearchParams(crudo);
   const sala = (datos.get(SALA) ?? '').toUpperCase();
   const clave = datos.get(CLAVE) ?? '';
@@ -116,10 +142,14 @@ export const direccionCompartible = (hostname = globalThis.location?.hostname ??
  * mensaje y no solo en la pagina porque quien lo recibe puede no tenerla, y mas
  * vale que lo sepa antes de abrir nada.
  */
-export const textoDeInvitacion = (invitacion: Invitacion): string => {
+export const textoDeInvitacion = (invitacion: Invitacion, juego: string | null = null): string => {
   const lineas = [`Sala: ${invitacion.sala}`, `Contrasena: ${invitacion.clave}`];
   if (direccionCompartible()) lineas.unshift(`Juega conmigo: ${enlaceDeInvitacion(invitacion)}`);
-  lineas.push('Necesitas tu propia copia del juego: el enlace no la lleva.');
+  lineas.push(
+    juego
+      ? `Necesitas tu propia copia de ${juego}: el enlace no la lleva.`
+      : 'Necesitas tu propia copia del juego: el enlace no la lleva.',
+  );
   return lineas.join('\n');
 };
 

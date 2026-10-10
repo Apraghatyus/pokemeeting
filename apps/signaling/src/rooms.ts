@@ -34,6 +34,14 @@ export type Room<Socket> = {
   createdAt: number;
   emptySince: number | null;
   joinAttempts: number;
+  /**
+   * La semilla del mundo que se juega aqui, o null si se juega la ROM tal cual.
+   *
+   * La guarda la sala para que el enlace de invitacion sea corto: en vez de
+   * llevar cien caracteres de base64 dentro, lleva el codigo y quien lo abre
+   * pregunta. Es texto -un numero y unos ajustes-, nunca nada del juego.
+   */
+  semilla: string | null;
 };
 
 /**
@@ -54,7 +62,11 @@ const generateCode = (): string => {
 export class RoomRegistry<Socket> {
   readonly #rooms = new Map<string, Room<Socket>>();
 
-  async create(password: string, host: Participant<Socket>): Promise<Room<Socket>> {
+  async create(
+    password: string,
+    host: Participant<Socket>,
+    semilla: string | null = null,
+  ): Promise<Room<Socket>> {
     let code = generateCode();
     while (this.#rooms.has(code)) code = generateCode();
 
@@ -69,6 +81,7 @@ export class RoomRegistry<Socket> {
       createdAt: Date.now(),
       emptySince: null,
       joinAttempts: 0,
+      semilla,
     };
     this.#rooms.set(code, room);
     return room;

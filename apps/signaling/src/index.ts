@@ -11,6 +11,7 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { compareRoms } from '@emupoke/pokemon';
 import {
   isValidRoomCode,
+  MAX_SEMILLA,
   type ClientMessage,
   type ErrorCode,
   type RomFingerprint,
@@ -67,7 +68,16 @@ const handleCreate = async (socket: WebSocket, message: Extract<ClientMessage, {
     fail(socket, 'peticion-invalida', 'Faltan la contrasena o los datos de la ROM.');
     return;
   }
-  const room = await rooms.create(message.password, { socket, rom: message.rom });
+  // La semilla del mundo que juega el anfitrion, para que el enlace de
+  // invitacion pueda ser corto y quien lo abra la pida al entrar. Es texto -un
+  // numero y unos ajustes-, nunca nada del juego; aun asi se le pone tope para
+  // que la sala no sirva de almacen de lo que sea.
+  const semilla =
+    typeof message.semilla === 'string' && message.semilla.length <= MAX_SEMILLA
+      ? message.semilla
+      : null;
+
+  const room = await rooms.create(message.password, { socket, rom: message.rom }, semilla);
   console.log(`[sala ${room.code}] creada  (${rooms.size} activas)`);
   send(socket, { type: 'room-created', roomCode: room.code });
 };
@@ -128,6 +138,43 @@ const handleJoin = async (socket: WebSocket, message: Extract<ClientMessage, { t
   }
 };
 
+/**
+ * Que hay en esa sala, para quien abre un enlace de invitacion.
+ *
+ * Se contesta SIN contrasena a proposito: quien llega por el enlace todavia no
+ * ha puesto su ROM, y sin ella no se puede entrar. Lo que se devuelve no es
+ * secreto -a que juego se juega y como rehacer ese mundo- y es justo lo que el
+ * anfitrion acaba de mandar por el chat.
+ *
+ * Lo que NO se devuelve es el nombre del fichero del anfitrion. Eso se sabe al
+ * entrar, donde ya hay contrasena de por medio; como alguien llama a su fichero
+ * no es asunto de quien teclee codigos al azar.
+ */
+const handleAsk = (socket: WebSocket, message: Extract<ClientMessage, { type: 'ask-room' }>) => {
+  const code = (message.roomCode ?? '').toUpperCase();
+  if (!isValidRoomCode(code)) {
+    fail(socket, 'peticion-invalida', 'Ese codigo de sala no es valido.');
+    return;
+  }
+
+  const room = rooms.get(code);
+  const anfitrion = room?.host ?? room?.guest ?? null;
+  if (!room || !anfitrion) {
+    fail(socket, 'sala-no-encontrada', `No existe ninguna sala con el codigo ${code}.`);
+    return;
+  }
+
+  send(socket, {
+    type: 'room-info',
+    datos: {
+      roomCode: code,
+      gameCode: anfitrion.rom.gameCode,
+      title: anfitrion.rom.title,
+      semilla: room.semilla,
+    },
+  });
+};
+
 const server = createServer((req, res) => {
   if (req.url === '/health') {
     res.writeHead(200, { 'content-type': 'application/json' });
@@ -166,6 +213,9 @@ wss.on('connection', (socket) => {
         break;
       case 'join-room':
         void handleJoin(socket, message);
+        break;
+      case 'ask-room':
+        handleAsk(socket, message);
         break;
       case 'signal': {
         // Reenvio ciego: el contenido es asunto de WebRTC, no nuestro.

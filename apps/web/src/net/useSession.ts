@@ -304,7 +304,7 @@ export const useSession = (
   }, [patch, romRef, startPeer]);
 
   const createRoom = useCallback(
-    async (password: string) => {
+    async (password: string, semilla: string | null = null) => {
       const rom = romRef.current;
       if (!rom) {
         patch({ error: 'Carga primero tu ROM: la sala necesita saber a que jugais.' });
@@ -315,7 +315,9 @@ export const useSession = (
       attemptsRef.current = 0;
       pendingPasswordRef.current = password;
       try {
-        (await connectSignaling()).createRoom(password, rom);
+        // La semilla se queda en la sala para que el enlace de invitacion sea
+        // corto: quien lo abre la pide con el codigo en vez de llevarla dentro.
+        (await connectSignaling()).createRoom(password, rom, semilla);
         patch({ password });
       } catch (err) {
         patch({ error: err instanceof Error ? err.message : String(err) });

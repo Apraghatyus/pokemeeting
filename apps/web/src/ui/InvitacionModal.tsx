@@ -2,28 +2,34 @@
 //
 // Es la primera pantalla que va a ver gente que no ha usado esto nunca: le han
 // mandado un enlace por WhatsApp y lo ha pulsado. Asi que no se le pide un
-// codigo, ni una contrasena, ni una semilla -todo eso viene en el enlace- y lo
-// unico que se le pide es lo unico que NO puede venir en el enlace: su propia
-// copia del juego.
+// codigo, ni una contrasena, ni una semilla -todo eso lo trae el enlace o lo
+// dice la sala- y lo unico que se le pide es lo unico que no puede venir de
+// ninguna de las dos: su propia copia del juego.
 //
-// Y despues un solo boton. Detras de ese boton pasan tres cosas que antes habia
-// que hacer a mano y en orden: se prepara el mundo que juega quien invita, se
-// carga, y se entra en la sala. Hacerlas por separado era lo que hacia que la
-// gente acabara en dos mundos distintos sin entender por que.
+// Y SE LE DICE CUAL. Antes se le pedia "tu ROM" a secas, y quien ponia otra
+// edicion se enteraba despues de haberla buscado. Ahora se le pregunta a la sala
+// a que se juega y se le dice el nombre antes de que vaya a por el fichero.
 //
-// LA SEGUNDA VEZ NO ES COMO LA PRIMERA, y esto se paso por alto al principio.
-// El mismo enlace se reenvia dias despues para seguir la partida de siempre: el
-// lunes se quedaron en el segundo gimnasio y el jueves vuelven. Entonces el
-// mundo ya esta aqui, con su guardado dentro, y lo que hace falta es ELEGIR:
-// seguir esa partida o empezar otra en el mismo mundo. Las dos cosas son
-// normales -se vuelve a quedar, o cayo el equipo y se repite- y adivinarla por
-// el jugador es meterle en la que no era.
+// LA SEGUNDA VEZ NO ES COMO LA PRIMERA. El mismo enlace se reenvia dias despues
+// para seguir la partida de siempre: el lunes se quedaron en el segundo gimnasio
+// y el jueves vuelven. Entonces el mundo ya esta aqui, con su guardado dentro, y
+// lo que hace falta es ELEGIR: seguir esa partida o empezar otra en el mismo
+// mundo. Se elige como en el aleatorizador, con la misma lista de siempre,
+// porque es la misma decision.
+//
+// POR QUE "EMPEZAR UNA NUEVA" NO ABRE LAS OPCIONES DEL ALEATORIZADOR. Porque
+// elegir opciones aqui seria generar OTRO mundo, y entonces los dos amigos
+// volverian a estar en sitios distintos: justo lo que el enlace vino a resolver.
+// El mundo de una invitacion lo decide quien invita, y lo que se elige aqui es
+// solo si se empieza de cero en el o se sigue lo que habia.
 
-import { useState, type RefObject } from 'react';
-import { parseGameCode } from '@emupoke/pokemon';
+import { useEffect, useState, type RefObject } from 'react';
+import { describeGame, parseGameCode } from '@emupoke/pokemon';
 import type { Invitacion } from '../core/invitacion';
 import { cuando, nombreDePartida, partidasDe, tocar, type PartidaGuardada } from '../core/partidas';
 import { rehacerDesdeSemilla, type BaseRom } from '../core/rehacer';
+import { descodificarSemilla, type Semilla } from '../core/semilla';
+import { consultarSala } from '../net/signalingClient';
 import type { PuestoEnCola } from '../net/randomizer';
 import { Modal } from './Modal';
 import { RomDropZone } from './RomDropZone';
@@ -60,8 +66,8 @@ type Fase =
   | { nombre: 'entrando' }
   | { nombre: 'error'; mensaje: string };
 
-/** Lo que se elige hacer cuando ese mundo ya esta aqui: empezar otra partida. */
-const NUEVA = 'nueva';
+/** Lo que dice la sala de si misma, o null mientras no ha contestado. */
+type DeLaSala = { gameCode: string; title: string; semilla: Semilla | null } | null;
 
 export const InvitacionModal = ({
   invitacion,
@@ -78,18 +84,53 @@ export const InvitacionModal = ({
   onUnirse,
 }: Props) => {
   const [fase, setFase] = useState<Fase>({ nombre: 'esperando' });
-  const [elegido, setElegido] = useState<string | null>(null);
+  const [sala, setSala] = useState<DeLaSala>(null);
+
+  // Se le pregunta a la sala a que se juega y con que mundo. Es lo que permite
+  // que el enlace sea corto -la semilla ya no va dentro- y lo que permite decir
+  // que ROM hace falta antes de que nadie busque un fichero.
+  const codigo = invitacion?.sala ?? null;
+  useEffect(() => {
+    if (!codigo) return;
+    let sigueInteresando = true;
+    void consultarSala(codigo).then((datos) => {
+      if (!sigueInteresando || !datos) return;
+      setSala({
+        gameCode: datos.gameCode,
+        title: datos.title,
+        semilla: datos.semilla ? descodificarSemilla(datos.semilla) : null,
+      });
+    });
+    return () => {
+      sigueInteresando = false;
+    };
+  }, [codigo]);
 
   if (!invitacion) return null;
 
   const base = baseRom.current;
-  const semilla = invitacion.semilla;
+  // Del enlace si lo trae -los de antes la llevaban dentro- y si no, de la sala.
+  const semilla = invitacion.semilla ?? sala?.semilla ?? null;
   const juego = gameCode !== null ? parseGameCode(gameCode).game : null;
 
-  // La semilla trae el CRC de la ROM original con la que se creo. Si no es la
-  // misma, el mundo saldria distinto, asi que se dice ANTES de dejar pulsar el
-  // boton y no despues de un minuto generando.
-  const otraRom = base !== null && semilla !== null && semilla.baseCrc32 !== base.crc32;
+  /** Como se llama el juego al que se juega ahi, para poder pedirlo por su nombre. */
+  const juegoPedido = sala ? describeGame(sala.gameCode) : null;
+
+  // Dos formas distintas de traer la copia equivocada, y conviene separarlas
+  // porque se arreglan distinto:
+  //
+  //   - Otra EDICION. Se sabe en cuanto contesta la sala, sin esperar a la
+  //     semilla, y se dice con su nombre: "hace falta Rojo Fuego".
+  //   - La misma edicion pero otro volcado. Dos copias del mismo juego pueden
+  //     diferir byte a byte, y entonces la misma semilla da otro mundo. Esto
+  //     solo lo distingue el CRC.
+  const otraEdicion =
+    base !== null &&
+    sala !== null &&
+    parseGameCode(gameCode ?? '').gameId !== parseGameCode(sala.gameCode).gameId;
+  const otroVolcado =
+    base !== null && !otraEdicion && semilla !== null && semilla.baseCrc32 !== base.crc32;
+  const copiaMala = otraEdicion || otroVolcado;
 
   /**
    * Las partidas que ya hay de ESE mundo, de la mas reciente a la mas vieja.
@@ -108,19 +149,12 @@ export const InvitacionModal = ({
           (p) => p.crc32 === semilla.crc32 && existeGuardada(p.fichero),
         );
 
-  // Por defecto, la ultima que se jugo: quien vuelve a abrir el enlace dias
-  // despues viene a seguir donde lo dejo, no a empezar de cero.
-  const eleccion = elegido ?? guardadas[0]?.id ?? NUEVA;
-  const seguir = guardadas.find((p) => p.id === eleccion) ?? null;
-
   const trabajando = fase.nombre === 'preparando' || fase.nombre === 'entrando';
-  const sePuede = base !== null && !otraRom && !trabajando;
 
-  const entrar = async () => {
+  /** Entra en la sala. `seguir` es la partida que se abre, o null para una nueva. */
+  const entrar = async (seguir: PartidaGuardada | null) => {
     try {
-      // 1. El mundo. Sin semilla no hay nada que preparar: quien invita juega su
-      //    ROM tal cual, y entonces basta con que este la suya.
-      if (semilla && seguir) {
+      if (seguir) {
         // Si ya esta puesta, no se recarga: le costaria a quien juega todo lo
         // que no haya guardado dentro del juego desde la ultima vez.
         if (romName !== seguir.fichero) {
@@ -142,8 +176,8 @@ export const InvitacionModal = ({
         });
       }
 
-      // 2. Y a la sala. El codigo y la contrasena venian en el enlace, asi que
-      //    aqui no hay nada que escribir.
+      // Y a la sala. El codigo y la contrasena venian en el enlace, asi que aqui
+      // no hay nada que escribir.
       setFase({ nombre: 'entrando' });
       await onUnirse(invitacion.sala, invitacion.clave);
       onClose();
@@ -161,7 +195,9 @@ export const InvitacionModal = ({
       onClose={trabajando ? () => {} : onClose}
       icon="((•))"
       title="Te han invitado a jugar"
-      subtitle={`Sala ${invitacion.sala}`}
+      subtitle={
+        juegoPedido ? `Sala ${invitacion.sala} · ${juegoPedido}` : `Sala ${invitacion.sala}`
+      }
     >
       {base && (
         <div className="invite">
@@ -172,102 +208,98 @@ export const InvitacionModal = ({
         </div>
       )}
 
-      {otraRom && (
+      {otraEdicion && (
         <p className="alert" role="alert">
-          Tu copia del juego no es la misma con la que se creó este mundo, así que la semilla daría
-          algo distinto. Hace falta exactamente la misma ROM original.
+          Ahí se juega a <strong>{juegoPedido}</strong> y lo que has puesto es otra edición. Hace
+          falta la misma, o estaríais jugando a juegos distintos.
         </p>
       )}
 
-      {/* Lo primero, porque es lo unico que se le pide y lo unico que el enlace
-          no puede traer. La ley es la ley: aqui no se reparten juegos.
+      {otroVolcado && (
+        <p className="alert" role="alert">
+          Es el mismo juego, pero no la misma copia con la que se creó este mundo, así que la
+          semilla daría algo distinto. Hace falta exactamente la misma ROM original.
+        </p>
+      )}
+
+      {/* Lo primero, porque es lo unico que se le pide y lo unico que no puede
+          traer ni el enlace ni la sala. La ley es la ley: aqui no se reparten
+          juegos, cada uno pone la suya.
 
           La zona de carga vuelve a salir si la copia puesta no sirve. Sin esto
           quedaba un callejon sin salida: el aviso decia que hacia falta otra ROM
           y no habia por donde ponerla. */}
-      {!base || otraRom ? (
+      {!base || copiaMala ? (
         <>
           <p className="hint">
-            {otraRom
+            {copiaMala
               ? 'Prueba con otra copia del juego.'
-              : semilla
-                ? 'Pon tu propia copia del juego. Con ella se prepara exactamente el mismo mundo que está jugando quien te invita.'
-                : 'Pon tu propia copia del juego para entrar en la sala.'}
+              : juegoPedido
+                ? `Pon tu copia de ${juegoPedido}. Con ella se prepara exactamente el mismo mundo que está jugando quien te invita.`
+                : 'Pon tu propia copia del juego. Con ella se prepara exactamente el mismo mundo que está jugando quien te invita.'}
           </p>
           <RomDropZone onRom={onRom} disabled={!nucleoListo} hint={hint} />
         </>
       ) : (
         <>
-          {/* El caso de volver dias despues: ese mundo ya esta aqui, con lo que
-              se jugo dentro. Se elige, no se adivina. */}
-          {guardadas.length > 0 ? (
-            <fieldset className="elegir">
-              <legend className="elegir__titulo">Ya tienes ese mundo. ¿Qué hacemos?</legend>
+          {/* Se elige como en el aleatorizador, con la misma lista: es la misma
+              decision, asi que no hay motivo para que se vea de otra manera. */}
+          <div className="tarjeta__titulo tarjeta__titulo--suelto">
+            <span className="tarjeta__marca" />
+            <h3>{guardadas.length > 0 ? 'Ya tienes ese mundo' : 'Su mundo'}</h3>
+          </div>
 
-              {guardadas.map((partida) => (
-                <label key={partida.id} className="elegir__opcion">
-                  <input
-                    type="radio"
-                    name="que-partida"
-                    checked={eleccion === partida.id}
-                    onChange={() => setElegido(partida.id)}
-                    disabled={trabajando}
-                  />
-                  <span className="elegir__texto">
-                    <strong>Seguir «{nombreDePartida(partida)}»</strong>
-                    <span className="elegir__nota">
-                      donde la dejaste · jugada {cuando(partida.jugada)}
-                    </span>
-                  </span>
-                </label>
-              ))}
-
-              <label className="elegir__opcion">
-                <input
-                  type="radio"
-                  name="que-partida"
-                  checked={eleccion === NUEVA}
-                  onChange={() => setElegido(NUEVA)}
+          <div className="huecos">
+            {guardadas.map((partida) => (
+              <div className="hueco hueco--partida" key={partida.id}>
+                <button
+                  type="button"
+                  className="hueco__abrir"
                   disabled={trabajando}
-                />
-                <span className="elegir__texto">
-                  <strong>Empezar una partida nueva</strong>
-                  {/* Que no se pierde nada es justo lo que hay que decir: esta
-                      es la opcion que da miedo pulsar. */}
-                  <span className="elegir__nota">
-                    el mismo mundo desde el principio, sin tocar lo que ya tienes
+                  title="Se abre donde la dejaste y se entra en la sala"
+                  onClick={() => void entrar(partida)}
+                >
+                  <span className="hueco__nombre">{nombreDePartida(partida)}</span>
+                  <span className="hueco__datos">
+                    <span className="hueco__juego">donde la dejaste</span>
+                    <span>jugada {cuando(partida.jugada)}</span>
                   </span>
-                </span>
-              </label>
-            </fieldset>
-          ) : (
-            <p className="hint">
-              {!semilla
-                ? 'Quien te invita juega su ROM tal cual, así que no hay nada que preparar.'
+                </button>
+              </div>
+            ))}
+
+            {/* Y empezar de cero en ESE mundo, no en otro: las opciones las
+                eligio quien invita. Ver la cabecera. */}
+            <button
+              type="button"
+              className="hueco hueco--libre"
+              disabled={trabajando}
+              title={
+                guardadas.length > 0
+                  ? 'Empieza de cero en el mismo mundo. Lo que ya tienes se queda donde está.'
+                  : 'Prepara el mundo de quien te invita y entra en la sala'
+              }
+              onClick={() => void entrar(null)}
+            >
+              {guardadas.length > 0 ? '+ Empezar una partida nueva' : '+ Entrar y empezar'}
+            </button>
+          </div>
+
+          <p className="hint">
+            {!semilla
+              ? 'Quien te invita juega su ROM tal cual, así que no hay nada que preparar.'
+              : guardadas.length > 0
+                ? 'Empezar una nueva no toca lo que ya tienes. El mundo es el mismo: lo eligió quien te invita.'
                 : 'Se va a generar el mismo mundo que juega quien te invita. Tarda un rato y puedes dejar la pestaña abierta.'}
-            </p>
-          )}
+          </p>
 
-          <button
-            type="button"
-            className="button--primary button--wide"
-            disabled={!sePuede}
-            onClick={() => void entrar()}
-          >
-            {fase.nombre === 'preparando'
-              ? seguir
-                ? 'Abriendo tu partida...'
-                : 'Preparando el mundo...'
-              : fase.nombre === 'entrando'
-                ? 'Entrando...'
-                : seguir
-                  ? 'Seguir y unirme a la sala'
-                  : 'Unirme a la sala'}
-          </button>
-
-          {fase.nombre === 'preparando' && fase.cola && (
+          {trabajando && (
             <p className="hint" role="status">
-              {textoDeEspera(fase.cola)}
+              {fase.nombre === 'entrando'
+                ? 'Entrando en la sala...'
+                : fase.cola
+                  ? textoDeEspera(fase.cola)
+                  : 'Preparando la partida...'}
             </p>
           )}
 

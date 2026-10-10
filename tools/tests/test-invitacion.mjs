@@ -1,10 +1,13 @@
 // El enlace que lleva directo a la sala.
 //
-// Dentro van tres cosas: el codigo, la contrasena y la semilla del mundo que
-// juega quien invita. Las tres hacen falta para que el otro pueda entrar sin
-// escribir nada y, sobre todo, para que entre AL MISMO MUNDO: antes habia que
-// pasarse las credenciales y la semilla por separado, y eso acababa con los dos
-// jugando mundos distintos sin entender por que.
+// Dentro van dos cosas y solo dos: el codigo y la contrasena. La semilla del
+// mundo NO va dentro -la guarda la sala y quien abre el enlace la pide con el
+// codigo-, porque eran cien caracteres de base64 en medio de un mensaje de
+// WhatsApp: el enlace ocupaba tres lineas y parecia cualquier cosa menos algo en
+// lo que pulsar.
+//
+// Los enlaces viejos siguen entendiendose, con su semilla dentro. Eso se prueba
+// aqui tambien: un enlace que alguien guardo ayer tiene que seguir valiendo.
 //
 // Lo que mas se prueba aqui es lo que NO debe dar por bueno. Un enlace a medias
 // que abre un cartel de "te han invitado" y luego no deja entrar es peor que no
@@ -55,6 +58,13 @@ const soloElFragmentoDe = (url) => url.slice(url.indexOf('#'));
 check('el enlace sale de la direccion de esta pagina',
   enlace.startsWith('https://pokemeeting.example/#'), enlace);
 
+// Lo que se pidio: que quepa en un mensaje y se vea como un enlace.
+check('y es corto: ni semilla dentro ni tres lineas de base64',
+  !enlace.includes('EMUPOKE1') && enlace.length < 60, `${enlace.length} caracteres`);
+// La forma que se pidio: el codigo, dos puntos y la contrasena.
+check('y se lee como un enlace y no como un volcado',
+  enlace.endsWith('#ABC123:un%20secreto'), enlace);
+
 // Lo que va detras de `#` no se manda al servidor. Con `?` la contrasena de la
 // sala quedaria escrita en el registro de accesos de cada maquina por la que
 // pase la peticion.
@@ -69,9 +79,27 @@ const vuelta = leerInvitacion(soloElFragmentoDe(enlace));
 check('se reconoce la invitacion', vuelta !== null);
 check('con su sala', vuelta?.sala === 'ABC123', vuelta?.sala);
 check('con su contrasena, espacio incluido', vuelta?.clave === 'un secreto', vuelta?.clave);
-check('y con la semilla entera, sin perder un solo caracter',
-  vuelta?.semilla && codificarSemilla(vuelta.semilla) === codificarSemilla(SEMILLA),
-  vuelta?.semilla ? codificarSemilla(vuelta.semilla) : 'ninguna');
+// El enlace nuevo no la lleva: la pide a la sala con el codigo.
+check('y sin semilla, que esa la guarda la sala', vuelta?.semilla === null);
+
+// Una contrasena con dos puntos dentro tampoco rompe el reparto: se parte por
+// el PRIMERO y lo de detras viene escapado.
+const conDosPuntos = leerInvitacion(
+  soloElFragmentoDe(enlaceDeInvitacion({ sala: 'ABC123', clave: 'a:b:c', semilla: null })),
+);
+check('una contrasena con dos puntos vuelve entera',
+  conDosPuntos?.clave === 'a:b:c', conDosPuntos?.clave);
+
+// --- los enlaces de antes, que si la llevaban ---
+//
+// Alguien puede tener uno guardado de ayer en el chat. Tiene que seguir
+// valiendo, y ademas asi no se depende de que la sala conteste.
+const viejo = `#sala=ABC123&clave=x&semilla=${encodeURIComponent(codificarSemilla(SEMILLA))}`;
+const deAntes = leerInvitacion(viejo);
+check('un enlace de los de antes se sigue entendiendo', deAntes !== null);
+check('y su semilla llega entera, sin perder un solo caracter',
+  deAntes?.semilla && codificarSemilla(deAntes.semilla) === codificarSemilla(SEMILLA),
+  deAntes?.semilla ? codificarSemilla(deAntes.semilla) : 'ninguna');
 
 // Un codigo de sala se dicta en mayusculas y se teclea como sea.
 const enMinusculas = leerInvitacion('#sala=abc123&clave=x');
@@ -118,8 +146,8 @@ check('y lleva ademas el codigo y la contrasena escritos',
 check('y avisa de que hace falta su propia copia del juego',
   /tu propia copia del juego/.test(mensaje));
 // La frontera de siempre: por aqui no se reparten juegos.
-check('el mensaje no lleva nada del juego, solo como rehacerlo',
-  mensaje.includes('EMUPOKE1'), 'solo la semilla');
+check('el mensaje son cuatro lineas de texto, no un fichero',
+  mensaje.length < 300, `${mensaje.length} caracteres`);
 
 // En localhost el enlace no sirve de nada: apunta al ordenador de quien copia,
 // no al de su amigo. Entonces se manda solo lo que se puede teclear.
@@ -148,6 +176,6 @@ check('y no deja una entrada nueva en el historial, para que atras no la devuelv
   typeof globalThis.history.pushState === 'undefined');
 
 console.log(
-  fallos === 0 ? '\nEL ENLACE LLEVA LA SALA Y EL MUNDO, NO EL JUEGO' : `\n${fallos} COMPROBACIONES FALLIDAS`,
+  fallos === 0 ? '\nEL ENLACE LLEVA A LA SALA, NO EL JUEGO' : `\n${fallos} COMPROBACIONES FALLIDAS`,
 );
 process.exit(fallos === 0 ? 0 : 1);

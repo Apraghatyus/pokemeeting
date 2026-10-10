@@ -504,7 +504,17 @@ export const App = () => {
         onClose={() => setRoomOpen(false)}
         state={session.state}
         romReady={hasRom}
-        onCreate={(password) => void session.createRoom(password)}
+        /* Con el mundo que se esta jugando: se queda en la sala y asi el
+           enlace que se comparte lleva solo el codigo y la contrasena. */
+        onCreate={(password) =>
+          void session.createRoom(
+            password,
+            (() => {
+              const suya = semillaEnCurso(state.header?.crc32 ?? null);
+              return suya ? codificarSemilla(suya) : null;
+            })(),
+          )
+        }
         onJoin={(code, password) => void session.joinRoom(code, password)}
         onLeave={() => {
           session.leave();
@@ -514,6 +524,7 @@ export const App = () => {
         /* El enlace que se comparte lleva el mundo dentro: asi quien entra no
            tiene que pedir la semilla aparte ni entender para que sirve. */
         semilla={semillaEnCurso(state.header?.crc32 ?? null)}
+        gameCode={state.header?.gameCode ?? null}
       />
     </div>
   );

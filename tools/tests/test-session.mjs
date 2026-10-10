@@ -102,8 +102,10 @@ await host.page.locator('.field__value.room-code').waitFor({ timeout: 10_000 });
 const code = (await host.page.locator('.field__value.room-code').textContent())?.trim() ?? '';
 check('el anfitrion obtiene un codigo de sala', /^[A-Z2-9]{6}$/.test(code), code);
 
-const copyLabel = await host.page.getByRole('button', { name: /Copiar credenciales/ }).count();
-check('el modal ofrece copiar las credenciales', copyLabel === 1);
+// Dejo de llamarse "Copiar credenciales" cuando el boton paso a dar un enlace
+// que entra directo, con la sala y la contrasena dentro.
+const copyLabel = await host.page.getByRole('button', { name: /Copiar invitacion/i }).count();
+check('el modal ofrece copiar la invitacion', copyLabel === 1);
 
 await host.page.screenshot({ path: `${SHOTS}/ui-modal-sala.png` });
 await host.page.keyboard.press('Escape');

@@ -1,4 +1,10 @@
-import type { ClientMessage, ErrorCode, RomFingerprint, ServerMessage } from '@emupoke/protocol';
+import type {
+  ClientMessage,
+  DatosDeSala,
+  ErrorCode,
+  RomFingerprint,
+  ServerMessage,
+} from '@emupoke/protocol';
 
 export type SignalingHandlers = {
   onRoomCreated: (roomCode: string) => void;
@@ -88,8 +94,8 @@ export class SignalingClient {
     }
   }
 
-  createRoom(password: string, rom: RomFingerprint): void {
-    this.#send({ type: 'create-room', password, rom });
+  createRoom(password: string, rom: RomFingerprint, semilla: string | null = null): void {
+    this.#send({ type: 'create-room', password, rom, semilla });
   }
 
   joinRoom(roomCode: string, password: string, rom: RomFingerprint): void {
@@ -105,3 +111,64 @@ export class SignalingClient {
     this.#socket = null;
   }
 }
+
+/** Lo que se espera a que conteste el servidor antes de darlo por perdido. */
+const ESPERA_MS = 8000;
+
+/**
+ * Pregunta que hay en una sala sin entrar en ella.
+ *
+ * Lo usa el cartel de invitacion: con el codigo solo se averigua a que juego se
+ * juega -para poder decir que ROM hace falta ANTES de que la busque- y la
+ * semilla de ese mundo, que antes viajaba dentro del enlace y lo hacia enorme.
+ *
+ * Abre su propio socket y lo cierra: esto pasa antes de que haya sesion, y
+ * montar la de verdad obliga a tener ya la ROM puesta, que es justo lo que
+ * todavia no hay.
+ *
+ * Devuelve null ante cualquier cosa: sala que ya no existe, servidor apagado o
+ * una respuesta que no se entiende. Quien pregunta sigue pudiendo entrar a
+ * mano, asi que no saber no es motivo para romper nada.
+ */
+export const consultarSala = (
+  roomCode: string,
+  url = defaultUrl(),
+): Promise<DatosDeSala | null> =>
+  new Promise((resolver) => {
+    let socket: WebSocket;
+    try {
+      socket = new WebSocket(url);
+    } catch {
+      resolver(null);
+      return;
+    }
+
+    let resuelto = false;
+    const acabar = (datos: DatosDeSala | null) => {
+      if (resuelto) return;
+      resuelto = true;
+      clearTimeout(reloj);
+      try {
+        socket.close();
+      } catch {
+        // Si ya estaba cerrado, mejor.
+      }
+      resolver(datos);
+    };
+
+    const reloj = setTimeout(() => acabar(null), ESPERA_MS);
+
+    socket.addEventListener('open', () =>
+      socket.send(JSON.stringify({ type: 'ask-room', roomCode: roomCode.toUpperCase() })),
+    );
+    socket.addEventListener('error', () => acabar(null));
+    socket.addEventListener('close', () => acabar(null));
+    socket.addEventListener('message', (event) => {
+      try {
+        const mensaje = JSON.parse(String(event.data)) as ServerMessage;
+        acabar(mensaje.type === 'room-info' ? mensaje.datos : null);
+      } catch {
+        acabar(null);
+      }
+    });
+  });

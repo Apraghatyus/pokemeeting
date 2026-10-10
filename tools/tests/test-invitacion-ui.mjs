@@ -92,8 +92,11 @@ const copiado = await anfitrion.evaluate(() => navigator.clipboard.readText());
 
 check('lo copiado lleva la sala', copiado.includes(`Sala: ${sala}`), copiado.split('\n')[0]);
 check('y la contrasena', copiado.includes(`Contrasena: ${CLAVE}`));
-check('y avisa de que hace falta su propia copia del juego',
-  /tu propia copia del juego/.test(copiado));
+// Y dice CUAL hace falta. Quien lo recibe tiene que ir a por su copia de ese
+// juego, y decirlo en el mensaje le ahorra abrir nada para enterarse.
+check('y avisa de que hace falta su propia copia, diciendo de que juego',
+  /tu propia copia de Rojo Fuego/i.test(copiado),
+  copiado.split('\n').pop());
 // La frontera de siempre, y aqui es donde se ve de verdad: lo que sale de la
 // pagina para mandarselo a alguien son tres lineas de texto. Nunca el juego.
 check('lo copiado son unas lineas de texto, no un fichero',
@@ -110,10 +113,62 @@ check('lo copiado son unas lineas de texto, no un fichero',
 check('desde localhost no se manda un enlace que no valdria',
   !copiado.includes('http'), copiado.split('\n').join(' | '));
 
+// ---------- la sala sabe a que se juega y con que mundo ----------
+//
+// Es lo que permite que el enlace sea corto -la semilla ya no va dentro, que
+// eran cien caracteres de base64 en medio de un mensaje de WhatsApp- y lo que
+// permite decirle a quien llega que ROM necesita antes de que la busque.
+const loQueDiceLaSala = await anfitrion.evaluate((codigo) => {
+  const protocolo = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const socket = new WebSocket(`${protocolo}//${location.host}/signaling`);
+  return new Promise((resolver) => {
+    const reloj = setTimeout(() => resolver(null), 8000);
+    socket.addEventListener('open', () =>
+      socket.send(JSON.stringify({ type: 'ask-room', roomCode: codigo })),
+    );
+    socket.addEventListener('message', (e) => {
+      clearTimeout(reloj);
+      socket.close();
+      resolver(JSON.parse(String(e.data)));
+    });
+  });
+}, sala);
+
+const deLaSala = loQueDiceLaSala?.datos;
+check('la sala dice a que juego se juega', deLaSala?.gameCode === 'BPRS', deLaSala?.gameCode);
+check('y guarda la semilla, que es lo que se saca del enlace', deLaSala?.semilla === semilla);
+// El nombre del fichero del anfitrion no. Se sabe al entrar, donde ya hay
+// contrasena de por medio; como alguien llama a su fichero no es asunto de
+// quien teclee codigos al azar.
+check('pero no como se llama el fichero del anfitrion',
+  deLaSala !== undefined && deLaSala.fileName === undefined, JSON.stringify(deLaSala));
+
+const inventada = await anfitrion.evaluate(() => {
+  const protocolo = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const socket = new WebSocket(`${protocolo}//${location.host}/signaling`);
+  return new Promise((resolver) => {
+    const reloj = setTimeout(() => resolver(null), 8000);
+    socket.addEventListener('open', () =>
+      socket.send(JSON.stringify({ type: 'ask-room', roomCode: 'ZZZZZZ' })),
+    );
+    socket.addEventListener('message', (e) => {
+      clearTimeout(reloj);
+      socket.close();
+      resolver(JSON.parse(String(e.data)));
+    });
+  });
+});
+check('y de una sala que no existe no se inventa nada',
+  inventada?.type === 'error' && inventada?.code === 'sala-no-encontrada',
+  JSON.stringify(inventada));
+
 // ---------- quien recibe el enlace ----------
-const datos = new URLSearchParams({ sala, clave: CLAVE, semilla });
+//
+// El enlace de verdad: solo el codigo y la contrasena. La semilla se la pide a
+// la sala al abrirlo.
+const datos = `${sala}:${encodeURIComponent(CLAVE)}`;
 const invitado = await nuevaPestana();
-await invitado.goto(`${URL}#${datos.toString()}`, { waitUntil: 'load' });
+await invitado.goto(`${URL}#${datos}`, { waitUntil: 'load' });
 await esperarElNucleo(invitado);
 
 const cartel = invitado.locator('.modal[open]');
@@ -130,6 +185,10 @@ check('la invitacion se borra de la direccion en cuanto se lee',
 // Lo unico que se le pide es lo unico que el enlace no puede traer.
 check('se le pide su copia del juego, dentro del cartel',
   (await cartel.locator('.dropzone').count()) === 1);
+// Y se le dice CUAL, que es lo que no se podia antes de que la sala lo contara.
+const loQuePide = ((await cartel.textContent()) ?? '').replace(/\s+/g, ' ');
+check('y se le dice que juego necesita, no "tu ROM" a secas',
+  /Rojo Fuego/i.test(loQuePide), loQuePide.slice(0, 120));
 check('y no hay dos zonas de carga en la pagina',
   (await invitado.locator('.dropzone').count()) === 1);
 
@@ -170,8 +229,13 @@ check('sigue siendo el cartel de la invitacion el que esta delante',
   (await cartel.locator('.modal__title').textContent()) === 'Te han invitado a jugar');
 
 // ---------- un boton ----------
-const unirse = invitado.getByRole('button', { name: 'Unirme a la sala' });
-check('aparece el boton de unirse', (await unirse.count()) === 1);
+//
+// Se elige como en el aleatorizador, con su misma lista: es la misma decision.
+// La primera vez no hay nada que seguir, asi que solo esta el hueco de empezar.
+check('no hay ninguna partida que seguir todavia',
+  (await invitado.locator('.modal[open] .hueco--partida').count()) === 0);
+const unirse = invitado.getByRole('button', { name: '+ Entrar y empezar' });
+check('aparece el boton de entrar', (await unirse.count()) === 1);
 await unirse.click();
 
 // Rehacer el mundo tarda: es generar la copia otra vez desde su semilla.
@@ -211,10 +275,13 @@ check('y se le ensena la sala en la que esta',
 // detras del #- asi que sin escuchar ese cambio no pasaba absolutamente nada:
 // ni cartel, ni sala, ni aviso. Se descubrio aqui, intentando escribir esta
 // misma prueba.
-await invitado.evaluate((url) => { globalThis.location.hash = url; }, datos.toString());
+await invitado.evaluate((url) => { globalThis.location.hash = url; }, datos);
 await invitado.waitForTimeout(1500);
 check('con la pagina ya abierta, el enlace tambien abre el cartel',
-  (await invitado.locator('.modal[open] .elegir, .modal[open] .dropzone').count()) >= 1);
+  (await invitado
+    .locator('.modal[open]')
+    .filter({ hasText: 'Te han invitado a jugar' })
+    .count()) === 1);
 // Se cierra solo el de la invitacion: el de la sala tambien esta abierto por
 // detras, de cuando entro.
 await invitado
@@ -236,42 +303,36 @@ await invitado.close();
 await anfitrion.waitForTimeout(2500);
 
 const jueves = await mismoNavegador.newPage();
-await jueves.goto(`${URL}#${datos.toString()}`, { waitUntil: 'load' });
+await jueves.goto(`${URL}#${datos}`, { waitUntil: 'load' });
 await esperarElNucleo(jueves);
 // Vuelve a hacer falta su copia del juego: el enlace sigue sin traerla.
 await jueves.setInputFiles('input[type=file][accept*=".gba"]', ROM);
 await jueves.waitForTimeout(3000);
 
-const eleccion = jueves.locator('.modal[open] .elegir');
-check('al volver con el mismo enlace se puede elegir que hacer',
-  (await eleccion.count()) === 1);
-
 const opciones = await jueves.evaluate(() =>
-  [...document.querySelectorAll('.modal[open] .elegir__opcion')].map((l) => ({
-    texto: (l.textContent ?? '').replace(/\s+/g, ' ').trim(),
-    marcada: l.querySelector('input')?.checked === true,
-  })),
+  [...document.querySelectorAll('.modal[open] .huecos > *')].map((e) =>
+    (e.textContent ?? '').replace(/\s+/g, ' ').trim(),
+  ),
 );
+check('al volver con el mismo enlace se puede elegir que hacer',
+  opciones.length === 2, opciones.join(' / '));
 check('se ofrece seguir la partida que quedo a medias',
-  opciones.some((o) => o.texto.startsWith('Seguir')),
-  opciones.map((o) => o.texto).join(' / '));
+  opciones.some((t) => t.includes('donde la dejaste')), opciones.join(' / '));
+check('y la que se ofrece es la que se jugo, con su nombre y cuando',
+  opciones.some((t) => /jugada/.test(t)), opciones[0]);
 check('y tambien empezar una nueva en el mismo mundo',
-  opciones.some((o) => o.texto.includes('Empezar una partida nueva')));
-// Quien vuelve a abrir el enlace dias despues viene a seguir, no a empezar de
-// cero. Que sea lo marcado por defecto es la diferencia entre un clic y ninguno.
-check('y viene marcada la de seguir, que es a lo que se vuelve',
-  opciones[0]?.marcada === true && opciones[0]?.texto.startsWith('Seguir'),
-  opciones[0]?.texto);
+  opciones.some((t) => t.includes('Empezar una partida nueva')));
 // Que no se pierde nada es lo que hay que decir: empezar otra es la opcion que
 // da miedo pulsar.
+const explica = ((await jueves.locator('.modal[open]').textContent()) ?? '').replace(/\s+/g, ' ');
 check('y se dice que empezar otra no toca lo que ya tienes',
-  opciones.some((o) => o.texto.includes('sin tocar lo que ya tienes')));
+  explica.includes('no toca lo que ya tienes'), explica.slice(0, 80));
 
 // Seguir no genera nada: se abre lo que ya estaba.
 const antesDeSeguir = await jueves.evaluate(
   () => JSON.parse(globalThis.localStorage.getItem('emupoke.partidas') ?? '[]').length,
 );
-await jueves.getByRole('button', { name: 'Seguir y unirme a la sala' }).click();
+await jueves.locator('.modal[open] .hueco--partida .hueco__abrir').first().click();
 await jueves.locator('.field__value.room-code').waitFor({ timeout: 120_000 }).catch(() => {});
 const despuesDeSeguir = await jueves.evaluate(() => ({
   cuantas: JSON.parse(globalThis.localStorage.getItem('emupoke.partidas') ?? '[]').length,

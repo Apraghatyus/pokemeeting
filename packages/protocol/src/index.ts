@@ -23,10 +23,38 @@ export type ErrorCode =
   | 'peticion-invalida'
   | 'demasiados-intentos';
 
+/**
+ * Lo que se puede saber de una sala ANTES de entrar en ella.
+ *
+ * Existe para que un enlace de invitacion sea corto. Antes llevaba la semilla
+ * dentro -cien caracteres de base64 en medio de un mensaje de WhatsApp- y ahora
+ * la guarda la sala: el enlace solo lleva el codigo y la contrasena, y quien lo
+ * abre pregunta por lo demas.
+ *
+ * Lo segundo que resuelve es poder decirle a quien llega QUE juego necesita.
+ * Antes se le pedia "tu ROM" a secas y, si ponia otra edicion, se enteraba
+ * despues. Ahora se le dice cual antes de que busque el fichero.
+ *
+ * NO lleva el nombre del fichero del anfitrion. Se sabe al entrar -ahi ya hay
+ * contrasena de por medio- pero esto se puede preguntar sin credenciales, y
+ * como alguien llama a su fichero no es asunto de nadie.
+ */
+export type DatosDeSala = {
+  roomCode: string;
+  /** Codigo de juego de la ROM del anfitrion, para decir a que se juega. */
+  gameCode: string;
+  /** El titulo de su cabecera, por si el codigo no se conoce. */
+  title: string;
+  /** Su semilla, o null si juega la ROM tal cual. */
+  semilla: string | null;
+};
+
 /** Mensajes del navegador hacia el servidor. */
 export type ClientMessage =
-  | { type: 'create-room'; password: string; rom: RomFingerprint }
+  | { type: 'create-room'; password: string; rom: RomFingerprint; semilla?: string | null }
   | { type: 'join-room'; roomCode: string; password: string; rom: RomFingerprint }
+  /** Que juego y que mundo hay en esa sala, para quien abre una invitacion. */
+  | { type: 'ask-room'; roomCode: string }
   /** Carga util de WebRTC (oferta, respuesta o candidato ICE) para el otro par. */
   | { type: 'signal'; data: unknown }
   | { type: 'leave' };
@@ -37,8 +65,17 @@ export type ServerMessage =
   | { type: 'room-joined'; roomCode: string; peerRom: RomFingerprint }
   | { type: 'peer-joined'; peerRom: RomFingerprint }
   | { type: 'peer-left' }
+  | { type: 'room-info'; datos: DatosDeSala }
   | { type: 'signal'; data: unknown }
   | { type: 'error'; code: ErrorCode; message: string };
+
+/**
+ * Lo que puede medir una semilla por el cable.
+ *
+ * Son unos cien caracteres: marca, dos CRC, el numero y los ajustes en base64.
+ * El tope esta para que nadie use la sala como almacen de lo que quiera.
+ */
+export const MAX_SEMILLA = 512;
 
 /** Alfabeto de los codigos de sala: sin caracteres que se confundan al dictarlos. */
 export const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';

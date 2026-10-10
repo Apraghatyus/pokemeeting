@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { RomCompatibility } from '@emupoke/pokemon';
+import { describeGame, type RomCompatibility } from '@emupoke/pokemon';
 import { textoDeInvitacion } from '../core/invitacion';
 import type { Semilla } from '../core/semilla';
 import { MAX_RECONNECT_ATTEMPTS, type SessionState } from '../net/useSession';
@@ -23,6 +23,8 @@ type Props = {
    * ROM tal cual, y entonces no hay nada que rehacer.
    */
   semilla: Semilla | null;
+  /** Codigo del juego que jugamos, para decir en el mensaje cual hace falta. */
+  gameCode: string | null;
 };
 
 /**
@@ -197,7 +199,7 @@ const Compatibility = ({ report }: { report: RomCompatibility }) => {
 
 /* ---------- con sala: credenciales ---------- */
 
-const RoomCredentials = ({ state, onLeave, onRetry, semilla }: Props) => {
+const RoomCredentials = ({ state, onLeave, onRetry, semilla, gameCode }: Props) => {
   const [copied, setCopied] = useState<'no' | 'si' | 'fallo'>('no');
 
   const copyAll = async () => {
@@ -206,7 +208,10 @@ const RoomCredentials = ({ state, onLeave, onRetry, semilla }: Props) => {
       // El formato del mensaje vive en `invitacion.ts`, con el del enlace: son
       // la misma cosa y separarlos era pedir que se desajustaran.
       await navigator.clipboard.writeText(
-        textoDeInvitacion({ sala: state.roomCode, clave: state.password ?? '', semilla }),
+        textoDeInvitacion(
+          { sala: state.roomCode, clave: state.password ?? '', semilla },
+          gameCode ? describeGame(gameCode) : null,
+        ),
       );
       setCopied('si');
       setTimeout(() => setCopied('no'), 2200);
