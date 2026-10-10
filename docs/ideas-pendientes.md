@@ -1146,6 +1146,40 @@ Dos cosas que hay que decidir:
   Hay que apuntarlo por nuestra cuenta según se vea, no deducirlo del equipo de
   ahora. Es el mismo aviso que ya está en la sección del mapa.
 
+### Los objetos de revivir, solo por el suelo
+
+**Que no salgan nunca en una tienda.** Hoy sí pueden: las tiendas se aleatorizan
+repartiendo lo que esa ROM ya vendía en alguna tienda, y en Rojo Fuego los
+Revivir se venden de serie -la lista de Ciudad Azulona es `2,3,19,20,21,24,23,…`
+y ese 24 es un Revivir-, así que entran en el reparto.
+
+**Por qué quitarlos.** Si se pueden comprar, revivir es cuestión de dinero y la
+regla de "un debilitado está muerto" se queda en un trámite. Dejándolos solo en
+el suelo, encontrarse uno tirado en una ruta es un golpe de suerte de verdad: una
+segunda vida que te dio el mundo, no la tienda.
+
+**Dónde se toca.** En `apps/randomizer/src/tiendas.ts`, al construir el
+catálogo: hoy entra todo lo que la ROM vendía y basta con dejar fuera esos
+índices. Son dos líneas.
+
+Pero hay que hacerlo en **los dos sitios**, y esto es lo que se escapa: de las
+veintitrés tiendas, tres las aleatoriza el randomizer por su cuenta y nosotros
+solo tocamos las otras veinte. O sea que quitarlos de nuestro catálogo deja
+abierta la puerta de esas tres. Como las direcciones de todas ya se leen de su
+base de datos, lo que hay que hacer es pasar también por esas tres después y
+cambiar el Revivir que haya puesto por otra cosa del catálogo.
+
+**Confirmar los índices antes de codificarlo.** Se deducen: la tienda de Ciudad
+Verde es `4,13,14,18` y eso encaja exactamente con la tabla de objetos de
+siempre -Poké Ball, Poción, Antídoto, Antiparaliz-, donde el 24 es Revivir y el
+25 Máx. Revivir. Encaja, pero es una deducción: media hora mirando la tienda
+dentro del juego lo confirma y evita quitar lo que no era.
+
+**Y lo que NO hay que tocar.** Los objetos del suelo son otra opción del
+aleatorizador (`objetos`, `setFieldItemsMod`) y los reparte el randomizer, no
+nosotros. Ahí los Revivir tienen que poder seguir saliendo: es justamente lo que
+hace que la regla valga la pena.
+
 ### En un Soul Link, la dificultad viene en la invitación
 
 **Si invitas a alguien, la dificultad va fijada desde el enlace.** No es un
