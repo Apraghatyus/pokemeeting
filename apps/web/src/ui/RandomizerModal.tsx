@@ -94,7 +94,21 @@ const SUPPORTED = new Set([
 ]);
 
 /** Lo que viene marcado al abrir: la mezcla habitual de una partida aleatoria. */
-const DEFAULT_SELECTION = ['salvajes', 'iniciales', 'entrenadores', 'movimientos'];
+/**
+ * Lo que viene marcado al abrir.
+ *
+ * Son las cuatro de siempre mas las tiendas. Las tiendas se anadieron porque se
+ * reporto que "no funcionaban", y lo que pasaba es que no estaban: la casilla
+ * existia, el servicio las aleatoriza -comprobado, cambia las listas de objetos
+ * de los centros comerciales- y nadie la marcaba, porque para verla hay que
+ * bajar por una lista de quince.
+ *
+ * Las que siguen apagadas lo estan a proposito: MTs, objetos del mapa,
+ * estadisticas, tipos y habilidades cambian como se juega de formas que conviene
+ * elegir a mano. Las tiendas no: cambian lo que te venden, y eso es justo lo que
+ * la gente espera de una copia aleatorizada.
+ */
+const DEFAULT_SELECTION = ['salvajes', 'iniciales', 'entrenadores', 'movimientos', 'tiendas'];
 
 /**
  * Se abre al cargar una ROM y pregunta como se quiere jugar.
@@ -487,7 +501,7 @@ export const RandomizerModal = ({
       title={progress.fase === 'hecho' ? 'Partida aleatorizada' : 'Randomizer'}
       subtitle={
         progress.fase === 'hecho'
-          ? 'Ya esta corriendo tu copia aleatorizada.'
+          ? ''
           : 'Semillas · Opciones · Partida'
       }
       pie={

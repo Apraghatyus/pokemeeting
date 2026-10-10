@@ -103,15 +103,19 @@ check('se ven los huecos que quedan libres', forma.libres === 3, `${forma.libres
 // comparten todas las ROMs, asi que si una partida de otro juego ocupa un hueco
 // hay que verla. Si no, el contador dice 1/3 y debajo solo hay dos huecos:
 // parece que falte uno.
-const cuadra = await modal.evaluate(() => {
-  const texto = document.querySelector('.cuenta')?.textContent?.trim() ?? '';
+// Se busca DENTRO del dialogo abierto y no con `document`, que es global: el
+// cartel de fin de partida tambien tiene un `.cuenta` -el de las medallas- y
+// aunque su dialogo este cerrado sigue en el documento. Buscando por fuera salia
+// el suyo y la comprobacion fallaba por el sitio equivocado.
+const cuadra = await modal.evaluate((caja) => {
+  const texto = caja.querySelector('.cuenta')?.textContent?.trim() ?? '';
   const [usadas, tope] = texto.split('/').map(Number);
   return {
     texto,
     tope,
     // Todo lo que ocupa o puede ocupar un hueco, se llame como se llame.
-    dibujados: document.querySelectorAll('.hueco').length,
-    ocupados: document.querySelectorAll('.hueco--partida, .hueco--ajena').length,
+    dibujados: caja.querySelectorAll('.hueco').length,
+    ocupados: caja.querySelectorAll('.hueco--partida, .hueco--ajena').length,
     usadas,
   };
 });
