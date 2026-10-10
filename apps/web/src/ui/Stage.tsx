@@ -428,7 +428,9 @@ export const Stage = ({
             solo en la pequena. Si estuviera solo en la del companero, al
             intercambiar desapareceria y no habria forma de volver. */}
         {connected && <BotonIntercambiar onSwap={() => onCambiarPantalla()} />}
-        {!hasRom && <div className="pantalla__encima">{dropzone}</div>}
+        {/* Sin zona de carga no se pinta la caja: con una invitacion delante,
+            la ROM se pide dentro de su cartel y aqui quedaria un hueco vacio. */}
+        {!hasRom && dropzone && <div className="pantalla__encima">{dropzone}</div>}
       </div>
 
       {puedeDeslizar && (

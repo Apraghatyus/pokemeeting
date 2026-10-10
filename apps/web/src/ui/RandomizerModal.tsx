@@ -25,6 +25,7 @@ import {
 import { parseGameCode } from '@emupoke/pokemon';
 import { crc32 } from '../core/romHeader';
 import { codificarSemilla, descodificarSemilla } from '../core/semilla';
+import { rehacerDesdeSemilla } from '../core/rehacer';
 import { empaquetar, leerPaquete, nombreDeFichero } from '../core/paquete';
 import { Modal } from './Modal';
 
@@ -110,7 +111,7 @@ const DEFAULT_SELECTION = ['salvajes', 'iniciales', 'entrenadores', 'movimientos
  * hacia arriba a proposito: quedarse corto es lo unico que hace que la gente
  * recargue la pagina.
  */
-const textoDeEspera = (cola: PuestoEnCola): string => {
+export const textoDeEspera = (cola: PuestoEnCola): string => {
   if (cola.delante === 0) return 'Eres el siguiente. Empieza en cuanto quede un hueco.';
 
   const segundos = cola.segundosPorCopia;
@@ -408,44 +409,18 @@ export const RandomizerModal = ({
       setProgress({ fase: 'error', message: 'Esa semilla no se entiende. Copiala entera.' });
       return;
     }
-    if (semilla.baseCrc32 !== base.crc32) {
-      setProgress({
-        fase: 'error',
-        message:
-          'Esa semilla es de otra copia de la ROM original. Hace falta exactamente la misma con la que se creo.',
-      });
-      return;
-    }
 
     setProgress({ fase: 'trabajando' });
     try {
-      const result = await randomizeRom(
-        { settingsString: semilla.ajustes, seed: semilla.semilla },
-        base.bytes,
-        avisarDeLaCola,
-      );
-      const generada = crc32(result.rom);
-      if (generada !== semilla.crc32) {
-        setProgress({
-          fase: 'error',
-          message:
-            'Lo generado no coincide con lo que dice la semilla, seguramente por una version distinta del randomizer. No lo cargo: seria otro mundo.',
-        });
-        return;
-      }
-      const fileName = nombreParaNueva(base.fileName);
-      await onRandomized(result.rom, fileName);
-      registrar({
-        fichero: fileName,
-        baseNombre: base.fileName,
-        baseCrc32: base.crc32,
-        semilla: semilla.semilla,
-        ajustes: semilla.ajustes,
-        crc32: generada,
-        cambiado: result.summary.changed,
-        nombre: null,
-        juego: juego?.label ?? null,
-        generacion: juego?.generacion ?? null,
+      // La comprobacion de que lo generado es de verdad el mismo mundo esta en
+      // `rehacer.ts`, compartida con el enlace de invitacion: es el sitio donde
+      // dos copias habrian acabado separandose.
+      await rehacerDesdeSemilla({
+        base,
+        semilla,
+        juego: { label: juego?.label ?? null, generacion: juego?.generacion ?? null },
+        cargar: onRandomized,
+        alEsperar: avisarDeLaCola,
       });
       onClose();
     } catch (error) {

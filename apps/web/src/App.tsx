@@ -11,7 +11,8 @@ import { useEquipoOrdenado } from './core/ordenEquipo';
 import { useEsEstrecha } from './core/useEsEstrecha';
 import { useEspecies } from './core/useEspecies';
 import { useMandoTactil } from './core/useMandoTactil';
-import { codificarSemilla } from './core/semilla';
+import { codificarSemilla, type Semilla } from './core/semilla';
+import { leerInvitacion, olvidarInvitacion, type Invitacion } from './core/invitacion';
 import { nombreDePartida, sePuedeRehacer, todasLasPartidas } from './core/partidas';
 import { motesDebilitados, parseGameCode } from '@emupoke/pokemon';
 import { EquipoPanel } from './ui/EquipoPanel';
@@ -20,6 +21,7 @@ import { IntercambioModal } from './ui/IntercambioModal';
 import { useIntercambio } from './core/useIntercambio';
 import { FinModal } from './ui/FinModal';
 import { TOTAL_LIGA, type PasoLiga } from './ui/Liga';
+import { InvitacionModal } from './ui/InvitacionModal';
 import { RandomizerModal } from './ui/RandomizerModal';
 import { RomDropZone, RoomDropZoneHint } from './ui/RomDropZone';
 import { RoomModal } from './ui/RoomModal';
@@ -41,6 +43,18 @@ export const App = () => {
   // para el de tu companero: por la red viaja el numero, no el nombre.
   const especies = useEspecies(emulator.romBytesRef, state.romName);
 
+  // La invitacion se lee UNA vez, al arrancar, y se borra de la barra de
+  // direcciones en el mismo momento: ahi dentro va la contrasena de la sala, y
+  // sin borrarla recargar la pagina a media partida volveria a lanzar el cartel
+  // de "te han invitado" sobre una sala en la que ya se esta.
+  const [invitacion, setInvitacion] = useState<Invitacion | null>(() => leerInvitacion());
+  useEffect(() => {
+    if (invitacion) olvidarInvitacion();
+    // Solo al arrancar: si se pusiera `invitacion` como dependencia, cerrar el
+    // cartel volveria a ejecutarlo para nada.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [roomOpen, setRoomOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [tratoOpen, setTratoOpen] = useState(false);
@@ -54,7 +68,7 @@ export const App = () => {
   // este en un boton: si no, las flechas moverian al personaje por detras.
   const keyboardOwner = useKeyboardOwnership(
     emulator.coreRef,
-    roomOpen || menuOpen || randomizerOpen || tratoOpen,
+    roomOpen || menuOpen || randomizerOpen || tratoOpen || invitacion !== null,
   );
 
   // Espacio enciende y apaga el avance rapido, como en casi cualquier emulador.
@@ -81,9 +95,15 @@ export const App = () => {
   // Al cargar una ROM se pregunta como quiere jugarse, antes de empezar:
   // aleatorizar despues de jugar un rato significa perder la partida. No se
   // pregunta por las ROMs que generamos nosotros, o seria un bucle.
+  //
+  // Y tampoco se pregunta a quien llega por un enlace de invitacion: ahi el
+  // mundo ya esta decidido -es el de quien invita, y viene en su semilla-, asi
+  // que preguntarle que quiere aleatorizar seria ofrecerle acabar en otro mundo
+  // distinto del de su companero.
   useEffect(() => {
+    if (invitacion) return;
     if (state.romSource === 'usuario' && state.romName) setRandomizerOpen(true);
-  }, [state.romName, state.romSource]);
+  }, [state.romName, state.romSource, invitacion]);
 
   // La huella de la ROM va en una ref y no en el estado de la sesion porque los
   // callbacks de la senalizacion viven mas que el render que los creo: leerla
@@ -101,6 +121,24 @@ export const App = () => {
           }
         : null;
   }, [state.header, state.romName]);
+
+  /**
+   * Espera a que la huella de la ROM este publicada.
+   *
+   * Hace falta al entrar por un enlace de invitacion: ahi se genera el mundo y
+   * se entra en la sala seguido, y la huella se publica en el efecto de arriba,
+   * que todavia no ha corrido cuando la copia acaba de cargarse. En ese hueco,
+   * entrar fallaba con "carga primero tu ROM" aunque la partida ya estuviera en
+   * marcha.
+   *
+   * Se rinde a los cinco segundos en vez de esperar para siempre: si la ROM no
+   * ha llegado en ese tiempo es que algo fallo antes, y la sala dira que falta.
+   */
+  const esperarLaRom = async (): Promise<void> => {
+    for (let i = 0; i < 100 && romRef.current === null; i += 1) {
+      await new Promise((sigue) => setTimeout(sigue, 50));
+    }
+  };
 
   const session = useSession(emulator.canvasRef, romRef);
 
@@ -261,12 +299,18 @@ export const App = () => {
               onVolume={session.setPartnerVolume}
             />
           }
+          /* Con una invitacion delante, la zona de carga vive DENTRO de su
+             cartel: ahi es donde se le pide la ROM a quien acaba de llegar, y
+             dos zonas de carga a la vez en la pagina no son dos sitios donde
+             elegir, son la misma cosa dos veces. */
           dropzone={
-            <RomDropZone
-              onRom={emulator.openRom}
-              disabled={state.status !== 'ready'}
-              hint={RoomDropZoneHint(state.status)}
-            />
+            invitacion ? null : (
+              <RomDropZone
+                onRom={emulator.openRom}
+                disabled={state.status !== 'ready'}
+                hint={RoomDropZoneHint(state.status)}
+              />
+            )
           }
         />
           </div>
@@ -394,6 +438,31 @@ export const App = () => {
         escribirGuardado={emulator.escribirGuardado}
       />
 
+      {/* Quien llega por un enlace no tiene que escribir nada: el codigo, la
+          contrasena y la semilla venian dentro. Lo unico que se le pide es su
+          copia del juego, que es lo unico que el enlace no puede traer. */}
+      <InvitacionModal
+        invitacion={invitacion}
+        onClose={() => setInvitacion(null)}
+        baseRom={emulator.baseRomRef}
+        gameCode={state.header?.gameCode ?? null}
+        romCrc32={state.header?.crc32 ?? null}
+        nucleoListo={state.status === 'ready'}
+        hint={RoomDropZoneHint(state.status)}
+        onRom={emulator.openRom}
+        onRandomized={emulator.openRomBytes}
+        onContinuar={emulator.openSavedGame}
+        existeGuardada={emulator.existeGuardada}
+        onUnirse={async (sala, clave) => {
+          await esperarLaRom();
+          await session.joinRoom(sala, clave);
+          // Se abre la sala para que se vea en que quedo: si el codigo o la
+          // contrasena no valen, el aviso sale ahi. Cerrar el cartel y no
+          // enseñar nada mas dejaria a quien llega sin saber si entro.
+          setRoomOpen(true);
+        }}
+      />
+
       <RoomModal
         open={roomOpen}
         onClose={() => setRoomOpen(false)}
@@ -406,6 +475,9 @@ export const App = () => {
           setRoomOpen(false);
         }}
         onRetry={session.retryNow}
+        /* El enlace que se comparte lleva el mundo dentro: asi quien entra no
+           tiene que pedir la semilla aparte ni entender para que sirve. */
+        semilla={semillaEnCurso(state.header?.crc32 ?? null)}
       />
     </div>
   );
@@ -435,6 +507,27 @@ const generacionDelEquipo = (equipo: EquipoResumen | null): number =>
 
 const LIGA_COMPLETA: readonly PasoLiga[] = Array.from({ length: TOTAL_LIGA }, () => 'derrotado');
 
+/**
+ * La semilla del mundo que corre ahora, si es uno que se sabe rehacer.
+ *
+ * Se busca por el CRC de la ROM cargada, que es lo que une una partida con su
+ * copia. Devuelve null jugando una ROM tal cual y tambien en las partidas
+ * antiguas que nacieron sin semilla: en los dos casos no hay mundo que pasarle
+ * a nadie, y el enlace lleva solo las credenciales.
+ */
+const semillaEnCurso = (crc32: string | null): Semilla | null => {
+  const partida = crc32
+    ? todasLasPartidas().find((p) => p.crc32 === crc32 && sePuedeRehacer(p))
+    : undefined;
+  if (!partida) return null;
+  return {
+    baseCrc32: partida.baseCrc32,
+    crc32: partida.crc32!,
+    semilla: partida.semilla!,
+    ajustes: partida.ajustes!,
+  };
+};
+
 const nombreDeLaPartidaEnCurso = (crc32: string | null): string | null => {
   if (!crc32) return null;
   const partida = todasLasPartidas().find((p) => p.crc32 === crc32);
@@ -444,17 +537,10 @@ const nombreDeLaPartidaEnCurso = (crc32: string | null): string | null => {
 const CopiarSemilla = ({ crc32 }: { crc32: string | null }) => {
   const [copiada, setCopiada] = useState(false);
 
-  const partida = crc32
-    ? todasLasPartidas().find((p) => p.crc32 === crc32 && sePuedeRehacer(p))
-    : undefined;
-  if (!partida) return null;
+  const semilla = semillaEnCurso(crc32);
+  if (!semilla) return null;
 
-  const texto = codificarSemilla({
-    baseCrc32: partida.baseCrc32,
-    crc32: partida.crc32!,
-    semilla: partida.semilla!,
-    ajustes: partida.ajustes!,
-  });
+  const texto = codificarSemilla(semilla);
 
   const copiar = async () => {
     try {

@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import type { RomCompatibility } from '@emupoke/pokemon';
+import { textoDeInvitacion } from '../core/invitacion';
+import type { Semilla } from '../core/semilla';
 import { MAX_RECONNECT_ATTEMPTS, type SessionState } from '../net/useSession';
 import { Modal } from './Modal';
 
@@ -12,6 +14,15 @@ type Props = {
   onJoin: (roomCode: string, password: string) => void;
   onLeave: () => void;
   onRetry: () => void;
+  /**
+   * El mundo que estamos jugando, si es uno aleatorizado que se sabe rehacer.
+   *
+   * Va dentro del enlace que se comparte. Sin esto, quien entra en la sala
+   * llega a un mundo distinto del nuestro, y los dos tardan un rato en
+   * entender por que los Pokemon de cada ruta no cuadran. Es null jugando la
+   * ROM tal cual, y entonces no hay nada que rehacer.
+   */
+  semilla: Semilla | null;
 };
 
 /**
@@ -186,28 +197,17 @@ const Compatibility = ({ report }: { report: RomCompatibility }) => {
 
 /* ---------- con sala: credenciales ---------- */
 
-/**
- * Texto que se copia al portapapeles.
- *
- * Incluye la direccion de la pagina solo si sirve de algo para quien la reciba:
- * "localhost" apunta al ordenador de quien copia, no al de su amigo, asi que
- * mandarlo seria enganoso.
- */
-const shareText = (code: string, password: string): string => {
-  const { origin, hostname } = globalThis.location;
-  const usable = !['localhost', '127.0.0.1', '::1'].includes(hostname);
-  const lines = [`Sala: ${code}`, `Contrasena: ${password}`];
-  if (usable) lines.unshift(`Juega conmigo en ${origin}`);
-  return lines.join('\n');
-};
-
-const RoomCredentials = ({ state, onLeave, onRetry }: Props) => {
+const RoomCredentials = ({ state, onLeave, onRetry, semilla }: Props) => {
   const [copied, setCopied] = useState<'no' | 'si' | 'fallo'>('no');
 
   const copyAll = async () => {
     if (!state.roomCode) return;
     try {
-      await navigator.clipboard.writeText(shareText(state.roomCode, state.password ?? ''));
+      // El formato del mensaje vive en `invitacion.ts`, con el del enlace: son
+      // la misma cosa y separarlos era pedir que se desajustaran.
+      await navigator.clipboard.writeText(
+        textoDeInvitacion({ sala: state.roomCode, clave: state.password ?? '', semilla }),
+      );
       setCopied('si');
       setTimeout(() => setCopied('no'), 2200);
     } catch {
@@ -235,12 +235,14 @@ const RoomCredentials = ({ state, onLeave, onRetry }: Props) => {
       {state.password && (
         <>
           <button type="button" className="button--primary button--wide" onClick={() => void copyAll()}>
-            {copied === 'si' ? 'Credenciales copiadas' : 'Copiar credenciales'}
+            {copied === 'si' ? 'Enlace copiado' : 'Copiar invitacion'}
           </button>
           <p className="hint hint--center">
             {copied === 'fallo'
               ? 'El navegador no ha dejado copiar. Puedes leerlos de arriba.'
-              : 'Incluye codigo y contrasena'}
+              : semilla
+                ? 'Un enlace que entra directo, con tu mundo dentro'
+                : 'Un enlace que entra directo, con codigo y contrasena'}
           </p>
         </>
       )}
