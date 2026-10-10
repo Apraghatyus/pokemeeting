@@ -67,7 +67,13 @@ ejecútala en vez de fiarte de esta lista.
   Liga, equipo y sprites. `test:fin`, `test:derrota`, `test:victoria`,
   `test:fin:ui`
 - **Medallas con su imagen de verdad**, las conseguidas a color y las que
-  faltaron apagadas. Falta medir dónde vive el byte. `test:medallas`
+  faltaron apagadas, en una tira al lado del equipo con el **tope de nivel de
+  cada gimnasio** debajo de cada una, leído de tu ROM. A quien se pasa del tope
+  se le apaga la ficha. `test:medallas`, `test:lideres`, `test:tope:ui`
+- **Lo que pasó en cada partida terminada queda apuntado**, aunque todavía no se
+  enseñe: cómo acabó, por dónde iba y el equipo exacto con los cuatro
+  movimientos de cada Pokémon. Es la materia prima del historial y de los
+  perfiles. `test:historial`
 
 **Aleatorizar**
 
@@ -853,11 +859,46 @@ discusión después.
 
 ---
 
-## Estadísticas y perfiles
+## Cuentas, historial y porcentaje de victorias
 
 La idea es tener un sitio con el historial: cuántas partidas aleatorizadas has
 jugado, cuántas terminaste y cuántas se fueron al traste, y poder ordenarlas por
 el tipo de aleatorización.
+
+**Parte de esto ya se está recogiendo, aunque no se vea en ningún sitio.** Desde
+que una partida se da por terminada se apunta en el navegador qué pasó: si se
+ganó o se perdió, si fue por la pareja caída de un Soul Link, cuántas medallas
+se llevaban, y el equipo exacto de ese momento **con los cuatro movimientos de
+cada Pokémon**. Ver `apps/web/src/core/historial.ts` y `test:historial`.
+
+Se hizo así a propósito y conviene no deshacerlo: una partida terminada no se
+vuelve a jugar, así que un historial que empiece a llenarse el día que se
+escriba su pantalla nace vacío. Lo que falta por hacer es enseñarlo, no
+recogerlo.
+
+**Lo que falta, por orden:**
+
+1. **Manejo de usuarios.** Cuentas, sesión iniciada y un sitio donde vivan los
+   datos. Es lo que convierte "mi historial en este navegador" en "mi
+   historial". Lee el aviso de abajo antes de empezar: esto cambia el proyecto
+   de categoría.
+2. **Historial de partidas.** La lista de lo que ya se guarda, de la más
+   reciente a la más vieja.
+3. **Porcentaje de victorias.** Sale de dos datos que ya se apuntan -cómo acabó
+   y cuándo-, pero hay que decidir antes qué cuenta (más abajo).
+4. **Cada partida, desplegable.** Al abrir una fila: hasta dónde llegó -las
+   medallas-, qué equipo tenía y **qué cuatro movimientos tenía cada Pokémon**.
+   Todo eso está ya guardado; lo único que falta es ponerle nombre a los
+   números, que se hace con la ROM del jugador igual que en el panel del equipo
+   (`encontrarTablaNombres` para las especies; para los movimientos haría falta
+   su tabla, que aún no se ha localizado).
+
+**Una cosa que hay que resolver para el desplegable:** los nombres de los
+movimientos no están guardados, solo sus números. Eso es deliberado -es la misma
+frontera de siempre: por aquí no viaja nada de la ROM- pero significa que para
+enseñarlos hace falta tener cargada una copia del juego. Si alguien mira su
+historial sin ROM puesta, o se enseñan los números, o se guarda también el
+nombre el día que se apunta. Decidirlo antes de dibujar la pantalla.
 
 **Lo que hay que saber antes de empezar es que esto cambia el proyecto de
 categoría.** Hoy el servidor no guarda absolutamente nada: ni partidas, ni
@@ -908,6 +949,115 @@ Tres cosas que conviene fijar antes de dibujar nada:
 - **Si el porcentaje se enseña con pocas partidas.** Con tres jugadas, un 33% no
   dice nada y parece que sí. Suele ser mejor enseñar el número crudo hasta tener
   unas cuantas.
+
+---
+
+## Dificultad: Normal, Nuzlocke y Nuzlocke nivelada
+
+En el modal del aleatorizador, junto a las opciones, un selector de dificultad.
+No cambia la ROM: cambia **las reglas que el programa vigila** y lo que se
+apunta en el historial.
+
+**Normal.** Como hasta ahora. Se captura lo que se quiera cuando se quiera y el
+nivel máximo de los líderes no afecta a nada. Es lo que hay hoy.
+
+**Nuzlocke.** Tres reglas:
+
+- Solo se puede capturar **el primer Pokémon de cada ruta**. Si se te escapa o
+  cae, esa ruta se acabó.
+- Un Pokémon **debilitado está muerto**: o al PC o liberado.
+- Y de ahí sale la restricción que de verdad cuesta: **no se puede salir de un
+  Centro Pokémon ni curar** sin haber sacado antes del equipo a todos los
+  debilitados.
+
+**Nuzlocke nivelada.** Lo anterior más el tope de nivel por gimnasio: un Pokémon
+por encima del tope del líder que toca **no se puede usar**.
+
+### Lo que ya está hecho de esto
+
+Más de lo que parece, y conviene saberlo antes de empezar de cero:
+
+- **El tope de nivel de cada gimnasio se lee de la ROM**, también de una
+  aleatorizada. `lideres.ts`, `test:lideres`.
+- **A quien se pasa del tope ya se le apaga la ficha** y se le pone cuánto se
+  pasa. Hoy es solo un aviso. `test:tope:ui`.
+- **Los debilitados se detectan** en cada lectura del equipo, y en un Soul Link
+  ya se marca la pareja al otro lado. `test:soullink`.
+- **Las medallas se leen en vivo**, de la memoria, así que el tope que toca
+  cambia en cuanto ganas la medalla. `medallas.ts`, `test:medallas`.
+- **Se sabe escribir en la memoria del juego**: los intercambios meten los cien
+  bytes de un Pokémon y recargan el estado. `intercambio.ts`. Esto importa para
+  lo de abajo.
+
+### El problema de verdad: vigilar no es impedir
+
+Todo lo que hace este programa hoy es **mirar**. Lee la memoria cada pocos
+segundos y cuenta lo que ve. Las tres reglas de arriba piden otra cosa: impedir
+que el jugador haga algo dentro de su juego. Y ahí hay tres caminos, con precios
+muy distintos:
+
+**1. Avisar y apuntar (barato, y encaja con todo lo demás).** El programa
+detecta que se rompió una regla, lo dice, y marca la partida como rota en el
+historial. No impide nada. Es exactamente lo que ya se hace con la pareja caída
+de un Soul Link: *se marca, no se impone*, porque la partida es de quien juega.
+Lo que lo hace suficiente es el historial: una Nuzlocke con una regla rota deja
+de contar como Nuzlocke, y eso ya duele bastante.
+
+**2. Intervenir en la memoria (caro y delicado).** Se puede. Por ejemplo, poner
+a cero las Poké Balls de la mochila mientras la regla diga "aquí ya no se
+captura", y devolverlas después. Pero hay que tener claro el riesgo: se está
+escribiendo en la partida de alguien, y un fallo ahí no se ve hasta que el
+guardado está corrupto. Lo de curar en el Centro Pokémon es peor todavía: eso lo
+hace un guion del juego, no un dato, así que no hay un byte que tocar.
+
+**3. Parchear la ROM al aleatorizar (lo más limpio si se llega a hacer).**
+Las restricciones se meterían en el propio juego al generarlo, como hace el
+randomizer con lo demás. Es mucho más trabajo y hay que estudiarlo.
+
+**Recomendación para cuando se empiece:** hacer el 1 completo antes de pensar en
+el 2. Da el 90% del valor y no puede romperle la partida a nadie. El 2 solo
+compensa si alguien pide de verdad que el programa le ate las manos.
+
+### Qué rutas están gastadas: el dato ya lo llevan ellos
+
+**No hay que apuntarlo a mano.** Cada Pokémon lleva dentro el sitio donde se
+capturó, en la subestructura `M` de sus cien bytes -el lector ya la localiza, de
+ahí sale la bandera de huevo-. O sea que la lista de rutas gastadas sale de
+mirar el equipo, que es algo que ya se hace cada tres segundos. Está explicado
+con más detalle en **"Mapa de dónde has capturado"**, más arriba; las dos cosas
+se construyen sobre el mismo dato y conviene hacerlas juntas.
+
+Con eso basta para *contar* y para avisar después. Para avisar **antes** -"aquí
+ya capturaste, no lances"- hace falta además saber en qué mapa está el jugador
+ahora mismo, y eso todavía no se lee. El camino está abierto: el mapa actual
+vive en el bloque de guardado, en la memoria, y ese bloque ya se sabe localizar
+siguiendo el puntero de `0x020398ac`, que es como se leen las medallas en vivo.
+Ver `medallas.ts`, que explica por qué una dirección fija no vale.
+
+Dos cosas que hay que decidir:
+
+- **Qué cuenta como "una ruta".** Un mapa de GBA no es una ruta: la Ruta 3 son
+  varios mapas y una cueva tiene uno por planta, así que contar por mapa da tres
+  capturas en una cueva de tres pisos. Las Nuzlocke cuentan por zona, así que
+  haría falta una tabla de mapas a zonas, o una regla más tosca pero honesta
+  -"por mapa"- diciéndolo claramente.
+- **Qué pasa con los que se mueren.** El sitio lo lleva el Pokémon, así que un
+  Pokémon liberado se lleva el dato con él y su ruta volvería a parecer libre.
+  Hay que apuntarlo por nuestra cuenta según se vea, no deducirlo del equipo de
+  ahora. Es el mismo aviso que ya está en la sección del mapa.
+
+### En un Soul Link, la dificultad viene en la invitación
+
+**Si invitas a alguien, la dificultad va fijada desde el enlace.** No es un
+detalle de comodidad: dos personas jugando el mismo mundo con reglas distintas
+no están jugando la misma partida, y en un Soul Link eso se nota enseguida -uno
+suelta a un debilitado y el otro no, y las parejas dejan de cuadrar-.
+
+El camino ya está hecho: el enlace de invitación es corto porque **la semilla la
+guarda la sala** y quien lo abre la pide con el código (ver `invitacion.ts` y
+`ask-room` en el servidor de salas). La dificultad viaja igual, por el mismo
+sitio y con el mismo mensaje. Quien entra la ve antes de aceptar, junto al juego
+que hace falta, y no puede cambiarla por su cuenta.
 
 ---
 
