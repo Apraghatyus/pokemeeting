@@ -62,6 +62,10 @@ type Props = {
   /**
    * Hasta que nivel se puede subir antes del proximo gimnasio.
    *
+   * Sirve para apagar al que se haya pasado. El numero en si ya no se escribe
+   * aqui: lo dice la tira de medallas de al lado, debajo de la que toca, y
+   * decirlo dos veces era ruido.
+   *
    * Es una regla que se pone la gente, no del juego, asi que esto AVISA y no
    * impide nada: el Pokemon sigue jugando y quien decide es su dueño. Igual que
    * con la pareja caida de un Soul Link.
@@ -269,18 +273,6 @@ export const EquipoPanel = ({
           </button>
         )}
       </div>
-
-      {/* El tope del gimnasio que toca, con el nombre del lider: sin el nombre
-          el numero no se sabe de donde sale, y sabiendolo se puede comprobar
-          dentro del juego. */}
-      {tope && (
-        <p className="equipo__tope">
-          <span className="equipo__tope-nivel">Nv.{tope.nivel}</span>
-          <span className="equipo__tope-quien">
-            tope para el gimnasio {tope.gimnasio}, {tope.lider}
-          </span>
-        </p>
-      )}
 
       {ranuras.length === 0 && motivo ? (
         <p className="equipo__vacio">{motivo}</p>

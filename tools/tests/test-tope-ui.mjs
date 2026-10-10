@@ -92,29 +92,33 @@ await page.setInputFiles('input[type=file][accept*=".gba"]', ROM);
 await page.getByRole('button', { name: 'Jugar tal cual' }).click({ timeout: 20_000 }).catch(() => {});
 await page.waitForTimeout(3000);
 
-const tope = page.locator('.equipo--propio .equipo__tope');
-const textoDelTope = async () =>
-  ((await tope.first().textContent()) ?? '').replace(/\s+/g, ' ').trim();
+// El tope del gimnasio que toca ya no se escribe en una frase: lo dice la tira
+// de medallas, debajo de la que toca. Decirlo en los dos sitios era ruido.
+// Dentro de la tira: el cartel de fin tambien pinta sus ocho medallas, y
+// aunque su dialogo este cerrado sigue estando en el documento.
+const siguiente = page.locator('.medallas-tira .medalla--siguiente');
+const topeDeAhora = async () =>
+  ((await siguiente.locator('.medalla__tope').textContent()) ?? '').trim();
 
 // Sin partida guardada no hay medallas que leer, y sin medallas no se sabe que
 // gimnasio toca. Preferir el hueco a adivinar el primero no es un detalle: a
 // quien lleva cuatro medallas le pondria un tope treinta niveles por debajo.
-check('sin partida guardada no se inventa un gimnasio', (await tope.count()) === 0);
+check('sin partida guardada no se marca ningun gimnasio como el que toca',
+  (await siguiente.count()) === 0);
 
 // --- 1. el gimnasio que toca ---
 await page.setInputFiles('input[type=file][accept*=".sav"]', SAV);
 // Recorrer la ROM se retrasa a proposito para no estorbar al arranque, asi que
 // hay que darle su tiempo.
-await tope.first().waitFor({ state: 'visible', timeout: 25_000 }).catch(() => {});
-check('con la partida cargada aparece el tope', (await tope.count()) > 0);
+await siguiente.first().waitFor({ state: 'visible', timeout: 25_000 }).catch(() => {});
+check('con la partida cargada se marca el gimnasio que toca', (await siguiente.count()) === 1);
 
-const conUna = await textoDelTope();
-check('y es el del gimnasio que toca, no el del primero', /Nv\.21/.test(conUna), conUna);
-check('con el lider, para poder comprobarlo dentro del juego', /MISTY/i.test(conUna), conUna);
-check('y diciendo que gimnasio es', /gimnasio 2/i.test(conUna), conUna);
+const conUna = await topeDeAhora();
+check('y su tope es el del gimnasio que toca, no el del primero',
+  conUna === 'Nv.21', conUna);
 // Brock es el tope del primero y la partida ya tiene su medalla: si saliera su
 // numero seria que se esta leyendo el gimnasio equivocado.
-check('no el de Brock, que ya esta ganado', !/Nv\.14/.test(conUna), conUna);
+check('no el de Brock, que ya esta ganado', conUna !== 'Nv.14', conUna);
 
 // --- 1b. la tira de medallas sobre la partida ---
 //
@@ -154,9 +158,13 @@ check('y no se marca como dudosa, porque esta partida si tiene guardado',
 // --- 2. sigue a las medallas ---
 await page.setInputFiles('input[type=file][accept*=".sav"]', SAV_SIN);
 await page.waitForTimeout(6000);
-const sinNinguna = await textoDelTope();
+const sinNinguna = await topeDeAhora();
 check('quitando la medalla, el tope vuelve al primer gimnasio',
-  /Nv\.14/.test(sinNinguna) && /BROCK/i.test(sinNinguna), sinNinguna);
+  sinNinguna === 'Nv.14', sinNinguna);
+check('y la marca se mueve a la primera medalla', await page.evaluate(() => {
+  const todas = [...document.querySelectorAll('.medallas-tira .medalla')];
+  return todas.findIndex((m) => m.classList.contains('medalla--siguiente')) === 0;
+}));
 
 // --- 3. a quien se pasa, se le marca ---
 //
@@ -178,7 +186,10 @@ if (ESTADO) {
 }
 
 const fichas = await page.evaluate(() => {
-  const cap = document.querySelector('.equipo--propio .equipo__tope-nivel')?.textContent ?? '';
+  // El tope sale de la tira: es el numero que hay debajo de la medalla marcada
+  // como la que toca.
+  const cap =
+    document.querySelector('.medallas-tira .medalla--siguiente .medalla__tope')?.textContent ?? '';
   const tope = Number(cap.replace(/[^0-9]/g, ''));
   return [...document.querySelectorAll('.equipo--propio .ficha:not(.ficha--hueco)')].map((f) => {
     const nivel = Number(
@@ -223,8 +234,40 @@ if (fichas.length === 0) {
 
 // Al companero no se le pone TU tope: su ROM y sus medallas estan en su
 // ordenador, y marcarle sus Pokemon por una regla que no es la suya es mentir.
-check('al companero no se le pone tu tope',
-  (await page.locator('.equipo--companero .equipo__tope').count()) === 0);
+check('al companero no se le apaga ningun Pokemon por tu tope',
+  (await page.locator('.equipo--companero .ficha--pasado').count()) === 0);
+
+// --- 3b. y a pantalla completa la partida sigue siendo la partida ---
+//
+// ESTO SE ROMPIO Y NO SE NOTO HASTA VERLO. La tira se escondia con
+// `display: none` en pantalla completa, y eso la saca del grid: dejaba de ser
+// una celda y todo lo de detras se corria una columna, asi que la partida caia
+// en la columna de las medallas. Medido: 920 pixeles de ancho fuera, 62 dentro.
+//
+// Se mide el ancho de la partida contra el de la ventana porque es lo unico que
+// lo habria cazado: no hubo error, ni aviso, ni nada roto en consola.
+await page.locator('.pantalla__boton--completa').first().click({ timeout: 8_000 });
+await page.waitForTimeout(1500);
+
+const enCompleta = await page.evaluate(() => {
+  const partida = document.querySelector('.pantallas')?.getBoundingClientRect();
+  return {
+    entro: document.fullscreenElement !== null,
+    ancho: partida ? Math.round(partida.width) : 0,
+    ventana: window.innerWidth,
+    medallas: document.querySelectorAll('.medallas-tira .medalla').length,
+  };
+});
+
+check('se entra en pantalla completa', enCompleta.entro === true);
+check('y la partida se queda con casi toda la ventana, no con una columna',
+  enCompleta.ancho > enCompleta.ventana * 0.6,
+  `${enCompleta.ancho}px de ${enCompleta.ventana}px`);
+// Y la tira se queda: en escritorio cuesta sesenta pixeles de ancho, que
+// sobran, y esconderla era lo que corria las columnas.
+check('y las medallas siguen ahi', enCompleta.medallas === 8, String(enCompleta.medallas));
+await page.evaluate(() => document.exitFullscreen());
+await page.waitForTimeout(800);
 
 // --- 4. y en un telefono, que no empuje el mando fuera ---
 //
@@ -252,7 +295,7 @@ await movil.getByRole('button', { name: 'Jugar tal cual' }).click({ timeout: 20_
 await movil.waitForTimeout(3000);
 await movil.setInputFiles('input[type=file][accept*=".sav"]', SAV);
 await movil
-  .locator('.equipo--propio .equipo__tope')
+  .locator('.medalla--siguiente')
   .first()
   .waitFor({ state: 'visible', timeout: 25_000 })
   .catch(() => {});
@@ -265,24 +308,25 @@ for (const [ancho, alto] of [
   await movil.waitForTimeout(1200);
 
   const medida = await movil.evaluate(() => {
-    const caja = document.querySelector('.equipo--propio .equipo__tope');
+    const tira = document.querySelector('.medallas-tira');
     const abajo = [...document.querySelectorAll('.pad button')].map(
       (b) => b.getBoundingClientRect().bottom,
     );
-    const alto = caja ? caja.getBoundingClientRect().height : null;
-    const linea = caja ? parseFloat(getComputedStyle(caja).lineHeight) : null;
     return {
-      seVe: caja !== null,
-      // En una linea: el nombre del lider es lo que podria partirlo en dos.
-      lineas: alto && linea ? Math.round(alto / linea) : null,
+      medallas: document.querySelectorAll('.medallas-tira .medalla').length,
+      // En un telefono la tira vuelve a ser una fila: lo que falta alli es alto.
+      enFila: tira
+        ? getComputedStyle(tira.querySelector('.medallas')).gridTemplateColumns.split(' ').length
+        : 0,
       sobra: abajo.length ? Math.round(window.innerHeight - Math.max(...abajo)) : null,
       desborda: document.documentElement.scrollHeight > window.innerHeight + 1,
     };
   });
 
-  check(`en ${ancho}x${alto} el tope se ve`, medida.seVe === true);
-  check(`y en ${ancho}x${alto} ocupa una sola linea`, medida.lineas === 1,
-    `${medida.lineas} lineas`);
+  check(`en ${ancho}x${alto} se ven las ocho medallas`, medida.medallas === 8,
+    String(medida.medallas));
+  check(`y en ${ancho}x${alto} van en fila, que es lo que cabe`, medida.enFila === 8,
+    `${medida.enFila} columnas`);
   check(`y en ${ancho}x${alto} el mando sigue llegando abajo`,
     medida.sobra !== null && medida.sobra >= 0 && medida.sobra < 40,
     `sobran ${medida.sobra}px por debajo del ultimo boton`);
