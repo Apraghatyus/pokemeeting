@@ -572,6 +572,66 @@ mGBA**. Otro núcleo significa rehacer todo eso.
 
 ---
 
+## Una aplicación propia para el móvil (APK)
+
+La idea: en el móvil se deja de jugar desde el navegador y se juega desde una
+aplicación con **su propio emulador, nativo**, que se conecta a la misma partida
+compartida que el resto. El teléfono deja de ser un navegador y pasa a ser otro
+cliente de la sala.
+
+**Por qué arreglaría lo de arriba.** Todo lo que se midió en la sección anterior
+señala al navegador y no al emulador: el núcleo corre en el hilo principal, el
+wasm se lleva unos 300 MB, y en un teléfono de 1,5 GB eso acaba en "la página no
+responde" o en que el sistema le quita el contexto de vídeo. Un mGBA nativo en
+Android no tiene ninguno de esos tres problemas: en un J7 va a velocidad plena.
+
+**Y por qué aun así no es lo primero que hay que hacer.** Porque significa un
+**segundo cliente completo**. El emulador es la parte fácil -ya existe, nativo y
+mantenido-; lo caro es todo lo demás, que hoy vive en el navegador y habría que
+rehacer en la aplicación: entrar en la sala por el servidor de señalización,
+montar el WebRTC con su vídeo, su voz y su canal de datos, leer el equipo de la
+partida, las medallas, el tope de nivel, el Soul Link, los intercambios y las
+reglas de fin de partida. Dos clientes significa además que cada cosa que se
+toque hay que tocarla dos veces, y que una se queda atrás.
+
+**Lo que SÍ se aprovecha tal cual, y no es poco:**
+
+- **El servidor de salas, sin cambiarlo.** Habla WebSocket y JSON; da igual
+  quién esté al otro lado.
+- **La forma de los mensajes**, que está escrita en `packages/protocol`.
+- **Y sobre todo, lo que se sabe de la partida.** Todo `packages/pokemon` -dónde
+  vive el equipo, cómo se descifran los cien bytes de un Pokémon, el puntero del
+  bloque de guardado, la tabla de entrenadores, las frases que delatan el final-
+  son hechos sobre el juego, no sobre JavaScript. Portarlos es traducir, no
+  volver a investigar, y esa investigación es la parte cara y ya está pagada.
+
+**Un aviso concreto antes de elegir el emulador nativo.** Tiene que ser mGBA, y
+conviene comprobar que su savestate es el mismo formato: el lector de aquí exige
+exactamente `0x61000` bytes y conoce de memoria dónde empieza cada región. Si la
+versión nativa guarda de otra forma, todo lo del párrafo anterior deja de valer
+y se cae en el mismo sitio que avisa la sección de arriba sobre cambiar de
+núcleo. Es media tarde comprobarlo y conviene hacerlo antes de escribir nada.
+
+**Lo que NO es un atajo:** envolver la web en un WebView. Es el mismo motor del
+navegador con los mismos límites, así que no arregla nada de lo que se midió.
+Si se hace una aplicación, el emulador tiene que ser nativo.
+
+**Lo legal no cambia.** La aplicación no puede traer ningún juego dentro: el
+jugador elige su fichero, igual que ahora. Y conviene pensar la distribución
+antes de empezar, porque fuera de la tienda significa que cada uno instale un
+APK a mano, y eso sube bastante el listón para la gente a la que va dirigido.
+
+**El orden sensato:** primero hacer el Worker con OffscreenCanvas de la sección
+anterior y volver a medir el tiempo de CPU por fotograma en un teléfono flojo.
+Es mucho menos trabajo y puede que baste. Si después de eso un J7 sigue sin
+poder, entonces sí: la aplicación es la respuesta, y entonces ya se sabrá con
+números cuánto hacía falta.
+
+Lo que sí es barato y ayuda hoy está en la sección anterior: dejar apagar el
+envío de vídeo en un móvil que no da abasto, y quedarse con el equipo y la voz.
+
+---
+
 ## El cable link: intercambiar y combatir dentro del juego
 
 La idea es que funcionen el intercambio y el combate **del propio juego**, con su
