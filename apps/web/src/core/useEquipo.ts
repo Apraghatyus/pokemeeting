@@ -156,7 +156,21 @@ export const useEquipo = (
       // Se mira en el mismo estado que acabamos de leer.
       setDerrota(enDerrota(estado));
       setVictoria(enSalonDeLaFama(estado));
-      setMedallas(leerMedallas(estado, juegoRef.current || leido?.juego || ''));
+      // Las medallas NO salen del estado: salen del fichero de guardado, que es
+      // lo unico con estructura reconocible. Ver `medallas.ts`. El precio es que
+      // se ven a fecha del ultimo guardado dentro del juego.
+      setMedallas(
+        leerMedallas(
+          (() => {
+            try {
+              return core.getSave();
+            } catch {
+              return null;
+            }
+          })(),
+          juegoRef.current || leido?.juego || '',
+        ),
+      );
 
       setDisponible(true);
       if (mismoEquipo(ultimoRef.current, leido)) return;

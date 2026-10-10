@@ -382,33 +382,46 @@ pestañas o en secciones plegadas, porque alargarlos más no arregla nada.
 
 ---
 
-## Las medallas: falta medir la direccion
+## Las medallas — RESUELTO
 
-Lo de alrededor esta hecho: se leen del estado, se dibujan las ocho -las
-conseguidas a color y las que faltaron apagadas- y salen en la pantalla de fin
-de partida. Lo unico que falta es **donde** vive el byte.
+**Ya se leen.** Y la solucion no estaba donde se buscaba, asi que conviene dejar
+escrito el camino entero.
 
-Y no se puede deducir. Las medallas son banderas, bits sueltos, y un byte de
-banderas no se distingue de cualquier otro byte: no tiene forma que buscar, al
-reves que el equipo, que se encuentra por su checksum. Rojo Fuego y Verde Hoja
-ademas **mueven sus bloques de guardado**, asi que tampoco vale una direccion
-fija, que es la misma razon por la que el equipo se busca en vez de leerse de
-una constante.
+**Por que no funcionaba.** Se buscaban en la memoria del juego, como el equipo.
+Imposible por dos motivos a la vez: son banderas -bits sueltos, sin forma que
+buscar- y Rojo Fuego coloca su bloque de guardado donde le cabe. Medido en una
+partida real: estaba en `0x0200148c`, dentro del monton. Ninguna direccion fija
+podia servir.
 
-Hay herramienta para medirlo: `npm run buscar:medallas -- antes.bin despues.bin`.
-Compara dos estados de la misma partida, uno antes y otro despues de ganar un
-gimnasio, y se queda con los bytes que cuadran con "las medallas se ganan en
-orden y no se pierden" -o sea, los que solo valen 0, 1, 3, 7...-. Con un tercer
-estado de otra medalla mas, lo que quede se cae solo.
+**Donde si hay forma: en el FICHERO de guardado.** Son catorce secciones de 4096
+bytes, cada una con su identificador y una firma (`0x08012025`) al final, y todo
+por duplicado para que un corte a mitad de guardar no se lleve la partida. Se
+rehace el bloque pegando las secciones 1 a 4 y el byte de las medallas cae
+siempre en `0x0FE4`: las banderas empiezan en `0x0EE0` y la primera medalla es la
+bandera `0x820`, que al ir las ocho seguidas desde un multiplo de ocho ocupa un
+byte entero.
 
-Para sacar los dos estados: menu ⋮ → Exportar estado, antes de entrar al
-combate del lider y despues de ganar.
+**Como se comprobo, que es lo que lo cierra.** Habia **tres** sitios que cumplian
+la regla de los bits: uno daba 1 medalla, otro 2 y otro 8. La regla sola no
+decidia. Se cargo la partida en el emulador y se abrio su **tarjeta de
+entrenador**, que decia `MEDALLAS 1` en Mt. Moon. Eso descarto los otros dos: lo
+dijo el juego, no una suposicion.
 
-Mientras no se mida, `leerMedallas` devuelve "no se sabe" y la tarjeta no sale.
-Es deliberado: enseñar cero medallas a quien tiene cuatro miente mas que
-callarse. Y cuando se mida, hay una comprobacion que protege de medir mal: si el
-byte no es un prefijo de bits, se da por desconocido en vez de contar bits de
-cualquier sitio.
+**Lo que cuesta, y hay que saberlo**: el juego escribe el fichero de guardado
+cuando el jugador guarda, no al ganar la medalla. Asi que se ven **a fecha del
+ultimo guardado**. En una Nuzlocke, donde se guarda cada dos pasos, es poca
+diferencia; pero quien gane la octava y mire sin guardar vera siete.
+
+Para leerlas en vivo haria falta localizar el bloque en memoria, y hay camino:
+buscando en EWRAM un trozo de las banderas tomado del propio fichero se
+encuentra -probado: dio `0x0200148c` y el byte correcto-. No se hizo porque
+exige descartar falsos positivos (un trozo de 64 bytes ya dio uno) y porque si
+hay progreso sin guardar el trozo no coincide y habria que volver al fichero
+igualmente.
+
+**Solo esta Rojo Fuego.** Verde Hoja usa el mismo formato casi con total
+seguridad, pero "casi" no basta: con una partida suya y su tarjeta de entrenador
+se confirma en un minuto.
 
 ---
 
