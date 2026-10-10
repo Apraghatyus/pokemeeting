@@ -19,7 +19,15 @@ import { existsSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 const pk = await import(pathToFileURL(`${process.cwd()}/packages/pokemon/src/index.ts`).href);
-const { leerMedallas, bloqueDeGuardado, MEDALLAS_EN_BLOQUE1, TOTAL_MEDALLAS } = pk;
+const {
+  leerMedallas,
+  medallasEnMemoria,
+  medallasAhora,
+  bloqueDeGuardado,
+  MEDALLAS_EN_BLOQUE1,
+  PUNTERO_AL_BLOQUE,
+  TOTAL_MEDALLAS,
+} = pk;
 
 let fallos = 0;
 const check = (nombre, ok, detalle = '') => {
@@ -113,6 +121,79 @@ if (!existsSync(ruta)) {
   check('la primera conseguida y el resto no',
     medallas.conseguidas.join() === 'true,false,false,false,false,false,false,false',
     medallas.conseguidas.join());
+}
+
+// --- y las de AHORA, sin haber guardado ---
+//
+// El guardado va por detras: el juego escribe cuando el jugador guarda, no al
+// ganar la medalla. Ganabas a Brock, el juego decia "obtuviste la MEDALLA ROCA"
+// y aqui seguia apagada. Por eso se lee tambien de la memoria.
+//
+// Los estados no estan en el repositorio -son partidas de alguien- asi que esta
+// parte se salta si no se pasan.
+check('de Rojo Fuego se sabe donde esta el puntero al bloque',
+  PUNTERO_AL_BLOQUE.BPR === 0x020398ac);
+
+check('sin estado, se queda lo del guardado',
+  medallasAhora(guardadoCon(0b11), null, 'BPRS').cuantas === 2);
+check('y un estado que no se entiende tampoco estropea lo del guardado',
+  medallasAhora(guardadoCon(0b11), new Uint8Array(16), 'BPRS').cuantas === 2);
+check('de un juego sin medir, no se lee la memoria',
+  medallasEnMemoria(new Uint8Array(0x61000), 'BPES') === null);
+
+// Los estados de prueba, por si se pasan otros. Son partidas de alguien, asi
+// que no estan en el repositorio y sin ellos esta parte se salta.
+const estados =
+  process.argv.length > 3
+    ? process.argv.slice(3)
+    : [
+        'roms/Pokemon - Edicion Rojo Fuego (Spain)-aleatoria-muw3zeeo.estado.bin',
+        'roms/Pokemon PELEA - Edicion Rojo Fuego (Spain)-aleatoria-muw3zeeo.estado (1).bin',
+      ].filter((f) => existsSync(f));
+if (estados.length === 0) {
+  console.log('\n(sin estados: no se comprueba la lectura en memoria contra partidas reales)');
+  console.log('Uso: npx tsx tools/tests/test-medallas.mjs <partida.sav> [estado.bin...]');
+} else {
+  for (const ruta of estados) {
+    if (!existsSync(ruta)) {
+      console.log(`SALTO  ${ruta}: no esta`);
+      continue;
+    }
+    const estado = new Uint8Array(readFileSync(ruta));
+    const corto = ruta.split(/[\\/]/).pop().slice(0, 44);
+    const enVivo = medallasEnMemoria(estado, 'BPRS');
+    check(`se encuentran las medallas en la memoria de ${corto}`,
+      enVivo !== null && (enVivo & (enVivo + 1)) === 0, String(enVivo));
+  }
+
+  // La prueba que de verdad importa: con una partida de verdad, la memoria
+  // tiene que decir lo mismo que su fichero de guardado. Si no, el puntero
+  // apunta a otra cosa.
+  if (existsSync(ruta) && estados[0] && existsSync(estados[0])) {
+    const estado = new Uint8Array(readFileSync(estados[0]));
+    const real = new Uint8Array(readFileSync(ruta));
+    check('y dicen lo mismo que el fichero de guardado de esa partida',
+      medallasEnMemoria(estado, 'BPRS') === (leerMedallas(real, 'BPRS').cuantas === 1 ? 1 : -1),
+      `memoria ${medallasEnMemoria(estado, 'BPRS')}, fichero ${leerMedallas(real, 'BPRS').cuantas}`);
+
+    // Y lo que esto vino a arreglar: si la memoria lleva una mas que el fichero
+    // -justo lo que pasa entre ganar la medalla y guardar- manda la memoria.
+    const conUnaMas = new Uint8Array(estado);
+    const vista = new DataView(conUnaMas.buffer);
+    const puntero = vista.getUint32(0x21000 + (PUNTERO_AL_BLOQUE.BPR - 0x02000000), true);
+    conUnaMas[0x21000 + (puntero + 0x1000 - 0x02000000)] = 0b11;
+    check('recien ganada y sin guardar, manda la memoria',
+      medallasAhora(real, conUnaMas, 'BPRS').cuantas === 2,
+      String(medallasAhora(real, conUnaMas, 'BPRS').cuantas));
+
+    // Pero al reves no: una medalla no se pierde, asi que menos en memoria que
+    // en el fichero solo puede ser que el puntero dejo de valer.
+    const conUnaMenos = new Uint8Array(estado);
+    conUnaMenos[0x21000 + (puntero + 0x1000 - 0x02000000)] = 0;
+    check('pero si la memoria dice menos, se la ignora: una medalla no se pierde',
+      medallasAhora(real, conUnaMenos, 'BPRS').cuantas === 1,
+      String(medallasAhora(real, conUnaMenos, 'BPRS').cuantas));
+  }
 }
 
 console.log(fallos === 0 ? '\nLAS MEDALLAS NO SE INVENTAN' : `\n${fallos} COMPROBACIONES FALLIDAS`);

@@ -12,11 +12,26 @@
 // para que un corte a mitad de guardar no se lleve la partida. Reconstruyendo el
 // bloque desde ahi, el byte de las medallas cae siempre en el mismo sitio.
 //
-// LO QUE ESTO CUESTA, y hay que decirlo: el juego escribe en el fichero de
-// guardado cuando el jugador guarda, no al ganar la medalla. Asi que esto
-// ensena las medallas **a fecha del ultimo guardado**. En una Nuzlocke, donde se
-// guarda cada dos pasos, es poca diferencia; pero si alguien gana la octava y
-// mira sin guardar, vera siete.
+// ESO COSTABA UNA COSA: el juego escribe en el fichero de guardado cuando el
+// jugador guarda, no al ganar la medalla. Asi que las medallas se veian **a
+// fecha del ultimo guardado**: ganabas a Brock, el juego decia "obtuviste la
+// MEDALLA ROCA" y aqui seguia apagada hasta que te acordabas de guardar.
+//
+// POR ESO SE LEEN TAMBIEN DE LA MEMORIA, que es lo que se intento primero y no
+// salio. Lo que fallaba era buscar el bloque en una direccion fija: Rojo Fuego
+// lo coloca en un sitio distinto cada vez que carga -es su proteccion contra
+// trucos- y medido en dos estados de la MISMA partida estaba en 0x02025ad8 y en
+// 0x02025b00.
+//
+// Lo que si esta quieto es un puntero que lo sigue, en 0x020398ac. Se comprobo
+// en tres estados reales, uno de ellos dentro de un combate, que es justo donde
+// la direccion fija fallaba.
+//
+// Y COMO NO ME FIO DE UN PUNTERO ENCONTRADO A MANO, lo que diga la memoria solo
+// se usa si cuadra con lo que dice el guardado: tiene que ser un prefijo de bits
+// y no puede llevar MENOS medallas que el fichero, porque una medalla no se
+// pierde. Si no cuadra, se usa el guardado como antes. Asi, un puntero que algun
+// dia deje de valer no ensena una barbaridad: ensena lo de siempre.
 
 /** Cuantas medallas hay en una region. Las ocho de siempre. */
 export const TOTAL_MEDALLAS = 8;
@@ -40,6 +55,67 @@ export const TOTAL_MEDALLAS = 8;
  */
 export const MEDALLAS_EN_BLOQUE1: Readonly<Record<string, number>> = {
   BPR: 0x0fe4,
+};
+
+/**
+ * Donde vive, por juego, el puntero que sigue al bloque de guardado en memoria.
+ *
+ * El numero sale de buscar, en dos estados de la misma partida, una direccion
+ * que apuntara cerca del bloque en los dos. Solo hubo una en toda la memoria.
+ *
+ * Lo que apunta no es exactamente el principio del bloque: las medallas caen
+ * 0x1000 bytes mas alla, y asi se escribe -sin inventarse una resta que no se
+ * ha comprobado-.
+ */
+export const PUNTERO_AL_BLOQUE: Readonly<Record<string, number>> = {
+  BPR: 0x020398ac,
+};
+
+/** Del puntero a las medallas. Ver `PUNTERO_AL_BLOQUE`. */
+const MEDALLAS_DESDE_PUNTERO = 0x1000;
+
+/** Donde empieza la memoria principal dentro de un estado, y que direccion es. */
+const EWRAM_EN_EL_ESTADO = 0x21000;
+const EWRAM_TAMANO = 0x40000;
+const EWRAM_BASE = 0x02000000;
+
+/** Lee un entero de 32 bits de la memoria principal, o null si cae fuera. */
+const leerEnMemoria = (estado: Uint8Array, direccion: number): number | null => {
+  const dentro = direccion - EWRAM_BASE;
+  if (dentro < 0 || dentro + 4 > EWRAM_TAMANO) return null;
+  const donde = EWRAM_EN_EL_ESTADO + dentro;
+  if (donde + 4 > estado.length) return null;
+  return new DataView(estado.buffer, estado.byteOffset, estado.byteLength).getUint32(donde, true);
+};
+
+/** Lee un byte de la memoria principal, o null si cae fuera. */
+const byteEnMemoria = (estado: Uint8Array, direccion: number): number | null => {
+  const dentro = direccion - EWRAM_BASE;
+  if (dentro < 0 || dentro >= EWRAM_TAMANO) return null;
+  const donde = EWRAM_EN_EL_ESTADO + dentro;
+  return donde < estado.length ? (estado[donde] ?? null) : null;
+};
+
+/**
+ * Las medallas tal y como estan AHORA en la memoria del juego, sin guardar.
+ *
+ * Es lo que hace que la medalla se encienda en cuanto el juego dice que te la
+ * dan, y no cuando te acuerdas de guardar.
+ *
+ * Devuelve null si de este juego no se sabe donde mirar, si el puntero no apunta
+ * a la memoria principal o si lo que hay ahi no puede ser un byte de medallas.
+ */
+export const medallasEnMemoria = (estado: Uint8Array, codigoJuego: string): number | null => {
+  const puntero = PUNTERO_AL_BLOQUE[codigoJuego.slice(0, 3).toUpperCase()];
+  if (puntero === undefined) return null;
+
+  const bloque = leerEnMemoria(estado, puntero);
+  if (bloque === null || bloque < EWRAM_BASE || bloque >= EWRAM_BASE + EWRAM_TAMANO) return null;
+
+  const byte = byteEnMemoria(estado, bloque + MEDALLAS_DESDE_PUNTERO);
+  if (byte === null) return null;
+  // Las medallas se ganan en orden: cualquier otra cosa es que ahi no estan.
+  return (byte & (byte + 1)) === 0 ? byte : null;
 };
 
 /** Lo que mide cada seccion del fichero de guardado, con su pie incluido. */
@@ -118,6 +194,12 @@ export const bloqueDeGuardado = (guardado: Uint8Array): Uint8Array | null => {
  * Esa comprobacion es lo que convierte un guardado raro en un hueco honesto en
  * vez de en un numero inventado.
  */
+/** Un byte de banderas, en medallas. Siempre sabe cuantas: el byte ya se valido. */
+const deUnByte = (byte: number): Medallas & { cuantas: number } => {
+  const conseguidas = Array.from({ length: TOTAL_MEDALLAS }, (_, i) => (byte & (1 << i)) !== 0);
+  return { cuantas: conseguidas.filter(Boolean).length, conseguidas };
+};
+
 export const leerMedallas = (guardado: Uint8Array | null, codigoJuego: string): Medallas => {
   if (!guardado) return SIN_SABER;
 
@@ -133,6 +215,31 @@ export const leerMedallas = (guardado: Uint8Array | null, codigoJuego: string): 
   // Las medallas se ganan en orden: cualquier otra cosa es que no es este byte.
   if ((byte & (byte + 1)) !== 0) return SIN_SABER;
 
-  const conseguidas = Array.from({ length: TOTAL_MEDALLAS }, (_, i) => (byte & (1 << i)) !== 0);
-  return { cuantas: conseguidas.filter(Boolean).length, conseguidas };
+  return deUnByte(byte);
+};
+
+/**
+ * Las medallas de verdad: las del guardado, y las de ahora si cuadran.
+ *
+ * La memoria manda cuando se puede leer, porque es la que esta al dia: la
+ * medalla se enciende en cuanto el juego dice que te la da. Pero solo si lleva
+ * al menos tantas como el fichero, porque una medalla no se pierde y una cuenta
+ * mas baja solo puede significar que el puntero dejo de valer.
+ *
+ * Sin estado -o sin saber leerlo- se queda lo del guardado, que es lo que habia.
+ */
+export const medallasAhora = (
+  guardado: Uint8Array | null,
+  estado: Uint8Array | null,
+  codigoJuego: string,
+): Medallas => {
+  const delFichero = leerMedallas(guardado, codigoJuego);
+  if (!estado) return delFichero;
+
+  const byte = medallasEnMemoria(estado, codigoJuego);
+  if (byte === null) return delFichero;
+
+  const enVivo = deUnByte(byte);
+  if (delFichero.cuantas !== null && enVivo.cuantas < delFichero.cuantas) return delFichero;
+  return enVivo;
 };

@@ -21,7 +21,7 @@ import {
   enSalonDeLaFama,
   leerCabecera,
   quienPelea,
-  leerMedallas,
+  medallasAhora,
   mismoEquipo,
   releerEquipo,
   resumirEquipo,
@@ -169,11 +169,12 @@ export const useEquipo = (
       // Se mira en el mismo estado que acabamos de leer.
       setDerrota(enDerrota(estado));
       setVictoria(enSalonDeLaFama(estado));
-      // Las medallas NO salen del estado: salen del fichero de guardado, que es
-      // lo unico con estructura reconocible. Ver `medallas.ts`. El precio es que
-      // se ven a fecha del ultimo guardado dentro del juego.
+      // Las medallas salen de las DOS cosas: del fichero de guardado, que es lo
+      // unico con estructura reconocible, y de la memoria, que es la que esta al
+      // dia. Manda la memoria cuando cuadra. Sin eso, la medalla no se encendia
+      // hasta que el jugador se acordaba de guardar. Ver `medallas.ts`.
       setMedallas(
-        leerMedallas(
+        medallasAhora(
           (() => {
             try {
               return core.getSave();
@@ -181,6 +182,7 @@ export const useEquipo = (
               return null;
             }
           })(),
+          estado,
           codigo,
         ),
       );

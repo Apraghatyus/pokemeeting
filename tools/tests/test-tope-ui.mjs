@@ -75,6 +75,28 @@ const sinMedallas = (bytes) => {
   return { copia, tocadas };
 };
 
+/**
+ * El mismo estado pero con las medallas que se pidan EN MEMORIA.
+ *
+ * Hace falta porque las medallas ya no salen solo del fichero de guardado: la
+ * memoria manda cuando cuadra, que es lo que hace que se enciendan al ganarlas
+ * y no al guardar. O sea que para probar el tope hay que tocar las dos cosas, o
+ * el estado traeria su medalla y el tope no bajaria.
+ *
+ * El byte se encuentra siguiendo el mismo puntero que sigue el programa.
+ */
+const conMedallasEnMemoria = (bytes, cuantas) => {
+  const copia = new Uint8Array(bytes);
+  const vista = new DataView(copia.buffer);
+  const EWRAM = 0x21000;
+  const PUNTERO = 0x020398ac;
+  const bloque = vista.getUint32(EWRAM + (PUNTERO - 0x02000000), true);
+  const donde = EWRAM + (bloque + 0x1000 - 0x02000000);
+  const antes = copia[donde];
+  copia[donde] = (1 << cuantas) - 1;
+  return { copia, antes };
+};
+
 const original = new Uint8Array(readFileSync(SAV));
 const { copia: limpia, tocadas } = sinMedallas(original);
 check('la partida de prueba tiene la seccion de las medallas, por duplicado',
@@ -172,7 +194,12 @@ check('y la marca se mueve a la primera medalla', await page.evaluate(() => {
 // su pantalla de titulo -importar la reinicia-. Se carga un estado, igual que
 // hace el menu de cargar, y por eso va DESPUES de importar y no antes.
 if (ESTADO) {
-  const bytes = Array.from(new Uint8Array(readFileSync(ESTADO)));
+  // Sin medallas tambien en memoria: si no, el estado traeria la suya y el tope
+  // subiria a Nv.21, donde ninguno de los tres Pokemon se pasa y no habria nada
+  // que comprobar.
+  const { copia, antes } = conMedallasEnMemoria(readFileSync(ESTADO), 0);
+  check('el estado de prueba traia sus medallas en memoria', antes === 1, String(antes));
+  const bytes = Array.from(copia);
   const cargado = await page.evaluate((datos) => {
     const core = globalThis.mGBAModule;
     const base = (core.gameName?.split('/').pop() ?? '').replace(/\.[^.]+$/, '');
@@ -236,6 +263,33 @@ if (fichas.length === 0) {
 // ordenador, y marcarle sus Pokemon por una regla que no es la suya es mentir.
 check('al companero no se le apaga ningun Pokemon por tu tope',
   (await page.locator('.equipo--companero .ficha--pasado').count()) === 0);
+
+// --- 3a. una medalla recien ganada, sin guardar ---
+//
+// ESTO ES LO QUE SE REPORTO: ganas a Brock, el juego dice "obtuviste la MEDALLA
+// ROCA" y aqui seguia apagada, porque las medallas salian del fichero de
+// guardado y el juego solo escribe ahi cuando el jugador guarda.
+//
+// Se reproduce poniendo la segunda medalla EN MEMORIA y dejando el fichero como
+// estaba: es exactamente el hueco entre ganarla y guardar.
+if (ESTADO) {
+  const { copia } = conMedallasEnMemoria(readFileSync(ESTADO), 2);
+  await page.evaluate((datos) => {
+    const core = globalThis.mGBAModule;
+    const base = (core.gameName?.split('/').pop() ?? '').replace(/\.[^.]+$/, '');
+    core.FS.writeFile(`${core.filePaths().saveStatePath}/${base}.ss4`, new Uint8Array(datos));
+    return Boolean(core.loadStateSlot(4, 0));
+  }, Array.from(copia));
+  await page.waitForTimeout(5000);
+
+  const reciente = await page.evaluate(() => ({
+    aColor: document.querySelectorAll('.medallas-tira .medalla--tiene').length,
+    toca: document.querySelector('.medallas-tira .medalla--siguiente .medalla__tope')?.textContent?.trim() ?? null,
+  }));
+  check('una medalla recien ganada se enciende sin esperar a guardar',
+    reciente.aColor === 2, `${reciente.aColor} a color`);
+  check('y el tope pasa al gimnasio siguiente', reciente.toca === 'Nv.24', reciente.toca);
+}
 
 // --- 3b. y a pantalla completa la partida sigue siendo la partida ---
 //
