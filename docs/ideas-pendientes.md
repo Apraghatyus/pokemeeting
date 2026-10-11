@@ -967,6 +967,12 @@ historial", y lo que permite comparar con tu compañera o recuperarlo desde otro
 aparato. Lee el aviso de abajo antes de empezar: eso sí cambia el proyecto de
 categoría.
 
+**Y hay un diseño de cómo sería**, hecho en Lovable: un ranking con todos los
+jugadores dentro. Está en la sección siguiente, **"El ranking: la página del
+historial, con todos dentro"**, con las dos pantallas guardadas. Ahí se ve por
+qué el login no es un accesorio, y qué hace falta empezar a apuntar YA para que
+esa página no nazca con las partidas de este año a medias.
+
 El sitio donde vivan es una base de datos, y tiene su propia sección más abajo:
 **"La base de datos: llevar todo esto a PostgreSQL"**. Ahí está qué se sube, qué
 no, y lo que arrastra consigo.
@@ -1020,6 +1026,117 @@ Tres cosas que conviene fijar antes de dibujar nada:
 - **Si el porcentaje se enseña con pocas partidas.** Con tres jugadas, un 33% no
   dice nada y parece que sí. Suele ser mejor enseñar el número crudo hasta tener
   unas cuantas.
+
+---
+
+## El ranking: la página del historial, con todos dentro
+
+Hay un diseño hecho en Lovable y está guardado aquí al lado:
+[solo](ranking/solo.png) y [soullink](ranking/soullink.png). Es la página que
+ayer se decidió que el historial tendría algún día, y conviene mirarla antes de
+escribir una línea: contesta sola varias preguntas que llevaban abiertas.
+
+Lo que enseña: un ranking de jugadores ordenado por porcentaje de victorias, con
+un conmutador **SOLO / SOULLINK** arriba del todo, las tres dificultades
+explicadas en tarjetas, pestañas para filtrar por dificultad, un buscador, y
+cada fila desplegable con sus últimas partidas terminadas -resultado, fecha,
+juego, dificultad, hasta dónde llegó, las medallas y el equipo-.
+
+Un detalle del diseño que no es casual: **"27 partidas" es exactamente 18V + 9D**.
+O sea que ahí "partidas" son las terminadas. Las descartadas, que no suman ni a
+un lado ni a otro, necesitan su propio sitio en la fila.
+
+### El login no es un accesorio, es lo que lo convierte en ranking
+
+Un ranking de una persona es una lista. Esto es lo que hace falta para que las
+cuentas valgan la pena, y por eso van juntas: ver
+**"Cuentas, historial y porcentaje de victorias"** aquí arriba y **"La base de
+datos"** aquí abajo. Mientras no haya con qué decir de quién es cada partida, el
+compilado de todos los jugadores no existe.
+
+### Filtro por juego
+
+No está en el diseño y hace falta: por juego, igual que ya hay por dificultad.
+
+Y hay un agujero que lo complica. **Hoy una partida terminada no sabe de qué
+juego es.** Lo único que guarda es el nombre del fichero de su copia; el nombre
+del juego vive en la partida guardada, que es otra cosa y que **se borra**: solo
+caben tres y se van reemplazando. En cuanto alguien borra la copia, la fila del
+historial se queda sin juego. Se arregla apuntando el juego -su código, `BPR`,
+`BPE`...- en el momento de terminar, que es cuando se sabe seguro.
+
+### Tres estados: victoria, derrota y descartada
+
+Una partida borrada o abandonada antes de llegar a la pantalla de victoria o de
+derrota queda **descartada**. No cuenta para el porcentaje, pero se cuenta
+aparte: saber cuántas ha descartado alguien dice mucho.
+
+**Y es justo lo que hace que el porcentaje no mienta.** Si descartar fuera
+gratis e invisible, en una Nuzlocke bastaría con borrar cada partida que va mal
+antes de que el juego la dé por perdida para quedarse en el 100%. Enseñar el
+número de descartadas al lado del porcentaje no es un adorno: es lo que lo
+sostiene. Un 90% con dos descartadas y un 90% con treinta no son el mismo 90%.
+
+Hay que decidir **cuándo se da una por descartada**, y la respuesta corta es:
+solo cuando el jugador la borra a propósito. Lo demás es adivinar. Una partida
+que lleva dos meses sin tocarse no está descartada, está parada, y contarla como
+descartada castiga a quien juega despacio.
+
+**Esto tampoco se está apuntando hoy.** Borrar una partida guardada no deja
+rastro de ninguna clase. Cada una que se borre de aquí al día del ranking es una
+descartada que ya no se podrá contar.
+
+### Nuzlocke sola y Nuzlocke en Soul Link son dos cosas distintas
+
+Y tienen que ir separadas, como en el diseño. No es la misma partida: en Soul
+Link tu Pokémon muere también cuando muere el de la otra persona, así que son
+dos runs que se caen a la vez. Mezclar las dos en un mismo porcentaje hace que
+ninguno de los dos números signifique nada.
+
+**El agujero, otra vez, está en lo que se apunta.** Hoy se guarda `porElEnlace`,
+que dice **cómo acabó** -si la mató una pareja caída-, no **cómo se jugó**. Una
+partida de Soul Link que se pierde por tu propia cuenta se apunta con
+`porElEnlace: false` y acabaría contada en SOLO, que es donde no va. Hace falta
+guardar el modo al terminar -había compañero conectado o no-, y eso ya se sabe
+en ese momento.
+
+De paso: el ranking de Soul Link es **de parejas** -"Juan + Mateo"-, así que la
+pareja es la entidad y hay que guardar con quién se jugó. Su apodo ya se conoce
+mientras dura la sala. Un apodo no identifica a nadie -se escribe a mano y no se
+comprueba-, así que el ranking de parejas de verdad necesita las cuentas; pero
+apuntar el apodo ahora es gratis y es lo único que habrá de las partidas de
+antes.
+
+### Lo que hoy NO se apunta, y hace falta
+
+| Lo que pide el ranking | ¿Se apunta hoy? |
+| --- | --- |
+| Resultado, fecha, medallas, equipo con movimientos | **Sí** |
+| De qué juego es | No. Está en la partida guardada, que se borra |
+| Modo: sola o Soul Link | No. Solo se sabe si el final vino por el enlace |
+| Con quién se jugó | No |
+| Descartadas | No. Borrar no deja rastro |
+| Dificultad | **No puede**: las dificultades todavía no existen |
+| Hasta dónde llegó, más allá de las 8 medallas | No |
+
+Dos de esas merecen explicación:
+
+- **La dificultad no se puede apuntar porque todavía no se ha hecho** -está en
+  la sección siguiente-. Todo lo jugado antes de que exista entrará en el
+  ranking como Normal, y no hay forma de arreglarlo después. No es grave, pero
+  conviene saberlo antes de que alguien se extrañe.
+- **"ALTO MANDO · AGATHA" y "CAMPEÓN" están más allá de las medallas.** Hoy solo
+  se lee el byte de las ocho; el Alto Mando y el Salón de la Fama son otra cosa
+  que hay que ir a buscar a la partida. Con ocho medallas y sin más dato, lo
+  honesto es decir "8 medallas" y no inventarse a qué miembro llegó.
+
+### Por dónde empezar
+
+La página entera necesita cuentas y base de datos, que es lo pesado. Pero **la
+mitad barata no espera a nada**: apuntar el juego, el modo, el compañero y las
+descartadas son cuatro campos más en lo que ya se guarda al terminar, y es lo
+único de esta lista que se pierde para siempre si se deja para luego. El ranking
+se puede dibujar el año que viene; las partidas de este mes, no.
 
 ---
 
@@ -1085,8 +1202,10 @@ Cinco tablas bastan para lo que se ha pedido:
   entras (ver más abajo).
 - **`partidas`** — una por mundo jugado: usuario, semilla completa, de qué juego
   es, qué se aleatorizó, cuándo se creó y cuándo se jugó por última vez.
-- **`partidas_terminadas`** — resultado, si fue por el enlace, cuántas medallas,
-  cuándo. Una fila por final.
+- **`partidas_terminadas`** — resultado -victoria, derrota o **descartada**, ver
+  la sección del ranking-, si fue por el enlace, el modo -sola o Soul Link-, con
+  quién se jugó, de qué juego era, cuántas medallas y cuándo. Una fila por
+  final.
 - **`pokemon_del_final`** — el equipo de ese momento: especie, mote, nivel, si
   cayó y sus cuatro movimientos. Puede ir como tabla o como JSON dentro de la
   anterior; con Postgres, `jsonb` es perfectamente razonable aquí porque nunca
