@@ -29,6 +29,15 @@ import { resolve } from 'node:path';
  */
 const CON_TUNEL = process.argv.includes('--tunel');
 
+// El .env de la raiz, si lo hay. Es lo que dice donde esta la base de datos, y
+// hace falta ANTES de decidir que piezas se arrancan. Sin fichero no pasa
+// nada: simplemente no habra servicio de cuentas.
+try {
+  process.loadEnvFile();
+} catch {
+  // No hay .env, que es el caso de casi todo el mundo.
+}
+
 const TODOS = [
   {
     nombre: 'salas',
