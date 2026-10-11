@@ -347,7 +347,6 @@ export const App = () => {
                suya. */
             tope={unoSolo && verSuEquipo ? null : topes.siguiente}
             onCambiar={unoSolo ? () => setVerSuEquipo((v) => !v) : undefined}
-            motivo={unoSolo && verSuEquipo ? 'Todavia no ha mandado su equipo.' : undefined}
             nombreDelOtro={nombreDelCompanero}
             nombrePropio={miNombre}
           />
@@ -430,7 +429,6 @@ export const App = () => {
               activo={equipoSuyo.alFrente}
               especies={especies}
               caidosDelOtro={caidosMios}
-              motivo=""
             />
           )}
         </div>

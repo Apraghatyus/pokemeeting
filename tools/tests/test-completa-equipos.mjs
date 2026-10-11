@@ -103,11 +103,19 @@ const mirar = (page) =>
       texto: (b.textContent ?? '').trim(),
       activa: b.classList.contains('is-activa'),
     })),
-    fichas: document.querySelectorAll('.equipo__lista > *').length,
+    // Los Pokemon de verdad, sin contar los huecos: la rejilla tiene seis
+    // sitios siempre, tenga equipo o no.
+    fichas: document.querySelectorAll('.equipo__lista > :not(.ficha--hueco)').length,
+    huecos: document.querySelectorAll('.equipo__lista > .ficha--hueco').length,
     // Donde empieza la lista: las dos tienen que empezar en el mismo sitio.
     izquierda: Math.round(
       document.querySelector('.equipo__lista')?.getBoundingClientRect().left ?? -1,
     ),
+    // Donde esta la pestana. Pulsarla no puede moverla de sitio.
+    pestanaY: (() => {
+      const b = document.querySelector('.equipo__pestana');
+      return b ? Math.round(b.getBoundingClientRect().top) : null;
+    })(),
     // Lo ancha que esta la partida: cambiar de pestana no puede moverla.
     anchoPartida: Math.round(
       document.querySelector('.pantallas')?.getBoundingClientRect().width ?? 0,
@@ -284,9 +292,25 @@ const vuelta = await mirar(anfitrion);
 check('y volver te devuelve a la tuya con tu equipo',
   vuelta.cual === 'propio' && vuelta.miPartidaGrande === true,
   `${vuelta.cual}, tu partida grande: ${vuelta.miPartidaGrande}`);
-// Y su equipo vacio lo dice en vez de enseñar seis huecos sin motivo.
-check('y mientras no mande equipo, se dice',
+// Mientras no mande equipo no se dice nada: seis huecos callados.
+check('y mientras no mande equipo, no se enseña ningun Pokemon',
   suyo.fichas === 0, `${suyo.fichas} fichas`);
+// Pero los seis huecos siguen ahi, que es lo que sostiene la cabecera en su
+// sitio. Sin ellos la columna se encoge y las pestanas se van detras.
+check('aunque los seis huecos siguen reservando el alto',
+  suyo.huecos === 6, `${suyo.huecos} huecos`);
+
+// LO QUE SE VINO A ARREGLAR. Esa columna se ancla abajo, y la lista es lo
+// unico que ocupa el alto sobrante. Cuando en su sitio iba una frase -"todavia
+// no ha mandado su equipo"- el alto se encogia y las pestanas se iban detras,
+// hacia abajo: el boton se movia justo despues de pulsarlo. Con la rejilla de
+// seis huecos siempre puesta, la cabecera no se mueve.
+check('y la pestana no se mueve de sitio al pulsarla',
+  completa.pestanaY !== null && completa.pestanaY === suyo.pestanaY,
+  `antes en ${completa.pestanaY}, despues en ${suyo.pestanaY}`);
+check('ni al volver a la tuya',
+  vuelta.pestanaY === completa.pestanaY,
+  `al volver en ${vuelta.pestanaY}`);
 
 // --- y la partida no pierde sitio por todo esto ---
 const sitio = await anfitrion.evaluate(() => {

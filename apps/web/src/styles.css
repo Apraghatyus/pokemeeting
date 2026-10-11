@@ -2444,13 +2444,6 @@ details.partidas[open] > summary::before {
   min-height: 0;
 }
 
-.equipo__vacio {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--muted);
-}
-
 /* --- Cada Pokemon --- */
 
 .ficha {

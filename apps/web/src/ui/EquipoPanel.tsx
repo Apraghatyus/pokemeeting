@@ -91,13 +91,6 @@ type Props = {
    * nombres se entiende de un vistazo que son dos jugadores.
    */
   nombrePropio?: string;
-  /**
-   * Por que no hay nada que enseñar.
-   *
-   * Sin esto la columna vacia no dice nada, que es lo que se quiere mientras
-   * no hay partida: una frase de relleno en cada hueco ensucia la pantalla.
-   */
-  motivo?: string;
 };
 
 /**
@@ -265,7 +258,6 @@ export const EquipoPanel = ({
   nombreDelOtro = 'Tu companero',
   nombrePropio = 'Tu equipo',
   onCambiar,
-  motivo,
 }: Props) => {
   const ranuras = equipo?.ranuras ?? [];
   // La coleccion de sprites se elige por el juego del que viene el equipo, que
@@ -315,13 +307,24 @@ export const EquipoPanel = ({
         )}
       </div>
 
-      {ranuras.length === 0 && motivo ? (
-        <p className="equipo__vacio">{motivo}</p>
-      ) : (
-        /* La `key` cambia al cambiar de equipo, asi que React rehace la lista y
-           la animacion de entrada vuelve a correr. Sin eso el cambio era
-           instantaneo y no se veia de donde venia lo que acababa de aparecer. */
-        <ul className={`equipo__lista equipo__lista--entra-${lado}`} key={lado}>
+      {/* La lista SIEMPRE, tenga Pokemon o no.
+          *
+          * Antes, cuando el companero todavia no habia mandado equipo, en su
+          * sitio iba una frase. Y ahi estaba el fallo: esta columna se ancla
+          * abajo -`justify-content: flex-end`- y la lista es lo unico que
+          * ocupa el alto sobrante. Al cambiarla por una frase corta, el alto
+          * se encogia y las pestanas se iban detras, hacia abajo. El boton se
+          * movia justo cuando acababas de pulsarlo.
+          *
+          * Con la rejilla de seis huecos siempre puesta, la cabecera se queda
+          * donde estaba y los huecos no dicen nada, que es lo que se queria:
+          * mientras no llega su equipo no hay nada que contar.
+          *
+          * La `key` cambia al cambiar de equipo, asi que React rehace la lista
+          * y la animacion de entrada vuelve a correr. Sin eso el cambio era
+          * instantaneo y no se veia de donde venia lo que acababa de
+          * aparecer. */}
+      <ul className={`equipo__lista equipo__lista--entra-${lado}`} key={lado}>
           {huecos.map((pokemon, i) =>
             pokemon ? (
               // La personalidad no cambia nunca, asi que cambiar dos Pokemon de
@@ -341,8 +344,7 @@ export const EquipoPanel = ({
               <li key={`hueco-${i}`} className="ficha ficha--hueco" aria-hidden="true" />
             ),
           )}
-        </ul>
-      )}
+      </ul>
     </aside>
   );
 };
