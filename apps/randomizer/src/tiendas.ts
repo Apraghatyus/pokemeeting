@@ -37,6 +37,28 @@ import { inflateRawSync } from 'node:zlib';
 const BALLS = { primera: 1, ultima: 12 };
 /** La pocion, que es el otro imprescindible del principio. */
 const POCION = 13;
+
+/**
+ * Revivir y Max. Revivir, que NO pueden salir en una tienda.
+ *
+ * POR QUE. Si se pueden comprar, revivir es cuestion de dinero y la regla de
+ * "un debilitado esta muerto" se queda en un tramite. Dejandolos solo en el
+ * suelo -donde los reparte el randomizer con otra opcion, y ahi no se tocan-,
+ * encontrarse uno tirado en una ruta es un golpe de suerte de verdad.
+ *
+ * DE DONDE SALEN ESTOS DOS NUMEROS. No de una lista copiada: la tienda de
+ * Ciudad Verde vende `4,13,14,18` y el juego las enseña como Poke Ball, Pocion,
+ * Antidoto y Antiparaliz, a 200, 300, 100 y 200 -nombres Y precios cuadran con
+ * la tabla de objetos de siempre-. En esa misma tabla el 24 es Revivir y el 25
+ * Max. Revivir. Lo refuerza una segunda tienda, la de 0x164A4C, que vende
+ * `2,3,19,20,21,24,23,85,84`: es la lista de unos grandes almacenes -balls,
+ * restaurantes, el 24 en medio y repelentes al final-, justo donde un Revivir
+ * encaja y un objeto cualquiera no.
+ *
+ * Aun asi es una deduccion y no una lectura: el dia que se toque esto, mirar la
+ * tienda de Ciudad Azulona dentro del juego lo confirma en cinco minutos.
+ */
+const REVIVIR = [24, 25];
 /** Cuantos objetos existen. Un indice mayor no es un objeto. */
 const OBJETO_MAXIMO = 377;
 /** Lo mas larga que puede ser la lista de una tienda antes de dar por malo lo leido. */
@@ -269,7 +291,11 @@ export const aleatorizarTiendas = (
     const plazas = plazasDe(rom, donde);
     if (!plazas) continue;
     listas.set(donde, plazas);
-    if (mapa.saltadas.includes(indice)) for (const id of plazas) catalogo.add(id);
+    if (mapa.saltadas.includes(indice)) {
+      // Los de revivir no entran en el reparto: por eso se quitan aqui, al
+      // hacer el catalogo, y no al escribir. Ver `REVIVIR`.
+      for (const id of plazas) if (!REVIVIR.includes(id)) catalogo.add(id);
+    }
   }
 
   const pool = [...catalogo].sort((a, b) => a - b);
@@ -310,6 +336,26 @@ export const aleatorizarTiendas = (
     for (const [i, id] of ahora.entries()) rom.writeUInt16LE(id, donde + i * 2);
     tiendas += 1;
     plazasCambiadas += ahora.length;
+  }
+
+  // Y una ultima pasada por TODAS, tambien por las tres que aleatoriza el
+  // randomizer.
+  //
+  // Es lo que se escapa al mirarlo por encima: quitar los de revivir de nuestro
+  // catalogo solo los quita de nuestras veinte tiendas, y el las pone en las
+  // suyas igual que el juego las ponia. Sin esto la regla valdria en veinte
+  // sitios y no en los tres restantes, que es como no valer.
+  //
+  // Se recorre en orden y con el mismo dado, asi que sigue saliendo lo mismo
+  // para la misma semilla.
+  for (const donde of mapa.offsets) {
+    const plazas = plazasDe(rom, donde);
+    if (!plazas) continue;
+    for (const [i, id] of plazas.entries()) {
+      if (!REVIVIR.includes(id)) continue;
+      rom.writeUInt16LE(pool[Math.floor(dado() * pool.length)] as number, donde + i * 2);
+      plazasCambiadas += 1;
+    }
   }
 
   return { tiendas, plazas: plazasCambiadas };

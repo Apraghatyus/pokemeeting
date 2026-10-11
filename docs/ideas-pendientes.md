@@ -1146,39 +1146,33 @@ Dos cosas que hay que decidir:
   Hay que apuntarlo por nuestra cuenta según se vea, no deducirlo del equipo de
   ahora. Es el mismo aviso que ya está en la sección del mapa.
 
-### Los objetos de revivir, solo por el suelo
+### Los objetos de revivir, solo por el suelo — HECHO
 
-**Que no salgan nunca en una tienda.** Hoy sí pueden: las tiendas se aleatorizan
-repartiendo lo que esa ROM ya vendía en alguna tienda, y en Rojo Fuego los
-Revivir se venden de serie -la lista de Ciudad Azulona es `2,3,19,20,21,24,23,…`
-y ese 24 es un Revivir-, así que entran en el reparto.
+**Ya no salen en ninguna tienda.** Si se pueden comprar, revivir es cuestión de
+dinero y la regla de "un debilitado está muerto" se queda en un trámite.
+Dejándolos solo en el suelo, encontrarse uno tirado en una ruta es un golpe de
+suerte de verdad.
 
-**Por qué quitarlos.** Si se pueden comprar, revivir es cuestión de dinero y la
-regla de "un debilitado está muerto" se queda en un trámite. Dejándolos solo en
-el suelo, encontrarse uno tirado en una ruta es un golpe de suerte de verdad: una
-segunda vida que te dio el mundo, no la tienda.
+Medido en la ROM española: **once de las veintitrés tiendas vendían Revivir** de
+serie, y después de aleatorizar no queda ninguno en ninguna.
 
-**Dónde se toca.** En `apps/randomizer/src/tiendas.ts`, al construir el
-catálogo: hoy entra todo lo que la ROM vendía y basta con dejar fuera esos
-índices. Son dos líneas.
+Dos cosas que conviene recordar de cómo se hizo:
 
-Pero hay que hacerlo en **los dos sitios**, y esto es lo que se escapa: de las
-veintitrés tiendas, tres las aleatoriza el randomizer por su cuenta y nosotros
-solo tocamos las otras veinte. O sea que quitarlos de nuestro catálogo deja
-abierta la puerta de esas tres. Como las direcciones de todas ya se leen de su
-base de datos, lo que hay que hacer es pasar también por esas tres después y
-cambiar el Revivir que haya puesto por otra cosa del catálogo.
+- **Hay dos pasadas, no una.** Quitarlos del catálogo solo los quita de las
+  veinte tiendas que tocamos nosotros; las otras tres las aleatoriza el
+  randomizer y las ponía igual que el juego. Hay una segunda pasada por las
+  veintitrés que cambia el que haya quedado. Sin eso la regla valdría en veinte
+  sitios y no en tres, que es como no valer.
+- **Los índices 24 y 25 están deducidos, no leídos.** La tienda de Ciudad Verde
+  vende `4,13,14,18` y el juego los enseña como Poké Ball, Poción, Antídoto y
+  Antiparaliz a 200, 300, 100 y 200: nombres *y* precios cuadran con la tabla de
+  objetos de siempre, donde el 24 es Revivir. Lo refuerza la tienda de
+  `0x164A4C`, que vende `2,3,19,20,21,24,23,85,84` -una lista de grandes
+  almacenes, con el 24 justo donde encaja un Revivir-. Aun así es una deducción:
+  mirar la tienda de Ciudad Azulona dentro del juego lo confirma en cinco
+  minutos, y hasta entonces queda escrito aquí.
 
-**Confirmar los índices antes de codificarlo.** Se deducen: la tienda de Ciudad
-Verde es `4,13,14,18` y eso encaja exactamente con la tabla de objetos de
-siempre -Poké Ball, Poción, Antídoto, Antiparaliz-, donde el 24 es Revivir y el
-25 Máx. Revivir. Encaja, pero es una deducción: media hora mirando la tienda
-dentro del juego lo confirma y evita quitar lo que no era.
-
-**Y lo que NO hay que tocar.** Los objetos del suelo son otra opción del
-aleatorizador (`objetos`, `setFieldItemsMod`) y los reparte el randomizer, no
-nosotros. Ahí los Revivir tienen que poder seguir saliendo: es justamente lo que
-hace que la regla valga la pena.
+`apps/randomizer/src/tiendas.ts`, `test:tiendas`.
 
 ### En un Soul Link, la dificultad viene en la invitación
 

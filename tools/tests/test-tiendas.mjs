@@ -133,6 +133,26 @@ check('donde se vendian balls se siguen vendiendo', sinSuBall === 0,
 check('y donde se vendian pociones tambien', sinSuPocion === 0,
   `${sinSuPocion} tiendas se quedaron sin la suya`);
 
+// --- 2b. y los de revivir, fuera de todas ---
+//
+// Si se pueden comprar, revivir es cuestion de dinero y lo de "un debilitado
+// esta muerto" se queda en un tramite. Solo pueden salir por el suelo, que lo
+// reparte otra opcion del randomizer y ahi no se toca.
+//
+// Se mira en LAS VEINTITRES, no solo en las nuestras: quitarlos de nuestro
+// catalogo deja las tres del randomizer intactas, y la regla valdria en veinte
+// sitios y no en tres, que es como no valer.
+const REVIVIR = [24, 25];
+const vendiaRevivir = TIENDAS.filter((d) => listaEn(rom, d).some((id) => REVIVIR.includes(id)));
+check('la ROM original si vende objetos de revivir', vendiaRevivir.length > 0,
+  `${vendiaRevivir.length} tiendas`);
+
+const siguenVendiendo = TIENDAS.filter((d) =>
+  listaEn(hecha.rom, d).some((id) => REVIVIR.includes(id)),
+);
+check('y despues no queda ninguno en ninguna tienda', siguenVendiendo.length === 0,
+  siguenVendiendo.map((d) => '0x' + d.toString(16)).join(' '));
+
 // --- 3. nada que la ROM no vendiera ya ---
 const catalogo = new Set(TIENDAS.flatMap((d) => listaEn(rom, d)));
 const nuevos = TIENDAS.flatMap((d) => listaEn(hecha.rom, d));
