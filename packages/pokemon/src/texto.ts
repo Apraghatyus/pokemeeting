@@ -57,6 +57,24 @@ const sueltos: Record<number, string> = {
   0x5b: '%',
   0x5c: '(',
   0x5d: ')',
+  // Las mayusculas acentuadas. La O salio de medirla: el movimiento 272 se
+  // guarda como "IMITACI?N" con un 0x0E en el hueco, y el 3 como
+  // "DOBLEBOFET?N" con el mismo byte. Las otras cuatro vienen de la misma tabla
+  // de la que ya salian la N con virgulilla (0x14) y esa misma O, asi que van
+  // con ella; si alguna estuviera mal se veria como una letra cambiada y no
+  // como texto roto.
+  //
+  // No es solo cosmetico: sin estos bytes, `pareceNombre` daba por basura toda
+  // entrada que llevara un acento, y por eso la tabla de nombres de movimiento
+  // no se encontraba buscandola por su forma.
+  // Y la U con dieresis, que salio sola: el movimiento 122 se guarda como
+  // "LENG?ETAZO" con un 0xf3 en el hueco, y ahi solo cabe una letra.
+  0xf3: 'Ü',
+  0x02: 'Á',
+  0x06: 'É',
+  0x0a: 'Í',
+  0x0e: 'Ó',
+  0x12: 'Ú',
   0x68: 'á',
   0x6f: 'í',
   0x73: 'ú',

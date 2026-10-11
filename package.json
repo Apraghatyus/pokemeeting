@@ -92,7 +92,8 @@
     "test:inyeccion": "node tools/tests/probar-inyeccion.mjs",
     "test:intercambio": "node tools/tests/probar-intercambio.mjs",
     "memoria:llenar": "npx tsx tools/memoria/llenar-equipo.mjs",
-    "memoria:intercambiar": "npx tsx tools/memoria/intercambiar.mjs"
+    "memoria:intercambiar": "npx tsx tools/memoria/intercambiar.mjs",
+    "test:movimientos": "npx tsx tools/tests/test-movimientos.mjs"
   },
   "engines": {
     "node": ">=20"

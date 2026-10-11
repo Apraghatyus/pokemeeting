@@ -6,6 +6,9 @@
 
 import { FIN, leerTexto, pareceNombre } from './texto';
 
+/** El guion, en el juego de caracteres del juego. Marca el movimiento 0. */
+const GUION = 0xae;
+
 /** Cada nombre de especie ocupa once bytes, rellenos con el terminador. */
 export const ANCHO_NOMBRE = 11;
 
@@ -34,6 +37,99 @@ const entradaValida = (rom: Uint8Array, offset: number): boolean => {
   // Un nombre de verdad termina antes de agotar el hueco.
   const fin = entrada.indexOf(FIN);
   return fin > 0 && fin <= ANCHO_NOMBRE;
+};
+
+/** Cada nombre de movimiento ocupa trece bytes, rellenos con el terminador. */
+export const ANCHO_MOVIMIENTO = 13;
+
+/** Huecos de movimiento en tercera generacion, contando el relleno inicial. */
+export const MOVIMIENTOS_GEN3 = 355;
+
+export type TablaMovimientos = {
+  /** Donde empieza el movimiento 0, que es el hueco de relleno. */
+  offset: number;
+  nombre: (movimiento: number) => string;
+};
+
+/**
+ * Localiza la tabla de nombres de movimiento dentro de una ROM.
+ *
+ * POR QUE NO SE PODIA ANTES, que es lo que costo: esto se intento con la misma
+ * tecnica que los nombres de especie -buscar una racha larga de entradas que
+ * parezcan un nombre- y no encontraba nada. La causa no estaba aqui sino en la
+ * tabla de caracteres: le faltaban las mayusculas acentuadas y la dieresis, asi
+ * que "IMITACION" o "LENGUETAZO" se daban por basura y la racha se partia en
+ * trozos cortos. Con esos caracteres puestos, la racha sale entera.
+ *
+ * Y NO SE PUEDE ANCLAR EN UN NOMBRE CONOCIDO, que es como se confirma la de
+ * especies: los Pokemon se llaman igual en todos los idiomas occidentales y los
+ * movimientos no -"Tackle" es "PLACAJE" aqui y otra cosa en frances-. El ancla
+ * es otra: el movimiento 0 no existe y el juego guarda ahi un guion suelto.
+ *
+ * Eso resuelve ademas el desplazamiento de una entrada, que es el mismo fallo
+ * que avisa la tabla de especies: la racha encontrada empieza DENTRO de la
+ * tabla anterior -la ultima especie, CHIMECHO- porque tambien parece un nombre.
+ * Medido en Rojo Fuego: la racha sale en 0x2427F3 y la tabla empieza en
+ * 0x242800, trece bytes mas alla. Buscando el guion se cae en el sitio.
+ */
+export const encontrarTablaMovimientos = (rom: Uint8Array): TablaMovimientos | null => {
+  const ancho = ANCHO_MOVIMIENTO;
+  /** Cuantos nombres seguidos hacen falta para creerselo. */
+  const suficientes = 300;
+
+  const entradaValida = (offset: number): boolean => {
+    const entrada = rom.subarray(offset, offset + ancho);
+    if (entrada.length < ancho) return false;
+    if (!pareceNombre(entrada)) return false;
+    const terminador = entrada.indexOf(FIN);
+    return terminador > 0 && terminador <= ancho;
+  };
+
+  for (let offset = 0; offset + ancho * suficientes < rom.length; offset += 1) {
+    // El ancla: un guion y, pegado, el terminador. Buscar eso byte a byte es
+    // mucho mas preciso que buscar una racha y luego intentar cuadrarla, que
+    // fue el primer intento: la racha empieza DENTRO de la tabla anterior -la
+    // ultima especie tambien parece un nombre- y en Esmeralda se colaba ademas
+    // desplazada un byte, que se veia como "ESTRUCTOR" en vez de "DESTRUCTOR".
+    // El relleno son guiones -uno en Rojo Fuego, DOS en Esmeralda- seguidos del
+    // terminador, asi que se cuentan en vez de dar por hecho que hay uno. Y se
+    // ancla en el PRIMERO: con dos, empezar por el segundo deja la tabla corrida
+    // un byte y se lee "ESTRUCTOR" donde dice "DESTRUCTOR".
+    if (rom[offset] !== GUION || rom[offset - 1] === GUION) continue;
+    let guiones = 0;
+    while (guiones < 4 && rom[offset + guiones] === GUION) guiones += 1;
+    if (rom[offset + guiones] !== FIN) continue;
+
+    // Y que ese guion sea de verdad el PRINCIPIO de una entrada.
+    //
+    // En Esmeralda el ancla sola no basta: hay un guion un byte mas adelante
+    // del sitio bueno y la tabla salia corrida, con "ESTRUCTOR" donde dice
+    // "DESTRUCTOR". Lo que lo distingue es lo que hay justo antes de cada
+    // entrada: con la tabla bien alineada es siempre relleno -el terminador o
+    // ceros-, y con un byte de mas es la letra anterior de un nombre.
+    let alineada = true;
+    for (let i = 1; i <= 20 && alineada; i += 1) {
+      const antes = rom[offset + i * ancho - 1];
+      if (antes !== FIN && antes !== 0) alineada = false;
+    }
+    if (!alineada) continue;
+
+    let seguidas = 0;
+    while (seguidas < MOVIMIENTOS_GEN3 && entradaValida(offset + (seguidas + 1) * ancho)) {
+      seguidas += 1;
+    }
+    if (seguidas < suficientes) continue;
+
+    return {
+      offset,
+      nombre: (movimiento: number): string =>
+        movimiento > 0 && movimiento < MOVIMIENTOS_GEN3
+          ? leerTexto(rom.subarray(offset + movimiento * ancho, offset + (movimiento + 1) * ancho))
+          : '',
+    };
+  }
+
+  return null;
 };
 
 export type TablaNombres = {
