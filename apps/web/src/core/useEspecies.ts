@@ -11,7 +11,12 @@
 // ordenador, ni la nuestra de aqui.
 
 import { useEffect, useMemo, useRef } from 'react';
-import { encontrarTablaDex, encontrarTablaEstadisticas, encontrarTablaNombres } from '@emupoke/pokemon';
+import {
+  encontrarTablaDex,
+  encontrarTablaEstadisticas,
+  encontrarTablaMovimientos,
+  encontrarTablaNombres,
+} from '@emupoke/pokemon';
 
 export type Especies = {
   nombre: (especie: number) => string;
@@ -30,6 +35,14 @@ export type Especies = {
    * una lista diria el tipo de siempre y seria falso en media partida.
    */
   tipos: (especie: number) => readonly [number, number] | null;
+  /**
+   * Como se llama un movimiento, o cadena vacia si no se sabe.
+   *
+   * De la ROM, como todo lo demas: los nombres de movimiento cambian con el
+   * idioma, asi que una lista nuestra solo valdria para uno. Lo usa el
+   * historial, que guarda numeros y les pone nombre al enseñarlos.
+   */
+  movimiento: (id: number) => string;
 };
 
 /**
@@ -43,6 +56,7 @@ export const useEspecies = (
   const nombresRef = useRef<((especie: number) => string) | null>(null);
   const dexRef = useRef<((especie: number) => number) | null>(null);
   const tiposRef = useRef<((especie: number) => readonly [number, number] | null) | null>(null);
+  const movimientosRef = useRef<((id: number) => string) | null>(null);
   const buscadaRef = useRef(false);
 
   useEffect(() => {
@@ -50,6 +64,7 @@ export const useEspecies = (
     nombresRef.current = null;
     dexRef.current = null;
     tiposRef.current = null;
+    movimientosRef.current = null;
     buscadaRef.current = false;
   }, [romName]);
 
@@ -66,6 +81,7 @@ export const useEspecies = (
       dexRef.current = encontrarTablaDex(rom)?.nacional ?? null;
       const stats = encontrarTablaEstadisticas(rom);
       tiposRef.current = stats ? (especie) => stats.estadisticas(especie)?.tipos ?? null : null;
+      movimientosRef.current = encontrarTablaMovimientos(rom)?.nombre ?? null;
     };
 
     return {
@@ -83,6 +99,12 @@ export const useEspecies = (
       tipos: (especie: number) => {
         asegurar();
         return tiposRef.current?.(especie) ?? null;
+      },
+      // Vacio y no "#45": quien lo ensena decide que poner cuando no se sabe, y
+      // un numero suelto en medio de una lista de nombres no dice nada.
+      movimiento: (id: number) => {
+        asegurar();
+        return movimientosRef.current?.(id) ?? '';
       },
     };
   }, [romBytesRef, romName]);

@@ -4746,3 +4746,178 @@ details.partidas[open] > summary::before {
 .liga__paso--bloqueado {
   opacity: 0.45;
 }
+
+/* ---------- el historial de partidas ----------
+
+   Una lista de lo que ya se acabo, y cada fila se abre para ver el equipo con
+   el que se acabo y los movimientos de cada uno. Se abre en vez de llevar a
+   otra pantalla porque lo que se hace aqui es comparar: mirar dos finales
+   seguidos sin perder el sitio. */
+.historial__resumen {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+}
+
+.historial__cuenta {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.historial__cuenta strong {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.historial__porcentaje {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.historial {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.historial__fila {
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  overflow: hidden;
+}
+
+.historial__cabecera {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.historial__cabecera:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Como acabo, que es lo primero que se busca al mirar una lista asi. */
+.historial__resultado {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--rojo);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.historial__resultado.is-victoria {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.historial__nombre {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.historial__datos {
+  flex: none;
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.historial__flecha {
+  flex: none;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* En un Soul Link, acabar por la pareja del otro es un final distinto de perder
+   en tu juego, y contarlo igual seria perderse la mitad de la historia. */
+.historial__enlace {
+  margin: 0;
+  padding: 0 12px 8px;
+  font-size: 11px;
+  color: var(--rojo);
+}
+
+.historial__equipo {
+  list-style: none;
+  margin: 0;
+  padding: 0 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.historial__pokemon {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+/* Quien cayo se apaga, como en el panel del equipo: es la misma informacion y
+   conviene que se lea igual en los dos sitios. */
+.historial__pokemon--caido {
+  opacity: 0.5;
+}
+
+.historial__quien {
+  display: flex;
+  flex-direction: column;
+  min-width: 120px;
+  font-size: 12px;
+}
+
+.historial__especie {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.historial__movimientos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.historial__movimiento {
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  font-size: 10px;
+  color: var(--text);
+}
+
+.historial__movimiento--sin {
+  color: var(--muted);
+  border-style: dashed;
+}
