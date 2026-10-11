@@ -1310,9 +1310,11 @@ Ciudad Celeste, ven" sin escribirlo. No toca la ROM.
   desaparecen y no hay reconexión posible; hay que crear una nueva. Con dos
   jugadores es una molestia; con quinientas parejas serían quinientas partidas
   cortadas de golpe, así que sube de prioridad en cuanto esto crezca.
-- **El mapa de depuración del núcleo se sube a producción.** Son 448 KB de
-  `mgba.wasm.map` que solo pide el navegador con las herramientas abiertas.
-  No hace daño, pero no pinta nada en el servidor.
+- ~~**El mapa de depuración del núcleo se sube a producción.**~~ **Resuelto.**
+  `sync-core.mjs` ya no lo copia al compilar -y además borra el que hubiera
+  dejado un `npm run dev`, que es lo que habría dejado el arreglo sin efecto en
+  la máquina donde más se nota-. En desarrollo se sigue copiando, que ahí es
+  justo para lo que sirve. Son 456 KB menos en el despliegue.
 - **Sin límite de espacio visible.** Se guardan hasta tres partidas de 16 MB,
   pero no se muestra cuánto ocupa ni se avisa si el navegador se queda sin
   sitio.
