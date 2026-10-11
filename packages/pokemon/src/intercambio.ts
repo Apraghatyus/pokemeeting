@@ -11,7 +11,8 @@
 // especie y su nombre intactos; lo que cambia es que en la ROM que lo recibe
 // esa especie puede tener otras estadisticas, otro tipo y otra habilidad.
 
-import { leerPokemon } from './gen3';
+import { escribirEspecie, escribirMote, leerPokemon } from './gen3';
+import { alIntercambiar, encontrarTablaEvoluciones } from './evoluciones';
 import {
   escribirContador,
   escribirEnRanura,
@@ -83,15 +84,25 @@ export type ContextoRom = {
   limites: Limites;
   estadisticas: (especie: number) => EstadisticasBase | null;
   nombre: (especie: number) => string;
+  /** En que se convierte al intercambiarlo, o null si en nada. */
+  evolucion: (especie: number, objeto: number) => number | null;
+  /** Su nombre en los bytes del juego, para poder reescribir el mote. */
+  nombreBruto: (especie: number) => Uint8Array | null;
 };
 
 export const contextoDeRom = (rom: Uint8Array): ContextoRom => {
   const stats = encontrarTablaEstadisticas(rom);
   const nombres = encontrarTablaNombres(rom);
+  // La tabla de evoluciones es de ESTA copia: si se aleatorizaron, Haunter
+  // puede convertirse aqui en algo que no es Gengar, y lo que manda es lo que
+  // diga el fichero que se esta jugando.
+  const evoluciones = encontrarTablaEvoluciones(rom);
   return {
     limites: limitesDeRom(rom),
     estadisticas: (especie) => stats?.estadisticas(especie) ?? null,
     nombre: (especie) => nombres?.nombre(especie) ?? `especie ${especie}`,
+    evolucion: (especie, objeto) => alIntercambiar(evoluciones, especie, objeto),
+    nombreBruto: (especie) => nombres?.bytes(especie) ?? null,
   };
 };
 
@@ -129,6 +140,13 @@ export type Recepcion = {
   /** El estado nuevo, listo para cargar. El original no se toca. */
   estado: Uint8Array;
   equipo: Equipo;
+  /**
+   * Si evoluciono al llegar, de que a que. Null si no.
+   *
+   * Se devuelve para poder decirlo: un Haunter que se convierte en Gengar sin
+   * avisar parece un fallo del programa, y es justo lo contrario.
+   */
+  evolucion: { de: string; a: string } | null;
 };
 
 /**
@@ -156,12 +174,44 @@ export const aplicarRecepcion = (
   const equipo = equipoDelJugador(estado);
   if (!equipo) throw new IntercambioInvalidoError('No encuentro tu equipo en la partida.');
 
+  // --- evolucionar, si le toca ---------------------------------------
+  //
+  // En el juego de verdad esto lo dispara el propio intercambio. Aqui el
+  // intercambio no pasa por el juego, asi que o se hace en este punto o un
+  // Haunter se queda Haunter para siempre; y Haunter SOLO evoluciona asi.
+  //
+  // Se mira contra la ROM que RECIBE, igual que todo lo demas: es la que va a
+  // jugar con ese Pokemon.
+  const llegado = leerPokemon(bloque);
+  const convertidoEn = contexto.evolucion(llegado.especie, llegado.objeto);
+
+  let conEspecie = bloque;
+  let evolucion: { de: string; a: string } | null = null;
+
+  if (convertidoEn !== null && convertidoEn !== llegado.especie) {
+    conEspecie = escribirEspecie(bloque, convertidoEn);
+    evolucion = { de: contexto.nombre(llegado.especie), a: contexto.nombre(convertidoEn) };
+
+    // Y el mote, pero SOLO si no tenia uno propio. En el juego, un Pokemon
+    // bautizado conserva su nombre al evolucionar y uno sin bautizar pasa a
+    // llamarse como su nueva especie. Se compara con el nombre de la especie
+    // de la que venia: si coincide es que nadie lo bautizo.
+    const comoSeLlamaba = contexto.nombreBruto(llegado.especie);
+    const comoSeLlamara = contexto.nombreBruto(convertidoEn);
+    if (comoSeLlamaba && comoSeLlamara && leerTexto(llegado.moteBruto) === leerTexto(comoSeLlamaba)) {
+      conEspecie = escribirMote(conEspecie, comoSeLlamara);
+    }
+  }
+
   // Un Pokemon guarda sus estadisticas ya calculadas y el juego solo las rehace
   // al subir de nivel. Si viene de una copia aleatorizada distinta, esas
   // estadisticas son las de la ROM de origen: hay que recalcularlas aqui o
   // arrastraria numeros ajenos durante media partida.
-  const base = contexto.estadisticas(leerPokemon(bloque).especie);
-  const ajustado = base ? recalcularEnBloque(bloque, base) : bloque;
+  //
+  // Y si acaba de evolucionar, con mas razon: las de Gengar no son las de
+  // Haunter. Por eso esto va DESPUES de cambiar la especie.
+  const base = contexto.estadisticas(leerPokemon(conEspecie).especie);
+  const ajustado = base ? recalcularEnBloque(conEspecie, base) : conEspecie;
 
   const nuevo = escribirEnRanura(estado, equipo.direccion, indice, ajustado);
 
@@ -182,7 +232,7 @@ export const aplicarRecepcion = (
       'El Pokemon no quedo bien escrito en la partida, asi que no se aplica el cambio.',
     );
   }
-  return { estado: conContador, equipo: comprobado };
+  return { estado: conContador, equipo: comprobado, evolucion };
 };
 
 /**

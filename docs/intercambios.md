@@ -75,16 +75,63 @@ uno. Por eso el intercambio es en dos fases y no se da por hecho hasta el final:
 Si algo falla antes de la confirmacion, los dos vuelven al estado anterior: el
 savestate previo sigue ahi, y recargarlo deshace todo limpiamente.
 
-## Limitacion conocida: evoluciones por intercambio
+## Evoluciones por intercambio — RESUELTO
 
 Machoke, Haunter, Kadabra y compania evolucionan porque el juego lo dispara al
-terminar la rutina de intercambio real. Moviendo el bloque de datos no pasamos
-por esa rutina, asi que **no evolucionan**.
+terminar la rutina de intercambio real. Moviendo el bloque de datos no se pasa
+por esa rutina, asi que durante un tiempo **no evolucionaban**: se cambiaban dos
+Haunter y los dos seguian siendo Haunter.
 
-No lo vamos a ocultar. La interfaz lo dira cuando el Pokemon ofrecido sea de los
-que evolucionan al intercambiar, y mas adelante podemos ofrecer un boton
-explicito de "forzar evolucion" que reescriba la especie, claramente marcado
-como lo que es: una intervencion del emulador, no una mecanica del juego.
+Eso no es un detalle que se pueda dejar pasar. Haunter, Machoke, Kadabra y
+Graveler **solo** evolucionan asi: sin esto, en este emulador no habia forma de
+tener un Gengar.
+
+**Ahora se hace al recibir**, en `aplicarRecepcion`. Son cuatro pasos:
+
+1. Se mira si la especie que llega tiene una evolucion por intercambio.
+2. Se le escribe la especie nueva en el bloque. La especie vive dentro de los
+   48 bytes cifrados, asi que hay que descifrar, escribir, volver a cifrar y
+   **rehacer el checksum**: un bloque cuya suma no cuadra lo pinta el juego
+   como "Bad Egg".
+3. Se recalculan las estadisticas con las de la especie nueva. Sin esto, el
+   Gengar pelearia con los numeros del Haunter hasta el siguiente nivel.
+4. Si no tenia mote propio, pasa a llamarse como su nueva especie. Si lo tenia,
+   lo conserva: es lo que hace el juego.
+
+**La lista sale de la ROM, no de un listado escrito a mano.** Son doce especies
+en un juego sin tocar, pero el aleatorizador puede cambiar a que evoluciona cada
+una, y una lista fija diria que Haunter se convierte en Gengar en una copia
+donde se convierte en otra cosa. Es la misma razon por la que los topes de los
+gimnasios y los nombres de los movimientos se leen del fichero.
+
+### Como se encuentra la tabla
+
+Por su forma. Son 412 especies con cinco huecos de ocho bytes:
+
+```
+u16 metodo | u16 parametro | u16 especie destino | u16 relleno
+```
+
+Lo que la hace reconocible es lo estricta que es: el relleno es cero en los
+2060 huecos, un metodo a cero obliga a que el hueco entero lo este, el metodo
+cabe en 1..15 y el destino en 1..411. Dieciseis mil bytes seguidos cumpliendo
+todo eso no salen por casualidad.
+
+Comprobado en los cinco juegos que se usan -Rojo Fuego, Verde Hoja, Esmeralda,
+Rubi y Zafiro-: en cada uno la busqueda encuentra **una sola** posicion, y es
+exactamente la que el propio aleatorizador lleva en su fichero de direcciones,
+que es un dato independiente del nuestro. Tarda entre 7 y 60 ms. Ver
+`test:evoluciones`.
+
+### Lo que se queda fuera
+
+- **La Pokedex no se entera.** En el juego, evolucionar registra la especie
+  nueva. Eso vive en el bloque de guardado, no en el Pokemon, y no se toca.
+- **El objeto no se gasta**, igual que en el juego: un Scyther que evoluciona
+  con la Garra Metal sigue llevandola puesta como Scizor.
+- **No hay animacion**, claro. En su lugar, el cartel del intercambio dice que
+  evoluciono y de que a que: un Haunter que entra convertido en Gengar sin
+  avisar parece un fallo del programa, y es justo lo contrario.
 
 ## Intercambiar entre ROMs randomizadas de forma distinta
 

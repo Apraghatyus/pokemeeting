@@ -138,6 +138,15 @@ export type TablaNombres = {
   /** Cuantas anclas coincidieron: 4 es confianza plena. */
   anclasVerificadas: number;
   nombre: (especie: number) => string;
+  /**
+   * El nombre tal y como esta en la ROM, sin traducir.
+   *
+   * Hace falta para escribir un mote: si un Haunter sin mote propio evoluciona
+   * al intercambiarlo, su nuevo mote tiene que ser "GENGAR" escrito en el juego
+   * de caracteres del juego y en el idioma de ESTA copia. Copiar los bytes de
+   * aqui evita traducir en los dos sentidos y acertar en ninguno.
+   */
+  bytes: (especie: number) => Uint8Array;
 };
 
 /**
@@ -172,7 +181,9 @@ export const encontrarTablaNombres = (rom: Uint8Array): TablaNombres | null => {
 
       const aciertos = ANCLAS.filter(([numero, esperado]) => nombre(numero) === esperado).length;
       if (aciertos >= 3) {
-        return { offset: inicio, anclasVerificadas: aciertos, nombre };
+        const bytes = (especie: number): Uint8Array =>
+          rom.slice(inicio + especie * ANCHO_NOMBRE, inicio + (especie + 1) * ANCHO_NOMBRE);
+        return { offset: inicio, anclasVerificadas: aciertos, nombre, bytes };
       }
     }
 

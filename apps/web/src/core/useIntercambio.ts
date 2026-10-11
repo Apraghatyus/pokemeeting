@@ -71,6 +71,14 @@ export type EstadoTrato = {
   aviso: string | null;
   /** Quedo un trato apuntado que no llego a terminarse. */
   aMedias: boolean;
+  /**
+   * Si el que llego evoluciono al entrar, de que a que.
+   *
+   * Hay que decirlo. Un Haunter que entra convertido en Gengar sin avisar
+   * parece un fallo del programa, y es justo lo contrario: es lo que habria
+   * pasado intercambiandolo con un cable.
+   */
+  evolucion: { de: string; a: string } | null;
 };
 
 const INICIAL: EstadoTrato = {
@@ -81,6 +89,7 @@ const INICIAL: EstadoTrato = {
   suListo: false,
   aviso: null,
   aMedias: false,
+  evolucion: null,
 };
 
 const aBase64 = (bytes: Uint8Array): string => {
@@ -217,54 +226,63 @@ export const useIntercambio = (
   );
 
   /**
-   * Escribe el Pokemon recibido en la partida. Devuelve el fallo, o null.
+   * Escribe el Pokemon recibido en la partida.
+   *
+   * Devuelve el fallo -o null si fue bien- y, si el que llego evoluciono al
+   * entrar, de que a que: eso hay que contarlo, no dejarlo pasar.
    *
    * Se apunta en el diario ANTES de tocar nada. Y se comprueba que no haya un
    * combate en marcha: cargar un estado editado en mitad de un combate es como
    * se corrompe una partida.
    */
   const aplicar = useCallback(
-    (diario: Diario): string | null => {
-      if (!partida) return 'No se a que partida pertenece esto.';
+    (diario: Diario): { fallo: string | null; evolucion: { de: string; a: string } | null } => {
+      const mal = (que: string) => ({ fallo: que, evolucion: null });
+
+      if (!partida) return mal('No se a que partida pertenece esto.');
       const ctx = contexto();
-      if (!ctx) return 'Todavia no tengo tu ROM cargada.';
+      if (!ctx) return mal('Todavia no tengo tu ROM cargada.');
 
       const actual = mirarPartida();
-      if (!actual) return 'No he podido leer tu partida.';
+      if (!actual) return mal('No he podido leer tu partida.');
 
       let codigo = '';
       try {
         codigo = leerCabecera(actual).codigoJuego;
       } catch {
-        return 'Esa partida no la se interpretar.';
+        return mal('Esa partida no la se interpretar.');
       }
 
       if (enCombate(actual, codigo) === true) {
-        return 'Estas en mitad de un combate. Sal al mapa y vuelve a intentarlo.';
+        return mal('Estas en mitad de un combate. Sal al mapa y vuelve a intentarlo.');
       }
 
       // Con el codigo del juego: sin el se puede acabar mirando el equipo rival.
       if (!localizarEquipo(actual, undefined, codigo)) {
-        return 'No encuentro tu equipo en la partida.';
+        return mal('No encuentro tu equipo en la partida.');
       }
 
       escribirDiario(partida, diario);
 
+      let evolucion: { de: string; a: string } | null = null;
       try {
-        const { estado: nuevo } = aplicarRecepcion(
+        const aplicado = aplicarRecepcion(
           actual,
           null,
           diario.ranura,
           deBase64(diario.recibo),
           ctx,
         );
-        if (!cargarPartida(nuevo)) return 'No he podido devolverle la partida al emulador.';
+        evolucion = aplicado.evolucion;
+        if (!cargarPartida(aplicado.estado)) {
+          return { fallo: 'No he podido devolverle la partida al emulador.', evolucion: null };
+        }
       } catch (err) {
-        return err instanceof Error ? err.message : String(err);
+        return { fallo: err instanceof Error ? err.message : String(err), evolucion: null };
       }
 
       escribirDiario(partida, null);
-      return null;
+      return { fallo: null, evolucion };
     },
     [cargarPartida, contexto, mirarPartida, partida],
   );
@@ -339,12 +357,13 @@ export const useIntercambio = (
       setEstado((previo) => ({ ...previo, aMedias: false }));
       return;
     }
-    const fallo = aplicar(diario);
+    const { fallo, evolucion } = aplicar(diario);
     setEstado((previo) => ({
       ...previo,
       aviso: fallo ?? 'Listo: el intercambio que quedo a medias ya esta aplicado.',
       aMedias: fallo !== null,
       fase: fallo === null ? 'hecho' : previo.fase,
+      evolucion,
     }));
   }, [aplicar, partida]);
 
@@ -399,7 +418,7 @@ export const useIntercambio = (
     aplicandoRef.current = true;
     setEstado((previo) => ({ ...previo, fase: 'aplicando' }));
 
-    const fallo = aplicar({
+    const { fallo, evolucion } = aplicar({
       trato: mia.trato,
       ranura: mia.ranura,
       recibo: suya.bloque,
@@ -412,6 +431,7 @@ export const useIntercambio = (
       fase: fallo === null ? 'hecho' : 'roto',
       aviso: fallo,
       aMedias: fallo !== null,
+      evolucion,
     }));
   }, [aplicar, estado]);
 

@@ -184,6 +184,17 @@ export const IntercambioModal = ({
               </section>
             )}
 
+            {/* Si evoluciono al llegar hay que decirlo, y antes que nada: un
+                Haunter que entra convertido en Gengar sin avisar parece un
+                fallo del programa, y es justo lo contrario. Es lo que habria
+                pasado intercambiandolo con un cable. */}
+            {estado.fase === 'hecho' && estado.evolucion && (
+              <p className="trato__evolucion">
+                ¡Y evolucionó al llegar! Tu <strong>{estado.evolucion.de}</strong> ahora es un{' '}
+                <strong>{estado.evolucion.a}</strong>.
+              </p>
+            )}
+
             <p className="hint">
               {estado.fase === 'hecho'
                 ? 'Hecho. El Pokemon ya esta en tu equipo.'

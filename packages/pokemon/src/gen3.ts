@@ -170,6 +170,63 @@ export const recalcularChecksum = (bloque: Uint8Array): Uint8Array => {
   return copia;
 };
 
+/**
+ * Cambia de especie a un Pokemon, dejando el bloque valido.
+ *
+ * Son tres pasos y los tres son obligatorios: la especie vive dentro de los 48
+ * bytes CIFRADOS, asi que hay que descifrar, escribir y volver a cifrar; y
+ * despues rehacer el checksum, porque los datos han cambiado y el juego
+ * rechaza como "Bad Egg" cualquier bloque cuya suma no cuadre.
+ *
+ * Lo usa la evolucion al intercambiar. Lo que NO hace es recalcular las
+ * estadisticas: eso es otra cosa y la hace `recalcularEnBloque`, que necesita
+ * los datos base de la nueva especie en ESTA ROM.
+ */
+export const escribirEspecie = (bloque: Uint8Array, especie: number): Uint8Array => {
+  const copia = bloque.slice();
+  const personalidad = u32(copia, OFF.personalidad);
+  const clave = (personalidad ^ u32(copia, OFF.idEntrenador)) >>> 0;
+
+  const datos = descifrarDatos(copia);
+  const g = posicionDe(personalidad, 'G');
+  datos[g] = especie & 0xff;
+  datos[g + 1] = (especie >>> 8) & 0xff;
+
+  // El cifrado es el mismo XOR de antes, palabra a palabra.
+  for (let i = 0; i < 48; i += 4) {
+    const palabra = (u32(datos, i) ^ clave) >>> 0;
+    copia[OFF.datos + i] = palabra & 0xff;
+    copia[OFF.datos + i + 1] = (palabra >>> 8) & 0xff;
+    copia[OFF.datos + i + 2] = (palabra >>> 16) & 0xff;
+    copia[OFF.datos + i + 3] = (palabra >>> 24) & 0xff;
+  }
+
+  // El checksum se calcula sobre los datos DESCIFRADOS, que son los que
+  // acabamos de cambiar.
+  const suma = calcularChecksum(datos);
+  copia[OFF.checksum] = suma & 0xff;
+  copia[OFF.checksum + 1] = (suma >>> 8) & 0xff;
+  return copia;
+};
+
+/**
+ * Le pone otro mote, en los bytes del propio juego.
+ *
+ * Se le pasan los bytes ya en el juego de caracteres de la ROM -por ejemplo,
+ * copiados de su tabla de nombres- porque asi no hay que traducir en ningun
+ * sentido y el mote queda escrito en el idioma de la copia que lo recibe.
+ *
+ * El mote NO va cifrado, asi que esto no toca el checksum.
+ */
+export const escribirMote = (bloque: Uint8Array, mote: Uint8Array): Uint8Array => {
+  const copia = bloque.slice();
+  for (let i = 0; i < 10; i += 1) copia[OFF.mote + i] = i < mote.length ? mote[i]! : FIN_DE_TEXTO;
+  return copia;
+};
+
+/** El 0xFF que cierra una cadena del juego. Se repite aqui para no depender. */
+const FIN_DE_TEXTO = 0xff;
+
 /** Si un bloque parece de verdad un Pokemon y no memoria cualquiera. */
 export const pareceValido = (bloque: Uint8Array, maxEspecie = 411): boolean => {
   if (bloque.length < TAMANO_EN_EQUIPO) return false;

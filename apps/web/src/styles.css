@@ -4948,3 +4948,16 @@ details.partidas[open] > summary::before {
   color: var(--ok);
   border-color: color-mix(in srgb, var(--ok) 45%, transparent);
 }
+
+/* Evoluciono al intercambiarlo. Se destaca porque es una sorpresa buena y
+   porque, sin decirlo, parece que el programa cambio el Pokemon por otro. */
+.trato__evolucion {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--ok) 40%, transparent);
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+  color: var(--text);
+  font-family: var(--tipo-texto);
+  font-size: 14px;
+}
