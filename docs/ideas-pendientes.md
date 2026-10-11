@@ -936,10 +936,21 @@ vuelve a jugar, así que un historial que empiece a llenarse el día que se
 escriba su pantalla nace vacío. Lo que falta por hacer es enseñarlo, no
 recogerlo.
 
-**Ya está hecho**, en Ajustes → Historial: la lista de partidas terminadas, de
-la más reciente a la más vieja, el porcentaje de victorias y cada fila
-desplegable con hasta dónde llegó, qué equipo tenía y **los cuatro movimientos
-de cada Pokémon, con su nombre**. `HistorialModal`, `test:historial`.
+**La pantalla está escrita, pero no se enseña, y es a propósito.** El historial
+va a tener **su propia página** el día que haya cuentas, en vez de ser una
+tarjeta escondida en Ajustes: es lo que se mira cuando no estás jugando, y ahí
+dentro no es donde se busca. Así que `HistorialModal` se queda en el repositorio
+sin enchufar a ningún botón -tiene el aviso en su cabecera- y volver a
+enchufarlo es un botón.
+
+Lo que **sí sigue funcionando es apuntarlo**, y eso no se puede pausar: una
+partida terminada no se vuelve a jugar. `test:historial` comprueba justamente
+eso, que se siga guardando ahora que no se ve.
+
+Lo que la pantalla ya resuelve, y no habrá que volver a pensar: la lista de la
+más reciente a la más vieja, el porcentaje de victorias y cada fila desplegable
+con hasta dónde llegó, qué equipo tenía y **los cuatro movimientos de cada
+Pokémon, con su nombre**.
 
 Dos decisiones que se tomaron al hacerlo y conviene no deshacer:
 
@@ -1118,10 +1129,15 @@ arregla eso: una sala es un par de WebSockets abiertos, y si el proceso se cae,
 las conexiones se caen con él. Guardarlas serviría para que los dos pudieran
 volver a entrar en la misma sala, no para que la conexión sobreviva.
 
-**Y la recomendación de orden:** lo que hay hoy en el navegador ya da el
-historial y el porcentaje. La base de datos no añade una función nueva, añade
-que te siga a otro aparato y que puedas compararte con tu compañera. Vale la
-pena, pero conviene tener claro que se paga con todo lo de la lista de arriba.
+**Y la recomendación de orden:** lo que hay hoy en el navegador ya da para el
+historial y el porcentaje -de hecho la pantalla está escrita, solo que sin
+enchufar hasta que tenga su propia página-. La base de datos no añade una
+función nueva, añade que te siga a otro aparato y que puedas compararte con tu
+compañera. Vale la pena, pero conviene tener claro que se paga con todo lo de la
+lista de arriba.
+
+Y van juntas: la página del historial y las cuentas se hacen de una vez, porque
+es la misma pantalla con y sin tus datos dentro.
 
 ---
 

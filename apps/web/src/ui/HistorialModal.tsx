@@ -1,5 +1,15 @@
 // Las partidas que ya se acabaron.
 //
+// SIN ENCHUFAR, A PROPOSITO. Esta pantalla no se abre desde ningun sitio: el
+// historial va a tener su propia pagina el dia que haya cuentas, y hasta
+// entonces no se ensena. Lo que SI sigue funcionando es apuntarlo -ver
+// `historial.ts`-, que es lo que importa: el dia que exista esa pagina habra
+// algo que contar en vez de empezar de cero.
+//
+// Esto se queda aqui porque la parte dificil ya esta resuelta -resolver los
+// nombres con la ROM, plegar el equipo, cuando el porcentaje miente- y tirarlo
+// seria volver a pensarlo. Enchufarlo de nuevo es un boton.
+//
 // Lo que se apunta al terminar una partida lleva un tiempo guardandose sin que
 // se viera en ningun sitio -ver `historial.ts`-, y esto es enseñarlo. Se hizo en
 // ese orden a proposito: una partida terminada no se vuelve a jugar, asi que un

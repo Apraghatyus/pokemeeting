@@ -13,8 +13,10 @@
 //      Se comprueban contra un estado de verdad.
 //   2. Que al acabar una partida queda apuntada: como acabo, por donde iba y
 //      con que equipo.
-//   3. Que eso se puede ver: la pantalla del historial, con su desplegable y
-//      los movimientos con su nombre.
+//
+// La pantalla que lo ensenaba esta sin enchufar a proposito -el historial sera
+// su propia pagina el dia que haya cuentas-, asi que aqui no se mira: lo que se
+// prueba es que se sigue apuntando, que es lo que no se puede recuperar luego.
 //
 // Lo segundo necesita la aplicacion levantada (npm run dev:all).
 //
@@ -193,65 +195,6 @@ check('y volver a verlo no la apunta dos veces', otraVez.length === 1, `${otraVe
 const comoTexto = JSON.stringify(otraVez);
 check('lo apuntado son numeros y motes, nada del juego',
   comoTexto.length < 4000, `${comoTexto.length} caracteres`);
-
-// --- 3. y se puede ver ---
-//
-// Los nombres se resuelven con la ROM cargada -lo guardado son numeros- asi que
-// la pantalla se mira con la partida puesta, que es como se va a mirar.
-// El cartel de fin esta delante -la partida se acaba de dar por terminada- y
-// tapa el menu. Se cierra con su X, que es la salida que NO marca nada.
-await page.locator('.modal[open] .modal__close').first().click().catch(() => {});
-await page.waitForTimeout(500);
-
-await page.locator('.iconbutton--opciones').click();
-await page.getByRole('button', { name: 'Ver las partidas terminadas' }).click();
-await page.waitForTimeout(600);
-
-const cartel = page.locator('.modal[open]');
-check('el historial se abre', (await cartel.locator('.historial').count()) === 1);
-check('con la partida que se acabo',
-  (await cartel.locator('.historial__fila').count()) === 1,
-  `${await cartel.locator('.historial__fila').count()} filas`);
-check('diciendo como acabo',
-  ((await cartel.locator('.historial__resultado').textContent()) ?? '').trim() === 'Derrota',
-  (await cartel.locator('.historial__resultado').textContent()) ?? '');
-
-// Con pocas partidas el porcentaje no dice nada y parece que si: hasta que hay
-// unas cuantas se ensena la cuenta cruda.
-check('y sin porcentaje, que con una partida no significaria nada',
-  (await cartel.locator('.historial__porcentaje').count()) === 0);
-check('pero con la cuenta, que si es cierta',
-  ((await cartel.locator('.historial__cuenta').textContent()) ?? '').includes('de 1'),
-  (await cartel.locator('.historial__cuenta').textContent()) ?? '');
-
-// El equipo esta plegado: una lista de finales se mira de arriba abajo, y seis
-// Pokemon por fila la convertirian en algo que hay que recorrer.
-check('el equipo viene plegado', (await cartel.locator('.historial__pokemon').count()) === 0);
-await cartel.locator('.historial__cabecera').click();
-await page.waitForTimeout(400);
-
-const equipoVisible = await cartel.locator('.historial__pokemon').count();
-if (equipoVisible === 0) {
-  console.log('SALTO  el desplegable: esa partida no llego a guardar equipo');
-} else {
-  check('y al abrir sale el equipo', equipoVisible > 0, `${equipoVisible} Pokemon`);
-
-  const texto = ((await cartel.locator('.historial__equipo').textContent()) ?? '')
-    .replace(/\s+/g, ' ');
-  check('con su mote, su especie y su nivel',
-    /MEH/.test(texto) && /GIRAFARIG/i.test(texto) && /Nv\.10/.test(texto), texto.slice(0, 90));
-
-  // LO QUE SE VINO A BUSCAR: los movimientos con su nombre, no con su numero.
-  // Salen de la tabla de la ROM; si no se encontrara, se verian como "#45".
-  const movimientos = await cartel.locator('.historial__movimiento').allTextContents();
-  check('y los movimientos con su nombre, no con su numero',
-    movimientos.length > 0 && movimientos.every((m) => !/^#\d+$/.test(m)),
-    movimientos.slice(0, 6).join(', '));
-  // Uno concreto, para que no valga con que sean "nombres" cualesquiera: el
-  // Pokemon de esta partida sabe el movimiento 45, que es GRUÑIDO.
-  check('y son los suyos de verdad', movimientos.includes('GRUÑIDO'),
-    movimientos.slice(0, 8).join(', '));
-}
 
 await navegador.close();
 console.log(

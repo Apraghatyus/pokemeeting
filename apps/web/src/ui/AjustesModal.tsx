@@ -42,8 +42,6 @@ type Props = {
   onAleatorizar: () => void;
   /** Boton para copiar la semilla, o null si esta partida no tiene. */
   copiarSemilla: ReactNode;
-  /** Abre el historial de partidas terminadas. */
-  onHistorial: () => void;
 };
 
 const MODOS: { valor: ModoMando; etiqueta: string }[] = [
@@ -63,7 +61,6 @@ export const AjustesModal = ({
   conCompanero,
   onAleatorizar,
   copiarSemilla,
-  onHistorial,
 }: Props) => (
   <Modal
     open={open}
@@ -104,19 +101,6 @@ export const AjustesModal = ({
               queda en este navegador.
             </p>
           )}
-        </section>
-
-        {/* Va fuera de la parte de aleatorizar, que solo sale con una ROM
-            puesta: el historial son las partidas que YA se acabaron y se mira
-            sobre todo cuando no estas jugando ninguna. */}
-        <section className="tarjeta">
-          <Titulo>Historial</Titulo>
-          <button type="button" className="boton-ancho" onClick={onHistorial}>
-            Ver las partidas terminadas
-          </button>
-          <p className="hint">
-            Cómo acabó cada una, hasta dónde llegaste y con qué equipo. Vive en este navegador.
-          </p>
         </section>
 
         <section className="tarjeta">

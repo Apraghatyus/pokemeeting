@@ -19,7 +19,6 @@ import { nombreDePartida, sePuedeRehacer, todasLasPartidas } from './core/partid
 import { motesDebilitados, parseGameCode } from '@emupoke/pokemon';
 import { EquipoPanel } from './ui/EquipoPanel';
 import { AjustesModal } from './ui/AjustesModal';
-import { HistorialModal } from './ui/HistorialModal';
 import { IntercambioModal } from './ui/IntercambioModal';
 import { useIntercambio } from './core/useIntercambio';
 import { FinModal } from './ui/FinModal';
@@ -80,7 +79,6 @@ export const App = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [tratoOpen, setTratoOpen] = useState(false);
   const [randomizerOpen, setRandomizerOpen] = useState(false);
-  const [historialOpen, setHistorialOpen] = useState(false);
 
   // El mando en pantalla aparece solo cuando hace falta: lo decide con que se
   // esta jugando, no que aparato es. Desde el menu se fuerza a mano.
@@ -90,7 +88,7 @@ export const App = () => {
   // este en un boton: si no, las flechas moverian al personaje por detras.
   const keyboardOwner = useKeyboardOwnership(
     emulator.coreRef,
-    roomOpen || menuOpen || randomizerOpen || tratoOpen || historialOpen || invitacion !== null,
+    roomOpen || menuOpen || randomizerOpen || tratoOpen || invitacion !== null,
   );
 
   // Espacio enciende y apaga el avance rapido, como en casi cualquier emulador.
@@ -488,14 +486,6 @@ export const App = () => {
           generacion={generacionDelEquipo(equipoMio.equipo)}
         />
 
-        <HistorialModal
-          open={historialOpen}
-          onClose={() => setHistorialOpen(false)}
-          /* Los nombres los pone TU ROM, igual que en el panel del equipo: lo
-             guardado son numeros. */
-          especies={especies}
-        />
-
         <AjustesModal
           open={menuOpen}
           onClose={() => setMenuOpen(false)}
@@ -510,12 +500,6 @@ export const App = () => {
             setRandomizerOpen(true);
           }}
           copiarSemilla={<CopiarSemilla crc32={state.header?.crc32 ?? null} />}
-          onHistorial={() => {
-            // Se cierra el de ajustes: dos dialogos abiertos a la vez dejan el
-            // de abajo a medio tapar y sin forma clara de volver.
-            setMenuOpen(false);
-            setHistorialOpen(true);
-          }}
         />
       </main>
 
