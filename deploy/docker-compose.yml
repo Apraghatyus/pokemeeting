@@ -4,6 +4,49 @@
 name: emupoke
 
 services:
+  # La base de datos de las cuentas y el historial.
+  #
+  # NO SALE A INTERNET. Vive en la red interna y solo la ve el servidor; el
+  # proxy de delante no la enruta y no tiene ningun hostname publico. Para
+  # desarrollar contra ella desde otra maquina se abre su puerto SOLO en la
+  # direccion que diga EMUPOKE_PG_BIND -la de Tailscale-, nunca en 0.0.0.0.
+  #
+  # Lo unico que guarda son cuentas, partidas terminadas y equipos: numeros,
+  # motes y fechas. Ni ROMs ni guardados. Esa linea no la cruza nada de aqui.
+  base:
+    image: postgres:16-alpine
+    container_name: emupoke-base
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${EMUPOKE_PG_BASE:-emupoke}
+      POSTGRES_USER: ${EMUPOKE_PG_USUARIO:-emupoke}
+      # Obligatoria y sin valor por defecto: una base con contrasena conocida
+      # es una base sin contrasena.
+      POSTGRES_PASSWORD: ${EMUPOKE_PG_CLAVE:?hace falta EMUPOKE_PG_CLAVE en .env}
+      # Con esto, el primer arranque crea el cluster ya exigiendo contrasena
+      # tambien a las conexiones locales.
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256 --auth-local=scram-sha-256
+    volumes:
+      - base:/var/lib/postgresql/data
+    ports:
+      # Por defecto solo desde la propia maquina. Para desarrollar desde el
+      # portatil: EMUPOKE_PG_BIND=<ip de Tailscale> en el .env.
+      - "${EMUPOKE_PG_BIND:-127.0.0.1}:${EMUPOKE_PG_PUERTO:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${EMUPOKE_PG_USUARIO:-emupoke} -d ${EMUPOKE_PG_BASE:-emupoke}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks: [interna]
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+
   servidor:
     build:
       context: ${EMUPOKE_REPO:-..}
@@ -17,8 +60,16 @@ services:
       RANDOMIZER_CONCURRENCIA: "2"
       RANDOMIZER_MAX_COLA: "50"
       RANDOMIZER_XMX: "768M"
+      # El servicio de cuentas. Sin DATABASE_URL no arranca esa pieza y las
+      # otras dos siguen funcionando: jugar no depende de tener cuenta.
+      DATABASE_URL: postgres://${EMUPOKE_PG_USUARIO:-emupoke}:${EMUPOKE_PG_CLAVE:?hace falta EMUPOKE_PG_CLAVE en .env}@base:5432/${EMUPOKE_PG_BASE:-emupoke}
+      # Las cookies de sesion se marcan Secure: detras del tunel todo es HTTPS.
+      CUENTAS_COOKIE_SEGURA: "1"
+    depends_on:
+      base:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "-e", "Promise.all([8787,8788].map(p=>fetch('http://127.0.0.1:'+p+'/health').then(r=>{if(!r.ok)throw r.status}))).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "Promise.all([8787,8788,8789].map(p=>fetch('http://127.0.0.1:'+p+'/health').then(r=>{if(!r.ok)throw r.status}))).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
       start_period: 30s
@@ -51,6 +102,10 @@ services:
           cpus: "0.50"
     labels:
       - "com.centurylinklabs.watchtower.enable=false"
+
+volumes:
+  # Lo unico del proyecto que hay que respaldar. Hasta ahora no habia nada.
+  base:
 
 networks:
   interna:

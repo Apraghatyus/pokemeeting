@@ -310,7 +310,13 @@ lo demas, y el motivo no es tecnico: es que quieres poder elegir el proveedor de
 TURN por el precio del ancho de banda, que es un criterio distinto al de las
 otras dos.
 
-Lo que no hace falta en ningun caso: **base de datos, ni respaldos, ni
+**Desde que hay cuentas esto cambia a medias.** PostgreSQL pide unos 512 MB y
+un volumen que si hay que respaldar. Pero solo si se quieren cuentas: sin
+`DATABASE_URL` esa pieza no arranca y todo lo de abajo sigue siendo cierto. Y
+lo que crece es ridiculo al lado de una ROM: una partida terminada con su
+equipo son unos 400 bytes, asi que cien mil finales no llegan a 50 MB.
+
+Lo que no hace falta en ningun caso: **respaldos de partidas ni de ROMs, ni
 almacenamiento**. El servidor no guarda partidas, ni guardados, ni ROMs. Nada que
 respaldar, y la linea legal del proyecto intacta: la ROM va y vuelve a quien la
 mando, y no se queda.

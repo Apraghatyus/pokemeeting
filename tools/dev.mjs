@@ -29,7 +29,7 @@ import { resolve } from 'node:path';
  */
 const CON_TUNEL = process.argv.includes('--tunel');
 
-const SERVICIOS = [
+const TODOS = [
   {
     nombre: 'salas',
     comando: ['run', 'dev:signaling'],
@@ -47,6 +47,18 @@ const SERVICIOS = [
     opcional: true,
   },
   {
+    nombre: 'cuentas',
+    comando: ['run', 'dev:cuentas'],
+    puerto: 8789,
+    color: '\u001b[32m',
+    salud: 'http://127.0.0.1:8789/health',
+    // Sin esto se juega igual: no habria donde iniciar sesion, y ya. Ademas
+    // necesita una base de datos, que no todo el mundo va a tener levantada
+    // para trabajar en el emulador.
+    opcional: true,
+    soloSi: () => Boolean(process.env['DATABASE_URL']),
+  },
+  {
     nombre: 'web   ',
     comando: ['run', CON_TUNEL ? 'dev:tunnel' : 'dev'],
     puerto: 5173,
@@ -54,6 +66,23 @@ const SERVICIOS = [
     salud: 'http://localhost:5173/',
   },
 ];
+
+/**
+ * Las piezas que de verdad se van a arrancar.
+ *
+ * El servicio de cuentas necesita una base de datos y no todo el mundo la
+ * tiene levantada para trabajar en el emulador. Sin DATABASE_URL simplemente
+ * no esta, en vez de arrancar y morir con un error que no le importa a quien
+ * esta tocando otra cosa.
+ */
+const SERVICIOS = TODOS.filter((s) => !s.soloSi || s.soloSi());
+
+if (TODOS.length !== SERVICIOS.length) {
+  console.log(
+    '\u001b[2mSin DATABASE_URL: no se arranca el servicio de cuentas. ' +
+      'Lo demas va igual.\u001b[0m\n',
+  );
+}
 
 /**
  * Si hay alguien escuchando ya en ese puerto.

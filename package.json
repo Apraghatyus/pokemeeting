@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "npm run dev --workspace=@emupoke/web",
     "dev:signaling": "npm run dev --workspace=@emupoke/signaling",
+    "dev:cuentas": "npm run dev --workspace=@emupoke/cuentas",
     "build": "npm run build --workspace=@emupoke/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "smoke": "node tools/tests/smoke.mjs",
@@ -93,7 +94,8 @@
     "test:intercambio": "node tools/tests/probar-intercambio.mjs",
     "memoria:llenar": "npx tsx tools/memoria/llenar-equipo.mjs",
     "memoria:intercambiar": "npx tsx tools/memoria/intercambiar.mjs",
-    "test:movimientos": "npx tsx tools/tests/test-movimientos.mjs"
+    "test:movimientos": "npx tsx tools/tests/test-movimientos.mjs",
+    "test:cuentas": "node tools/tests/test-cuentas.mjs"
   },
   "engines": {
     "node": ">=20"

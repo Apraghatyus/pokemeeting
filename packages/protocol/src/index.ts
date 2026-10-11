@@ -3,6 +3,11 @@
 // Vive en un paquete aparte porque lo usan los dos lados: si cambia un mensaje,
 // que el compilador rompa en ambos a la vez y no en produccion.
 
+// Las cuentas hablan su propio idioma -usuarios, contrasenas, lo que se sube-
+// y esta en su fichero, pero sale por la misma puerta: los dos lados importan
+// de "@emupoke/protocol" y ya.
+export * from './cuentas';
+
 /**
  * Identidad de una ROM. Viaja entre jugadores para comprobar compatibilidad.
  * Nunca viaja la ROM en si: solo estos datos de su cabecera.

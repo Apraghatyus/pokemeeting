@@ -14,6 +14,7 @@
 // para encontrar una cosa.
 
 import type { ReactNode } from 'react';
+import type { Cuenta } from '@emupoke/protocol';
 import type { EmulatorState } from '../core/useEmulator';
 import type { MandoTactil, ModoMando } from '../core/useMandoTactil';
 import { BOTONES, nombreVisible, type Teclas } from '../core/useTeclas';
@@ -42,6 +43,10 @@ type Props = {
   onAleatorizar: () => void;
   /** Boton para copiar la semilla, o null si esta partida no tiene. */
   copiarSemilla: ReactNode;
+  /** Quien eres, o null si no has entrado. */
+  cuenta: Cuenta | null;
+  /** Abre la pantalla de entrar. */
+  onCuenta: () => void;
 };
 
 const MODOS: { valor: ModoMando; etiqueta: string }[] = [
@@ -61,6 +66,8 @@ export const AjustesModal = ({
   conCompanero,
   onAleatorizar,
   copiarSemilla,
+  cuenta,
+  onCuenta,
 }: Props) => (
   <Modal
     open={open}
@@ -100,6 +107,33 @@ export const AjustesModal = ({
               Guardado a las {new Date(state.lastSaveAt).toLocaleTimeString('es')}. La partida
               queda en este navegador.
             </p>
+          )}
+        </section>
+
+        {/* Va en la columna de "lo que haces" y no en la de la partida: la
+            cuenta no depende de que haya una ROM puesta, y de hecho el mejor
+            momento para entrar es justo cuando no estas jugando. */}
+        <section className="tarjeta">
+          <Titulo>Tu cuenta</Titulo>
+          {cuenta ? (
+            <>
+              <p className="cuenta__quien">
+                Has entrado como <strong>{cuenta.apodo}</strong>
+              </p>
+              <button type="button" className="boton-ancho" onClick={onCuenta}>
+                Ver tu cuenta
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="boton-ancho" onClick={onCuenta}>
+                Entrar o crear una cuenta
+              </button>
+              <p className="hint">
+                No hace falta para jugar. Sirve para que tu historial no viva solo en este
+                navegador.
+              </p>
+            </>
           )}
         </section>
 

@@ -60,6 +60,14 @@ const proxy: Record<string, ProxyOptions> = {
   },
 };
 
+// Las cuentas, por el mismo camino que las salas: asi en desarrollo y en
+// produccion la direccion es la misma -/cuentas- y la galleta de sesion es de
+// este origen, sin permisos de origen cruzado de por medio.
+proxy['/cuentas'] = {
+  target: 'http://127.0.0.1:8789',
+  rewrite: (path) => path.replace(/^\/cuentas/, ''),
+};
+
 /** Hosts que consideramos "esta misma maquina". */
 const isLocalHost = (host: string | undefined): boolean =>
   /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(host ?? '');

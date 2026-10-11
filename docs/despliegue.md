@@ -26,16 +26,18 @@ y un dominio `<ip>.sslip.io`.
 
 ## Lo que vas a montar
 
-Son tres piezas, y solo una mira a internet:
+Son cuatro piezas, y solo una mira a internet:
 
 ```
         internet
            |
     [ proxy inverso ]   <- aqui viven el HTTPS y las dos cabeceras
-     /      |      \
-ficheros  /signaling  /randomizer
-estaticos    :8787       :8788
-  (dist)     Node      Node + Java
+     /     |      |     \
+ficheros /signaling /randomizer /cuentas
+estaticos  :8787      :8788      :8789
+  (dist)   Node    Node + Java   Node
+                                   |
+                              [ PostgreSQL ]  <- no sale a internet
 ```
 
 - **La aplicacion** es un monton de ficheros estaticos. No necesita Node para
@@ -46,9 +48,19 @@ estaticos    :8787       :8788
 - **El servicio de aleatorizacion** es opcional. Sin el, la aplicacion funciona
   entera salvo el menu de aleatorizar.
 
-Lo que **no** hay es base de datos. El servidor no guarda partidas, ni ROMs, ni
-guardados: todo eso vive en el navegador de cada jugador. No hay nada que
-respaldar.
+- **El servicio de cuentas** es opcional tambien, y es el unico que guarda
+  algo. Sin `DATABASE_URL` no arranca y el resto funciona igual: jugar, verse,
+  hablar y aleatorizar nunca han necesitado una cuenta.
+
+**Lo que guarda la base, y lo que no.** Guarda cuentas, partidas terminadas y
+los equipos con los que se acabaron: numeros, motes y fechas. **No guarda ROMs,
+ni copias aleatorizadas, ni guardados.** De una partida se guarda su *semilla*,
+que son cuatro campos de texto con los que su dueno vuelve a generar la copia
+desde su propia ROM. Esa linea es la misma de siempre y no se mueve porque
+ahora haya base de datos.
+
+Hasta que existio esto, el servidor no guardaba absolutamente nada y no habia
+nada que respaldar. Ahora hay **una cosa**: el volumen de PostgreSQL.
 
 ## Requisitos
 
@@ -94,6 +106,40 @@ del emulador (`dist/mgba/`), que se copia solo durante la compilacion.
 **No uses `npm ci --omit=dev`.** Las dos piezas de servidor ejecutan
 TypeScript directamente con `tsx`, que esta entre las dependencias de
 desarrollo. Sin ellas el servidor de salas no arranca.
+
+## La base de datos
+
+Solo hace falta si quieres cuentas. Esta en el `docker-compose.yml` como
+servicio `base` y **no se expone a internet**: vive en la red interna de Docker
+y el proxy no la enruta.
+
+```bash
+cp deploy/.env.ejemplo deploy/.env
+# genera una contrasena larga y ponla en EMUPOKE_PG_CLAVE
+openssl rand -base64 32
+
+docker compose -f deploy/docker-compose.yml up -d base
+docker compose -f deploy/docker-compose.yml logs -f base
+```
+
+El esquema se crea solo: el servicio de cuentas aplica las migraciones al
+arrancar, en orden y cada una en su transaccion. No hay ningun paso manual.
+
+**Respaldarla.** Es lo unico del proyecto que hay que respaldar, y cabe en un
+fichero de texto:
+
+```bash
+docker exec emupoke-base pg_dump -U emupoke emupoke | gzip > emupoke-$(date +%F).sql.gz
+```
+
+**Para desarrollar contra ella** desde otra maquina, pon en el `.env` la IP de
+Tailscale del servidor:
+
+```
+EMUPOKE_PG_BIND=100.x.y.z
+```
+
+Nunca `0.0.0.0`: eso la deja abierta a toda la red local.
 
 ## 2. Las dos piezas de servidor
 

@@ -19,6 +19,8 @@ import { nombreDePartida, sePuedeRehacer, todasLasPartidas } from './core/partid
 import { motesDebilitados, parseGameCode } from '@emupoke/pokemon';
 import { EquipoPanel } from './ui/EquipoPanel';
 import { AjustesModal } from './ui/AjustesModal';
+import { CuentaModal } from './ui/CuentaModal';
+import { useCuenta } from './core/useCuenta';
 import { IntercambioModal } from './ui/IntercambioModal';
 import { useIntercambio } from './core/useIntercambio';
 import { FinModal } from './ui/FinModal';
@@ -79,6 +81,11 @@ export const App = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [tratoOpen, setTratoOpen] = useState(false);
   const [randomizerOpen, setRandomizerOpen] = useState(false);
+  const [cuentaOpen, setCuentaOpen] = useState(false);
+
+  // Quien eres, si es que has entrado. No hace falta para jugar: si el
+  // servicio de cuentas no esta, esto se queda en null y no se nota.
+  const cuenta = useCuenta();
 
   // El mando en pantalla aparece solo cuando hace falta: lo decide con que se
   // esta jugando, no que aparato es. Desde el menu se fuerza a mano.
@@ -88,7 +95,7 @@ export const App = () => {
   // este en un boton: si no, las flechas moverian al personaje por detras.
   const keyboardOwner = useKeyboardOwnership(
     emulator.coreRef,
-    roomOpen || menuOpen || randomizerOpen || tratoOpen || invitacion !== null,
+    roomOpen || menuOpen || randomizerOpen || tratoOpen || cuentaOpen || invitacion !== null,
   );
 
   // Espacio enciende y apaga el avance rapido, como en casi cualquier emulador.
@@ -486,6 +493,8 @@ export const App = () => {
           generacion={generacionDelEquipo(equipoMio.equipo)}
         />
 
+        <CuentaModal open={cuentaOpen} onClose={() => setCuentaOpen(false)} cuenta={cuenta} />
+
         <AjustesModal
           open={menuOpen}
           onClose={() => setMenuOpen(false)}
@@ -500,6 +509,13 @@ export const App = () => {
             setRandomizerOpen(true);
           }}
           copiarSemilla={<CopiarSemilla crc32={state.header?.crc32 ?? null} />}
+          cuenta={cuenta.cuenta}
+          onCuenta={() => {
+            // Se cierra el de ajustes: dos dialogos a la vez dejan el de
+            // abajo a medio tapar y sin forma clara de volver.
+            setMenuOpen(false);
+            setCuentaOpen(true);
+          }}
         />
       </main>
 

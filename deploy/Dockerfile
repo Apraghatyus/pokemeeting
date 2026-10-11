@@ -16,6 +16,7 @@ COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/
 COPY apps/signaling/package.json apps/signaling/
 COPY apps/randomizer/package.json apps/randomizer/
+COPY apps/cuentas/package.json apps/cuentas/
 COPY packages/protocol/package.json packages/protocol/
 COPY packages/pokemon/package.json packages/pokemon/
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1

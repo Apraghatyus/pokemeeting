@@ -4921,3 +4921,22 @@ details.partidas[open] > summary::before {
   color: var(--muted);
   border-style: dashed;
 }
+
+/* --- La cuenta ---------------------------------------------------------
+   Casi todo lo de esta pantalla son piezas que ya existian -el formulario,
+   las pestanas, los avisos-. Lo unico suyo es la linea que dice quien eres. */
+
+.cuenta {
+  display: grid;
+  gap: 12px;
+}
+
+.cuenta__quien {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.cuenta__quien strong {
+  color: var(--text);
+}

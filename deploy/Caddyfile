@@ -18,6 +18,11 @@
 		reverse_proxy {$SERVIDOR:emupoke-servidor}:8787
 	}
 
+	handle /cuentas* {
+		uri strip_prefix /cuentas
+		reverse_proxy {$SERVIDOR:emupoke-servidor}:8789
+	}
+
 	handle /randomizer* {
 		request_body {
 			max_size 64MB
