@@ -91,17 +91,17 @@ console.log(`     equipo de partida: ${equipoAna.join(', ')}`);
 // --- se juntan en una sala ---
 await ana.locator('.roomchip').click();
 await ana.locator('.tabs button', { hasText: 'Crear sala' }).click();
-await ana.locator('.form input[type=password]').fill('trato');
-await ana.locator('.form button[type=submit]').click();
+await ana.locator('.modal[open] .form input[type=password]').fill('trato');
+await ana.locator('.modal[open] .form button[type=submit]').click();
 await ana.waitForSelector('.room-code', { timeout: 20_000 });
 const codigo = ((await ana.locator('.room-code').textContent()) ?? '').trim();
 await ana.keyboard.press('Escape');
 
 await beto.locator('.roomchip').click();
 await beto.locator('.tabs button', { hasText: 'Entrar en una' }).click();
-await beto.locator('.form input.input--code').fill(codigo);
-await beto.locator('.form input[type=password]').fill('trato');
-await beto.locator('.form button[type=submit]').click();
+await beto.locator('.modal[open] .form input.input--code').fill(codigo);
+await beto.locator('.modal[open] .form input[type=password]').fill('trato');
+await beto.locator('.modal[open] .form button[type=submit]').click();
 await beto.keyboard.press('Escape');
 
 const botonTrato = '[aria-label="Intercambiar un Pokemon"]';

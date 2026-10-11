@@ -80,8 +80,8 @@ const crcDelMundo = semilla.split('.')[2];
 
 await anfitrion.getByRole('button', { name: 'Empezar a jugar' }).click();
 await anfitrion.locator('.roomchip').click();
-await anfitrion.locator('.form input[type=password]').fill(CLAVE);
-await anfitrion.locator('.form button[type=submit]').click();
+await anfitrion.locator('.modal[open] .form input[type=password]').fill(CLAVE);
+await anfitrion.locator('.modal[open] .form button[type=submit]').click();
 await anfitrion.locator('.field__value.room-code').waitFor({ timeout: 15_000 });
 const sala = ((await anfitrion.locator('.field__value.room-code').textContent()) ?? '').trim();
 check('y una sala abierta', /^[A-Z0-9]{6}$/.test(sala), sala);

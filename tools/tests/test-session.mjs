@@ -77,7 +77,7 @@ check(
 
 await host.page.locator('.roomchip').click();
 await host.page.locator('.tabs button', { hasText: 'Entrar en una' }).click();
-const codeField = host.page.locator('.form input.input--code');
+const codeField = host.page.locator('.modal[open] .form input.input--code');
 await codeField.click();
 // Se espera en vez de mirar al instante: React repinta de forma asincrona y
 // una comprobacion inmediata mediria la carrera, no el comportamiento.
@@ -95,8 +95,8 @@ check('lo tecleado llega al campo intacto', typed === 'ABC123', `campo = "${type
 
 // --- el anfitrion crea la sala ---
 await host.page.locator('.tabs button', { hasText: 'Crear sala' }).click();
-await host.page.locator('.form input[type=password]').fill(PASSWORD);
-await host.page.locator('.form button[type=submit]').click();
+await host.page.locator('.modal[open] .form input[type=password]').fill(PASSWORD);
+await host.page.locator('.modal[open] .form button[type=submit]').click();
 
 await host.page.locator('.field__value.room-code').waitFor({ timeout: 10_000 });
 const code = (await host.page.locator('.field__value.room-code').textContent())?.trim() ?? '';
@@ -123,9 +123,9 @@ check(
 // --- el invitado entra ---
 await guest.page.locator('.roomchip').click();
 await guest.page.locator('.tabs button', { hasText: 'Entrar en una' }).click();
-await guest.page.locator('.form input.input--code').fill(code);
-await guest.page.locator('.form input[type=password]').fill(PASSWORD);
-await guest.page.locator('.form button[type=submit]').click();
+await guest.page.locator('.modal[open] .form input.input--code').fill(code);
+await guest.page.locator('.modal[open] .form input[type=password]').fill(PASSWORD);
+await guest.page.locator('.modal[open] .form button[type=submit]').click();
 
 // Con ediciones distintas la regla es rechazar, asi que la prueba termina aqui.
 if (ROM_HOST !== ROM_GUEST) {

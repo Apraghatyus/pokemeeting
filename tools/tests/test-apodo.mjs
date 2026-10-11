@@ -55,7 +55,7 @@ const abrir = async () => {
 };
 
 const escribirNombre = async (page, nombre) => {
-  const campo = page.locator('.form input[placeholder="Como quieres que te llamen"]');
+  const campo = page.locator('.modal[open] .form input[placeholder="Como quieres que te llamen"]');
   if (nombre === null) return (await campo.count()) === 1;
   await campo.fill(nombre);
   return true;
@@ -67,17 +67,17 @@ const invitado = await abrir();
 // --- 1. cada uno ve el nombre del otro ---
 await anfitrion.locator('.roomchip').click();
 check('al crear una sala se puede poner nombre', await escribirNombre(anfitrion, 'Lucho'));
-await anfitrion.locator('.form input[type=password]').fill(CLAVE);
-await anfitrion.locator('.form button[type=submit]').click();
+await anfitrion.locator('.modal[open] .form input[type=password]').fill(CLAVE);
+await anfitrion.locator('.modal[open] .form button[type=submit]').click();
 await anfitrion.locator('.field__value.room-code').waitFor({ timeout: 15_000 });
 const sala = ((await anfitrion.locator('.field__value.room-code').textContent()) ?? '').trim();
 
 await invitado.locator('.roomchip').click();
 await invitado.locator('.tabs button', { hasText: 'Entrar en una' }).click();
-await invitado.locator('.form input.input--code').fill(sala);
+await invitado.locator('.modal[open] .form input.input--code').fill(sala);
 await escribirNombre(invitado, 'Juan');
-await invitado.locator('.form input[type=password]').fill(CLAVE);
-await invitado.locator('.form button[type=submit]').click();
+await invitado.locator('.modal[open] .form input[type=password]').fill(CLAVE);
+await invitado.locator('.modal[open] .form button[type=submit]').click();
 
 const conectados = await Promise.all(
   [anfitrion, invitado].map((p) =>
@@ -105,8 +105,11 @@ const comoLeLlama = (page) =>
 const vistoPorElAnfitrion = await comoLeLlama(anfitrion);
 check('el anfitrion ve el nombre del otro en su ventana',
   vistoPorElAnfitrion.ventana === 'Juan', String(vistoPorElAnfitrion.ventana));
+// Su nombre a secas, no "Equipo de Juan": en la otra columna esta el tuyo
+// igual de pelado, y los dos titulos tienen que leerse como lo que son, dos
+// jugadores.
 check('y en su columna de equipo',
-  vistoPorElAnfitrion.columna === 'Equipo de Juan', String(vistoPorElAnfitrion.columna));
+  vistoPorElAnfitrion.columna === 'Juan', String(vistoPorElAnfitrion.columna));
 // Lo que no puede pasar: verse a uno mismo al otro lado.
 check('y no ve el suyo propio', vistoPorElAnfitrion.ventana !== 'Lucho');
 
@@ -135,16 +138,16 @@ const mudo = await abrir();
 const otraSala = await abrir();
 
 await mudo.locator('.roomchip').click();
-await mudo.locator('.form input[type=password]').fill(CLAVE);
-await mudo.locator('.form button[type=submit]').click();
+await mudo.locator('.modal[open] .form input[type=password]').fill(CLAVE);
+await mudo.locator('.modal[open] .form button[type=submit]').click();
 await mudo.locator('.field__value.room-code').waitFor({ timeout: 15_000 });
 const sala2 = ((await mudo.locator('.field__value.room-code').textContent()) ?? '').trim();
 
 await otraSala.locator('.roomchip').click();
 await otraSala.locator('.tabs button', { hasText: 'Entrar en una' }).click();
-await otraSala.locator('.form input.input--code').fill(sala2);
-await otraSala.locator('.form input[type=password]').fill(CLAVE);
-await otraSala.locator('.form button[type=submit]').click();
+await otraSala.locator('.modal[open] .form input.input--code').fill(sala2);
+await otraSala.locator('.modal[open] .form input[type=password]').fill(CLAVE);
+await otraSala.locator('.modal[open] .form button[type=submit]').click();
 
 const sinNombre = await Promise.all(
   [mudo, otraSala].map((p) =>

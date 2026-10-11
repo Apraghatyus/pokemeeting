@@ -83,6 +83,15 @@ type Props = {
    */
   nombreDelOtro?: string;
   /**
+   * Y como te llamas tu, para la otra pestana.
+   *
+   * Tu apodo si tienes cuenta o lo escribiste al abrir la sala, y "Tu equipo"
+   * si no. Con dos pestanas una al lado de la otra, "Tu equipo" junto a un
+   * nombre propio se lee como si fueran dos cosas distintas; con los dos
+   * nombres se entiende de un vistazo que son dos jugadores.
+   */
+  nombrePropio?: string;
+  /**
    * Por que no hay nada que enseñar.
    *
    * Sin esto la columna vacia no dice nada, que es lo que se quiere mientras
@@ -254,6 +263,7 @@ export const EquipoPanel = ({
   caidosDelOtro,
   tope = null,
   nombreDelOtro = 'Tu companero',
+  nombrePropio = 'Tu equipo',
   onCambiar,
   motivo,
 }: Props) => {
@@ -288,7 +298,7 @@ export const EquipoPanel = ({
               className={`equipo__pestana${lado === 'propio' ? ' is-activa' : ''}`}
               onClick={lado === 'propio' ? undefined : onCambiar}
             >
-              Tu equipo
+              {nombrePropio}
             </button>
             <button
               type="button"

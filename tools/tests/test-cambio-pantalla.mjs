@@ -55,17 +55,17 @@ const escritorio = await abrir(1280, 860);
 
 await movil.locator('.roomchip').click();
 await movil.locator('.tabs button', { hasText: 'Crear sala' }).click();
-await movil.locator('.form input[type=password]').fill('cambio');
-await movil.locator('.form button[type=submit]').click();
+await movil.locator('.modal[open] .form input[type=password]').fill('cambio');
+await movil.locator('.modal[open] .form button[type=submit]').click();
 await movil.waitForSelector('.room-code', { timeout: 20_000 });
 const codigo = ((await movil.locator('.room-code').textContent()) ?? '').trim();
 await movil.keyboard.press('Escape');
 
 await escritorio.locator('.roomchip').click();
 await escritorio.locator('.tabs button', { hasText: 'Entrar en una' }).click();
-await escritorio.locator('.form input.input--code').fill(codigo);
-await escritorio.locator('.form input[type=password]').fill('cambio');
-await escritorio.locator('.form button[type=submit]').click();
+await escritorio.locator('.modal[open] .form input.input--code').fill(codigo);
+await escritorio.locator('.modal[open] .form input[type=password]').fill('cambio');
+await escritorio.locator('.modal[open] .form button[type=submit]').click();
 await escritorio.keyboard.press('Escape');
 
 await movil.waitForSelector('.pantalla--pequena', { timeout: 45_000 });

@@ -25,6 +25,11 @@ import { chromium } from 'playwright';
 const ROM = process.argv[2];
 const URL = process.env.SMOKE_URL ?? 'http://localhost:5173/';
 const CLAVE = 'dos pestanas';
+// Con nombre los dos: las pestanas tienen que decir quien es quien, no "tu
+// equipo" y "tu companero". Con dos columnas que se parecen -seis fichas cada
+// una- el nombre es lo unico que las distingue de un vistazo.
+const YO = 'Juan';
+const EL_OTRO = 'Mateo';
 
 if (!ROM) {
   console.error('Uso: node tools/tests/test-completa-equipos.mjs <rom.gba>');
@@ -58,16 +63,18 @@ const anfitrion = await abrir();
 const invitado = await abrir();
 
 await anfitrion.locator('.roomchip').click();
-await anfitrion.locator('.form input[type=password]').fill(CLAVE);
-await anfitrion.locator('.form button[type=submit]').click();
+await anfitrion.locator('.modal[open]').getByPlaceholder('Como quieres que te llamen').fill(YO);
+await anfitrion.locator('.modal[open] .form input[type=password]').fill(CLAVE);
+await anfitrion.locator('.modal[open] .form button[type=submit]').click();
 await anfitrion.locator('.field__value.room-code').waitFor({ timeout: 15_000 });
 const sala = ((await anfitrion.locator('.field__value.room-code').textContent()) ?? '').trim();
 
 await invitado.locator('.roomchip').click();
 await invitado.locator('.tabs button', { hasText: 'Entrar en una' }).click();
-await invitado.locator('.form input.input--code').fill(sala);
-await invitado.locator('.form input[type=password]').fill(CLAVE);
-await invitado.locator('.form button[type=submit]').click();
+await invitado.locator('.modal[open] .form input.input--code').fill(sala);
+await invitado.locator('.modal[open]').getByPlaceholder('Como quieres que te llamen').fill(EL_OTRO);
+await invitado.locator('.modal[open] .form input[type=password]').fill(CLAVE);
+await invitado.locator('.modal[open] .form button[type=submit]').click();
 
 const conectados = await Promise.all(
   [anfitrion, invitado].map((p) =>
@@ -122,13 +129,19 @@ const completa = await mirar(anfitrion);
 check('a pantalla completa se ve un solo equipo', completa.columnas === 1, `${completa.columnas}`);
 check('y aparecen las dos pestanas', completa.pestanas.length === 2,
   completa.pestanas.map((p) => p.texto).join(' / '));
+// Las pestanas dicen los nombres de los dos jugadores. Sin ellos ponia "Tu
+// equipo" y "Tu companero", que describe el papel y no a la persona: con dos
+// columnas iguales, el nombre es lo que las separa.
+check('y dicen quien es quien, no "tu equipo" y "tu companero"',
+  completa.pestanas[0]?.texto === YO && completa.pestanas[1]?.texto === EL_OTRO,
+  completa.pestanas.map((p) => p.texto).join(' / '));
 check('con la tuya marcada al entrar',
   completa.pestanas[0]?.activa === true && completa.pestanas[1]?.activa === false,
   JSON.stringify(completa.pestanas));
 check('y lo que se ve es tu equipo', completa.cual === 'propio', completa.cual);
 
 // --- cambiar de equipo ---
-await anfitrion.locator('.equipo__pestana', { hasText: 'Tu companero' }).click();
+await anfitrion.locator('.equipo__pestana', { hasText: EL_OTRO }).click();
 await anfitrion.waitForTimeout(900);
 
 const suyo = await mirar(anfitrion);

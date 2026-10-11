@@ -48,17 +48,17 @@ const invitado = await abrir();
 
 await anfitrion.locator('.roomchip').click();
 await anfitrion.locator('.tabs button', { hasText: 'Crear sala' }).click();
-await anfitrion.locator('.form input[type=password]').fill('arrastre');
-await anfitrion.locator('.form button[type=submit]').click();
+await anfitrion.locator('.modal[open] .form input[type=password]').fill('arrastre');
+await anfitrion.locator('.modal[open] .form button[type=submit]').click();
 await anfitrion.waitForSelector('.room-code', { timeout: 20_000 });
 const codigo = ((await anfitrion.locator('.room-code').textContent()) ?? '').trim();
 await anfitrion.keyboard.press('Escape');
 
 await invitado.locator('.roomchip').click();
 await invitado.locator('.tabs button', { hasText: 'Entrar en una' }).click();
-await invitado.locator('.form input.input--code').fill(codigo);
-await invitado.locator('.form input[type=password]').fill('arrastre');
-await invitado.locator('.form button[type=submit]').click();
+await invitado.locator('.modal[open] .form input.input--code').fill(codigo);
+await invitado.locator('.modal[open] .form input[type=password]').fill('arrastre');
+await invitado.locator('.modal[open] .form button[type=submit]').click();
 await invitado.keyboard.press('Escape');
 
 const ventana = invitado.locator('.pantalla--pequena');

@@ -60,17 +60,17 @@ const guest = await abrir('invitado');
 
 // --- emparejar ---
 await host.locator('.roomchip').click();
-await host.locator('.form input[type=password]').fill(PASSWORD);
-await host.locator('.form button[type=submit]').click();
+await host.locator('.modal[open] .form input[type=password]').fill(PASSWORD);
+await host.locator('.modal[open] .form button[type=submit]').click();
 await host.locator('.field__value.room-code').waitFor({ timeout: 10_000 });
 const code = (await host.locator('.field__value.room-code').textContent())?.trim() ?? '';
 await host.keyboard.press('Escape');
 
 await guest.locator('.roomchip').click();
 await guest.locator('.tabs button', { hasText: 'Entrar en una' }).click();
-await guest.locator('.form input.input--code').fill(code);
-await guest.locator('.form input[type=password]').fill(PASSWORD);
-await guest.locator('.form button[type=submit]').click();
+await guest.locator('.modal[open] .form input.input--code').fill(code);
+await guest.locator('.modal[open] .form input[type=password]').fill(PASSWORD);
+await guest.locator('.modal[open] .form button[type=submit]').click();
 await guest.keyboard.press('Escape');
 
 const conectados = await Promise.all([

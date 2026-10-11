@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { EquipoResumen, RomFingerprint } from '@emupoke/protocol';
 import { useTeclas } from './core/useTeclas';
 import { useEmulator } from './core/useEmulator';
@@ -12,7 +12,7 @@ import { useEsEstrecha } from './core/useEsEstrecha';
 import { usePantallaCompleta } from './core/usePantallaCompleta';
 import { useEspecies } from './core/useEspecies';
 import { useMandoTactil } from './core/useMandoTactil';
-import { comoSeLlama } from './core/apodo';
+import { apodoGuardado, comoSeLlama } from './core/apodo';
 import { codificarSemilla, type Semilla } from './core/semilla';
 import { leerInvitacion, olvidarInvitacion, type Invitacion } from './core/invitacion';
 import { nombreDePartida, sePuedeRehacer, todasLasPartidas } from './core/partidas';
@@ -180,6 +180,18 @@ export const App = () => {
   // otro no.
   const nombreDelCompanero = comoSeLlama(session.state.peerNombre);
 
+  // Y como te llamas tu. De la cuenta si has entrado; si no, del apodo que
+  // escribiste al abrir la sala. Sin ninguno de los dos se queda en "Tu
+  // equipo", que es lo que decia siempre.
+  //
+  // Se recalcula al entrar en la cuenta y al montar o cambiar de sala, que son
+  // los dos momentos en que esto puede cambiar. Leer localStorage en cada
+  // pintada seria hacerlo decenas de veces por minuto para nada.
+  const miNombre = useMemo(
+    () => cuenta.cuenta?.apodo ?? apodoGuardado() ?? 'Tu equipo',
+    [cuenta.cuenta, session.state.phase, session.state.roomCode],
+  );
+
   // Tu equipo se lee de la partida cada pocos segundos y, cuando cambia, se le
   // manda al companero. Si no hay sala, enviarEquipo no hace nada.
   const miEquipo = useEquipo(
@@ -323,7 +335,7 @@ export const App = () => {
           {/* Con sitio, los dos equipos a los lados. En pantalla estrecha solo
               cabe uno, asi que se enseña ese y se cambia con el boton. */}
           <EquipoPanel
-            titulo={unoSolo && verSuEquipo ? `Equipo de ${nombreDelCompanero}` : 'Tu equipo'}
+            titulo={unoSolo && verSuEquipo ? `Equipo de ${nombreDelCompanero}` : miNombre}
             lado={unoSolo && verSuEquipo ? 'companero' : 'propio'}
             equipo={unoSolo && verSuEquipo ? equipoSuyo.equipo : equipoMio.equipo}
             activo={unoSolo && verSuEquipo ? equipoSuyo.alFrente : equipoMio.alFrente}
@@ -337,6 +349,7 @@ export const App = () => {
             onCambiar={unoSolo ? () => setVerSuEquipo((v) => !v) : undefined}
             motivo={unoSolo && verSuEquipo ? 'Todavia no ha mandado su equipo.' : undefined}
             nombreDelOtro={nombreDelCompanero}
+            nombrePropio={miNombre}
           />
 
           {/* Por donde va la partida, en una columna pegada al equipo: las ocho
@@ -408,7 +421,10 @@ export const App = () => {
               Jugando solo, la partida se lleva ese hueco. */}
           {conCompanero && !unoSolo && (
             <EquipoPanel
-              titulo={`Equipo de ${nombreDelCompanero}`}
+              /* Su nombre a secas, como el tuyo en la otra columna. "Equipo de
+                 Mateo" al lado de "Juan" se lee como si fueran dos cosas
+                 distintas, y son lo mismo visto desde cada lado. */
+              titulo={nombreDelCompanero}
               lado="companero"
               equipo={equipoSuyo.equipo}
               activo={equipoSuyo.alFrente}
