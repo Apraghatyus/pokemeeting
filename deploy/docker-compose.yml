@@ -142,6 +142,15 @@ services:
     image: emupoke-web:latest
     container_name: emupoke-web
     restart: unless-stopped
+    environment:
+      # El Caddyfile lee esto del entorno DEL CONTENEDOR, asi que ponerlo solo
+      # en el .env no sirve de nada: hay que pasarlo aqui. Sin esta linea se
+      # usaba siempre el valor por defecto y el limite de intentos de
+      # /cuentas volvia a ser un cupo global, sin que nada lo dijera.
+      EMUPOKE_PROXY_FIABLE: ${EMUPOKE_PROXY_FIABLE:-192.168.128.2/32}
+      # Lo mismo vale para esta, pero su valor por defecto es el nombre real
+      # del contenedor, asi que funciona sin tocarla.
+      SERVIDOR: ${EMUPOKE_SERVIDOR:-emupoke-servidor}
     ports:
       - "${EMUPOKE_PORT:-8790}:80"
     volumes:

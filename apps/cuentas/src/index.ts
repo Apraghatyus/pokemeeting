@@ -39,15 +39,37 @@ const PORT = Number(process.env['PORT'] ?? 8789);
 const HOST = process.env['HOST'] ?? '127.0.0.1';
 
 /**
- * Cuantos intentos de entrar se admiten antes de parar.
+ * Cuantos intentos de entrar se admiten antes de parar. Hay DOS cupos, y el
+ * que de verdad trabaja es el primero.
  *
- * Diez por cuarto de hora y por direccion. Quien se equivoca al escribir su
- * contrasena no llega ni de lejos; quien prueba una lista, se para en el
- * intento once.
+ * POR CUENTA: diez por cuarto de hora. Quien se equivoca al escribir su
+ * contrasena no llega ni de lejos; quien prueba una lista contra una cuenta
+ * se para en el intento once. Este cupo vale siempre, porque el nombre de la
+ * cuenta lo manda quien pregunta y no depende de la red.
+ *
+ * POR DIRECCION: cincuenta, que es un techo y no un cerrojo. Antes este era
+ * el unico, y tenia un problema serio: la direccion solo es de verdad si el
+ * proxy de delante esta bien configurado -ver EMUPOKE_PROXY_FIABLE-. Si no lo
+ * esta, TODOS los visitantes llegan con la misma, el cupo pasa a ser comun, y
+ * una persona equivocandose diez veces deja fuera a las demas. Lo peor es que
+ * eso no se nota hasta que pasa.
+ *
+ * Asi que el peso lo lleva el cupo por cuenta, que no se puede estropear
+ * configurando mal nada, y el de direccion se queda como red de seguridad con
+ * el numero lo bastante alto como para que una instalacion mal configurada no
+ * se cierre sola.
  */
-const intentos = new Cupo(10, 15 * 60 * 1000);
-/** Y las cuentas nuevas, que si no cualquiera llena la base en una tarde. */
-const altas = new Cupo(5, 60 * 60 * 1000);
+const porCuenta = new Cupo(10, 15 * 60 * 1000);
+const porDireccion = new Cupo(50, 15 * 60 * 1000);
+/**
+ * Y las cuentas nuevas, que si no cualquiera llena la base en una tarde.
+ *
+ * Veinte por hora y por direccion, por lo mismo de arriba: si el proxy no esta
+ * bien configurado, esta cuenta la comparte TODO el mundo, y un numero bajo
+ * dejaria sin poder registrarse a un grupo de amigos que se apunta junto. Para
+ * frenar a quien lo automatice, veinte por hora sigue sobrando.
+ */
+const altas = new Cupo(20, 60 * 60 * 1000);
 
 type Fila = {
   id: string;
@@ -132,9 +154,12 @@ const registro = async (req: IncomingMessage, res: ServerResponse): Promise<void
 };
 
 const entrar = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
-  const desde = deDondeViene(req);
-  if (intentos.pasado(desde)) {
+  const demasiados = (): void =>
     fallar(res, 429, 'Demasiados intentos. Espera un rato antes de volver a probar.');
+
+  const desde = deDondeViene(req);
+  if (porDireccion.pasado(desde)) {
+    demasiados();
     return;
   }
 
@@ -142,9 +167,17 @@ const entrar = async (req: IncomingMessage, res: ServerResponse): Promise<void> 
   const usuario = texto(cuerpo['usuario']) ?? '';
   const clave = typeof cuerpo['clave'] === 'string' ? cuerpo['clave'] : '';
 
+  // Por cuenta, y antes de tocar la base: probar contrasenas contra una cuenta
+  // se para aqui aunque quien lo intente venga de mil direcciones distintas.
+  const cuenta = normalizarUsuario(usuario);
+  if (porCuenta.pasado(cuenta)) {
+    demasiados();
+    return;
+  }
+
   const { rows } = await pool.query<Fila & { clave: string }>(
     'select id, usuario, apodo, creada, clave from usuarios where normalizado = $1',
-    [normalizarUsuario(usuario)],
+    [cuenta],
   );
   const fila = rows[0];
 
@@ -162,7 +195,10 @@ const entrar = async (req: IncomingMessage, res: ServerResponse): Promise<void> 
     return;
   }
 
-  intentos.olvidar(desde);
+  // Quien entra bien no arrastra sus fallos, ni los suyos ni los que otro haya
+  // hecho desde la misma direccion.
+  porCuenta.olvidar(cuenta);
+  porDireccion.olvidar(desde);
   await pool.query('update usuarios set entrada = now() where id = $1', [fila.id]);
   responder(res, 200, { cuenta: comoSeCuenta(fila) }, galletaDeSesion(await abrirSesion(fila.id)));
 };
@@ -263,7 +299,8 @@ const arrancar = async (): Promise<void> => {
   setInterval(
     () => {
       barrerSesiones().catch(() => {});
-      intentos.barrer();
+      porCuenta.barrer();
+      porDireccion.barrer();
       altas.barrer();
     },
     60 * 60 * 1000,

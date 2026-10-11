@@ -212,6 +212,43 @@ check(
   noExiste.cuerpo.error,
 );
 
+// --- el limite de intentos ---------------------------------------------
+//
+// Lo que se comprueba no es que exista un limite: es DE QUE depende. El cupo
+// por direccion solo sirve si el proxy de delante esta bien configurado, y si
+// no lo esta, todo el mundo llega con la misma direccion. Por eso el que lleva
+// el peso es el de la cuenta, que no se puede estropear configurando mal nada.
+const VICTIMA = `victima${Date.now().toString(36)}`;
+await pedir('/registro', {
+  method: 'POST',
+  body: JSON.stringify({ usuario: VICTIMA, clave: CLAVE }),
+});
+galleta = null;
+
+let cortado = 0;
+for (let i = 0; i < 12; i += 1) {
+  const r = await pedir('/entrar', {
+    method: 'POST',
+    body: JSON.stringify({ usuario: VICTIMA, clave: `intento-numero-${i}` }),
+  });
+  if (r.estado === 429) cortado = cortado || i + 1;
+}
+check('probar contrasenas contra una cuenta se corta', cortado > 0 && cortado <= 11, `al intento ${cortado}`);
+
+// Y LO QUE DE VERDAD IMPORTA: que cortar a esa cuenta no deja fuera a nadie
+// mas. Con un unico cupo por direccion -y un proxy mal configurado- esto
+// seria que una persona equivocandose cierra la puerta a todas las demas.
+const otraPersona = await pedir('/entrar', {
+  method: 'POST',
+  body: JSON.stringify({ usuario: USUARIO, clave: CLAVE }),
+});
+check(
+  'pero no deja fuera a los demas, que es lo que pasaria con un cupo comun',
+  otraPersona.estado === 200,
+  `${otraPersona.estado}`,
+);
+galleta = null;
+
 const vuelta = await pedir('/entrar', {
   method: 'POST',
   body: JSON.stringify({ usuario: USUARIO.toUpperCase(), clave: CLAVE }),

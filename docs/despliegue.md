@@ -196,10 +196,9 @@ docker exec emupoke-base pg_dump -U emupoke_admin emupoke | gzip > emupoke-$(dat
 
 ### La IP del proxy, que hay que cambiar
 
-En `deploy/Caddyfile` hay un `trusted_proxies` con **una IP de ejemplo**. Es
-quien puede decir cual es la IP del visitante, y de eso depende que el limite
-de intentos de inicio de sesion sea por persona y no un cupo global para todo
-el mundo. Ponla en `EMUPOKE_PROXY_FIABLE`:
+En `deploy/Caddyfile` hay un `trusted_proxies` con **una IP de ejemplo**: la de
+una instalacion concreta, no la tuya. Es quien puede decir cual es la IP del
+visitante. Ponla en `EMUPOKE_PROXY_FIABLE`, en el `.env`:
 
 ```bash
 docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' cloudflared
@@ -207,11 +206,19 @@ docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' cl
 
 Tiene que ser la IP **exacta**, no la subred: por la subred entera entra
 tambien el trafico directo al puerto, y entonces cualquiera puede escribir la
-cabecera que quiera y saltarse el limite.
+cabecera que quiera y decir que viene de donde le convenga.
 
-Si no la cambias no se rompe nada -una IP que no existe en tu red no es nadie,
-y entonces no se cree la cabecera a nadie, que es el lado seguro de
-equivocarse-, pero el limite volvera a ser global.
+**Que pasa si no la cambias.** Todos los visitantes se ven con la misma
+direccion -la del proxy-, asi que los cupos que van por direccion dejan de
+distinguir a nadie. No se cuela nadie por eso; lo que pasa es que esos cupos
+se vuelven comunes.
+
+Por eso el limite de intentos de inicio de sesion **no depende de esto**: va
+sobre todo por cuenta -diez por cuarto de hora-, que es un dato que manda quien
+pregunta y no se puede estropear configurando mal la red. El cupo por direccion
+existe, pero es un techo alto, de red de seguridad. Asi, una instalacion a la
+que se le olvido esta linea no se cierra sola la puerta: antes bastaba con que
+una persona se equivocara diez veces para dejar fuera a las demas.
 
 ## 2. Las dos piezas de servidor
 
