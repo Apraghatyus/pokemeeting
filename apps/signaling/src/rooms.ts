@@ -23,6 +23,8 @@ export const EMPTY_ROOM_TTL_MS = 10 * 60 * 1000;
 export type Participant<Socket> = {
   socket: Socket;
   rom: RomFingerprint;
+  /** Como se llama, o null si no lo dijo. */
+  nombre: string | null;
 };
 
 export type Room<Socket> = {

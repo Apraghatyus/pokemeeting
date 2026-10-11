@@ -39,8 +39,33 @@ export type ErrorCode =
  * contrasena de por medio- pero esto se puede preguntar sin credenciales, y
  * como alguien llama a su fichero no es asunto de nadie.
  */
+/**
+ * Lo largo que puede ser un apodo.
+ *
+ * Diecisiete porque es lo que cabe en el nombre de un entrenador en el juego, y
+ * porque esto se pinta en una etiqueta estrecha encima de una pantalla: un
+ * nombre de doscientos caracteres no es un nombre, es un ataque a la maqueta.
+ */
+export const MAX_APODO = 17;
+
+/**
+ * Deja un apodo en algo que se puede enseñar, o null si no queda nada.
+ *
+ * Viene de un navegador que no controlamos y acaba pintado en la pantalla del
+ * otro, asi que se corta y se le quitan los caracteres de control, que no se
+ * ven pero descolocan una linea de texto.
+ */
+export const limpiarApodo = (valor: unknown): string | null => {
+  if (typeof valor !== 'string') return null;
+  // eslint-disable-next-line no-control-regex
+  const limpio = valor.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, MAX_APODO);
+  return limpio === '' ? null : limpio;
+};
+
 export type DatosDeSala = {
   roomCode: string;
+  /** Como se llama quien monto la sala, para poder decirlo en la invitacion. */
+  anfitrion: string | null;
   /** Codigo de juego de la ROM del anfitrion, para decir a que se juega. */
   gameCode: string;
   /** El titulo de su cabecera, por si el codigo no se conoce. */
@@ -51,8 +76,21 @@ export type DatosDeSala = {
 
 /** Mensajes del navegador hacia el servidor. */
 export type ClientMessage =
-  | { type: 'create-room'; password: string; rom: RomFingerprint; semilla?: string | null }
-  | { type: 'join-room'; roomCode: string; password: string; rom: RomFingerprint }
+  | {
+      type: 'create-room';
+      password: string;
+      rom: RomFingerprint;
+      semilla?: string | null;
+      /** Como quiere que le llamen. Opcional: sin el se dice "tu companero". */
+      nombre?: string | null;
+    }
+  | {
+      type: 'join-room';
+      roomCode: string;
+      password: string;
+      rom: RomFingerprint;
+      nombre?: string | null;
+    }
   /** Que juego y que mundo hay en esa sala, para quien abre una invitacion. */
   | { type: 'ask-room'; roomCode: string }
   /** Carga util de WebRTC (oferta, respuesta o candidato ICE) para el otro par. */
@@ -62,8 +100,14 @@ export type ClientMessage =
 /** Mensajes del servidor hacia el navegador. */
 export type ServerMessage =
   | { type: 'room-created'; roomCode: string }
-  | { type: 'room-joined'; roomCode: string; peerRom: RomFingerprint }
-  | { type: 'peer-joined'; peerRom: RomFingerprint }
+  | {
+      type: 'room-joined';
+      roomCode: string;
+      peerRom: RomFingerprint;
+      /** Como se llama el otro, si lo dijo. */
+      peerNombre?: string | null;
+    }
+  | { type: 'peer-joined'; peerRom: RomFingerprint; peerNombre?: string | null }
   | { type: 'peer-left' }
   | { type: 'room-info'; datos: DatosDeSala }
   | { type: 'signal'; data: unknown }

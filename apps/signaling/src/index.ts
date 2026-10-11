@@ -11,6 +11,7 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { compareRoms } from '@emupoke/pokemon';
 import {
   isValidRoomCode,
+  limpiarApodo,
   MAX_SEMILLA,
   type ClientMessage,
   type ErrorCode,
@@ -77,7 +78,11 @@ const handleCreate = async (socket: WebSocket, message: Extract<ClientMessage, {
       ? message.semilla
       : null;
 
-  const room = await rooms.create(message.password, { socket, rom: message.rom }, semilla);
+  const room = await rooms.create(
+    message.password,
+    { socket, rom: message.rom, nombre: limpiarApodo(message.nombre) },
+    semilla,
+  );
   console.log(`[sala ${room.code}] creada  (${rooms.size} activas)`);
   send(socket, { type: 'room-created', roomCode: room.code });
 };
@@ -126,15 +131,24 @@ const handleJoin = async (socket: WebSocket, message: Extract<ClientMessage, { t
   // El intento correcto limpia el contador: quien acierta no debe arrastrar los
   // fallos de tecleo anteriores.
   room.joinAttempts = 0;
-  const participant = { socket, rom: message.rom };
+  const participant = { socket, rom: message.rom, nombre: limpiarApodo(message.nombre) };
   if (room.host) room.guest = participant;
   else room.host = participant;
   room.emptySince = null;
 
   console.log(`[sala ${code}] se une un jugador`);
   if (other) {
-    send(socket, { type: 'room-joined', roomCode: code, peerRom: other.rom });
-    send(other.socket, { type: 'peer-joined', peerRom: message.rom });
+    send(socket, {
+      type: 'room-joined',
+      roomCode: code,
+      peerRom: other.rom,
+      peerNombre: other.nombre,
+    });
+    send(other.socket, {
+      type: 'peer-joined',
+      peerRom: message.rom,
+      peerNombre: participant.nombre,
+    });
   }
 };
 
@@ -168,6 +182,9 @@ const handleAsk = (socket: WebSocket, message: Extract<ClientMessage, { type: 'a
     type: 'room-info',
     datos: {
       roomCode: code,
+      // Quien monto la sala, para que la invitacion pueda decir quien invita.
+      // Es un apodo que se eligio para esto; no sale de ningun otro sitio.
+      anfitrion: anfitrion.nombre,
       gameCode: anfitrion.rom.gameCode,
       title: anfitrion.rom.title,
       semilla: room.semilla,

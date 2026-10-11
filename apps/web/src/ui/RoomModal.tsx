@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { describeGame, type RomCompatibility } from '@emupoke/pokemon';
+import { apodoGuardado, guardarApodo, MAX_APODO } from '../core/apodo';
 import { textoDeInvitacion } from '../core/invitacion';
 import type { Semilla } from '../core/semilla';
 import { MAX_RECONNECT_ATTEMPTS, type SessionState } from '../net/useSession';
@@ -10,8 +11,8 @@ type Props = {
   onClose: () => void;
   state: SessionState;
   romReady: boolean;
-  onCreate: (password: string) => void;
-  onJoin: (roomCode: string, password: string) => void;
+  onCreate: (password: string, nombre: string) => void;
+  onJoin: (roomCode: string, password: string, nombre: string) => void;
   onLeave: () => void;
   onRetry: () => void;
   /**
@@ -58,6 +59,9 @@ const RoomSetup = ({ romReady, state, onCreate, onJoin }: Props) => {
   const [mode, setMode] = useState<'crear' | 'unirme'>('crear');
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
+  // Con el de la ultima vez puesto: el apodo no cambia de una partida a otra y
+  // volver a escribirlo cada vez es un paso que no aporta nada.
+  const [nombre, setNombre] = useState(() => apodoGuardado() ?? '');
 
   const ready = romReady && password.length > 0 && (mode === 'crear' || code.length === 6);
 
@@ -84,8 +88,9 @@ const RoomSetup = ({ romReady, state, onCreate, onJoin }: Props) => {
         className="form"
         onSubmit={(event) => {
           event.preventDefault();
-          if (mode === 'crear') onCreate(password);
-          else onJoin(code, password);
+          guardarApodo(nombre);
+          if (mode === 'crear') onCreate(password, nombre);
+          else onJoin(code, password, nombre);
         }}
       >
         {mode === 'unirme' && (
@@ -101,6 +106,19 @@ const RoomSetup = ({ romReady, state, onCreate, onJoin }: Props) => {
             />
           </label>
         )}
+        {/* El nombre no es obligatorio: sin el, el otro ve "tu companero", que
+            es lo que veia antes. Pedirlo como requisito seria un paso mas para
+            entrar en una sala, que es justo lo que se quiere que cueste poco. */}
+        <label>
+          Tu nombre <span className="hint hint--linea">opcional</span>
+          <input
+            value={nombre}
+            onChange={(event) => setNombre(event.target.value)}
+            placeholder="Como quieres que te llamen"
+            maxLength={MAX_APODO}
+            autoComplete="off"
+          />
+        </label>
         <label>
           Contrasena
           <input

@@ -67,7 +67,13 @@ type Fase =
   | { nombre: 'error'; mensaje: string };
 
 /** Lo que dice la sala de si misma, o null mientras no ha contestado. */
-type DeLaSala = { gameCode: string; title: string; semilla: Semilla | null } | null;
+type DeLaSala = {
+  gameCode: string;
+  title: string;
+  semilla: Semilla | null;
+  /** Como se llama quien monto la sala, si lo dijo. */
+  anfitrion: string | null;
+} | null;
 
 export const InvitacionModal = ({
   invitacion,
@@ -98,6 +104,7 @@ export const InvitacionModal = ({
       setSala({
         gameCode: datos.gameCode,
         title: datos.title,
+        anfitrion: datos.anfitrion ?? null,
         semilla: datos.semilla ? descodificarSemilla(datos.semilla) : null,
       });
     });
@@ -194,7 +201,10 @@ export const InvitacionModal = ({
       open
       onClose={trabajando ? () => {} : onClose}
       icon="((•))"
-      title="Te han invitado a jugar"
+      /* Con su nombre si lo dijo: quien recibe un enlace por el chat ya sabe
+         de quien es, pero verlo escrito es lo que lo convierte en una
+         invitacion suya y no en un enlace cualquiera. */
+      title={sala?.anfitrion ? `${sala.anfitrion} te ha invitado a jugar` : 'Te han invitado a jugar'}
       subtitle={
         juegoPedido ? `Sala ${invitacion.sala} · ${juegoPedido}` : `Sala ${invitacion.sala}`
       }

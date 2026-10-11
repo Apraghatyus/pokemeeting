@@ -8,8 +8,8 @@ import type {
 
 export type SignalingHandlers = {
   onRoomCreated: (roomCode: string) => void;
-  onRoomJoined: (roomCode: string, peerRom: RomFingerprint) => void;
-  onPeerJoined: (peerRom: RomFingerprint) => void;
+  onRoomJoined: (roomCode: string, peerRom: RomFingerprint, peerNombre: string | null) => void;
+  onPeerJoined: (peerRom: RomFingerprint, peerNombre: string | null) => void;
   onPeerLeft: () => void;
   onSignal: (data: unknown) => void;
   onError: (code: ErrorCode, message: string) => void;
@@ -71,10 +71,10 @@ export class SignalingClient {
         h.onRoomCreated(message.roomCode);
         break;
       case 'room-joined':
-        h.onRoomJoined(message.roomCode, message.peerRom);
+        h.onRoomJoined(message.roomCode, message.peerRom, message.peerNombre ?? null);
         break;
       case 'peer-joined':
-        h.onPeerJoined(message.peerRom);
+        h.onPeerJoined(message.peerRom, message.peerNombre ?? null);
         break;
       case 'peer-left':
         h.onPeerLeft();
@@ -94,12 +94,22 @@ export class SignalingClient {
     }
   }
 
-  createRoom(password: string, rom: RomFingerprint, semilla: string | null = null): void {
-    this.#send({ type: 'create-room', password, rom, semilla });
+  createRoom(
+    password: string,
+    rom: RomFingerprint,
+    semilla: string | null = null,
+    nombre: string | null = null,
+  ): void {
+    this.#send({ type: 'create-room', password, rom, semilla, nombre });
   }
 
-  joinRoom(roomCode: string, password: string, rom: RomFingerprint): void {
-    this.#send({ type: 'join-room', roomCode: roomCode.toUpperCase(), password, rom });
+  joinRoom(
+    roomCode: string,
+    password: string,
+    rom: RomFingerprint,
+    nombre: string | null = null,
+  ): void {
+    this.#send({ type: 'join-room', roomCode: roomCode.toUpperCase(), password, rom, nombre });
   }
 
   signal(data: unknown): void {

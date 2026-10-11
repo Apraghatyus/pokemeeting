@@ -12,6 +12,7 @@ import { useEsEstrecha } from './core/useEsEstrecha';
 import { usePantallaCompleta } from './core/usePantallaCompleta';
 import { useEspecies } from './core/useEspecies';
 import { useMandoTactil } from './core/useMandoTactil';
+import { comoSeLlama } from './core/apodo';
 import { codificarSemilla, type Semilla } from './core/semilla';
 import { leerInvitacion, olvidarInvitacion, type Invitacion } from './core/invitacion';
 import { nombreDePartida, sePuedeRehacer, todasLasPartidas } from './core/partidas';
@@ -166,6 +167,12 @@ export const App = () => {
   // aparezca en cuanto entra y no de un salto cuando llegue su primer aviso.
   const conCompanero = session.state.phase === 'conectada';
 
+  // Como llamarle. Su apodo si lo dijo, y "tu companero" si no. Se calcula una
+  // vez y se reparte: sale en la etiqueta de su ventana, en su columna de
+  // equipo y en su pestana, y lo peor seria que en un sitio diga su nombre y en
+  // otro no.
+  const nombreDelCompanero = comoSeLlama(session.state.peerNombre);
+
   // Tu equipo se lee de la partida cada pocos segundos y, cuando cambia, se le
   // manda al companero. Si no hay sala, enviarEquipo no hace nada.
   const miEquipo = useEquipo(
@@ -306,7 +313,7 @@ export const App = () => {
           {/* Con sitio, los dos equipos a los lados. En pantalla estrecha solo
               cabe uno, asi que se enseña ese y se cambia con el boton. */}
           <EquipoPanel
-            titulo={unoSolo && verSuEquipo ? 'Equipo de tu companero' : 'Tu equipo'}
+            titulo={unoSolo && verSuEquipo ? `Equipo de ${nombreDelCompanero}` : 'Tu equipo'}
             lado={unoSolo && verSuEquipo ? 'companero' : 'propio'}
             equipo={unoSolo && verSuEquipo ? equipoSuyo.equipo : equipoMio.equipo}
             activo={unoSolo && verSuEquipo ? equipoSuyo.alFrente : equipoMio.alFrente}
@@ -319,6 +326,7 @@ export const App = () => {
             tope={unoSolo && verSuEquipo ? null : topes.siguiente}
             onCambiar={unoSolo ? () => setVerSuEquipo((v) => !v) : undefined}
             motivo={unoSolo && verSuEquipo ? 'Todavia no ha mandado su equipo.' : undefined}
+            nombreDelOtro={nombreDelCompanero}
           />
 
           {/* Por donde va la partida, en una columna pegada al equipo: las ocho
@@ -351,9 +359,10 @@ export const App = () => {
           onCambiarPantalla={cambiarDePantalla}
           canvasRef={emulator.canvasRef}
           remoteStream={session.state.remoteStream}
-          /* El nombre del fichero de su ROM no le dice nada a nadie, y ademas
-             delata como lo tiene guardado. */
-          partnerLabel="Tu companero"
+          /* Su apodo, si lo dijo al entrar en la sala. El nombre del fichero
+             de su ROM no sale nunca: no le dice nada a nadie y ademas delata
+             como lo tiene guardado. */
+          partnerLabel={nombreDelCompanero}
           hasRom={hasRom}
           proporcion={
             state.platform
@@ -389,7 +398,7 @@ export const App = () => {
               Jugando solo, la partida se lleva ese hueco. */}
           {conCompanero && !unoSolo && (
             <EquipoPanel
-              titulo="Equipo de tu companero"
+              titulo={`Equipo de ${nombreDelCompanero}`}
               lado="companero"
               equipo={equipoSuyo.equipo}
               activo={equipoSuyo.alFrente}
@@ -540,16 +549,17 @@ export const App = () => {
         romReady={hasRom}
         /* Con el mundo que se esta jugando: se queda en la sala y asi el
            enlace que se comparte lleva solo el codigo y la contrasena. */
-        onCreate={(password) =>
+        onCreate={(password, nombre) =>
           void session.createRoom(
             password,
             (() => {
               const suya = semillaEnCurso(state.header?.crc32 ?? null);
               return suya ? codificarSemilla(suya) : null;
             })(),
+            nombre,
           )
         }
-        onJoin={(code, password) => void session.joinRoom(code, password)}
+        onJoin={(code, password, nombre) => void session.joinRoom(code, password, nombre)}
         onLeave={() => {
           session.leave();
           setRoomOpen(false);

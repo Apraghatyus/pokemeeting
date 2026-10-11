@@ -47,6 +47,14 @@ export type SessionState = {
   /** true si somos quien creo la sala. */
   isHost: boolean;
   peerRom: RomFingerprint | null;
+  /**
+   * Como se llama el companero, o null si no lo dijo.
+   *
+   * Es un apodo que se escribe al entrar en la sala y no sale de ahi: no es una
+   * cuenta ni se guarda en ningun servidor. Sirve para que su ventana y su
+   * equipo lleven su nombre en vez de "tu companero".
+   */
+  peerNombre: string | null;
   compatibility: RomCompatibility | null;
   error: string | null;
   /** Video en directo de la partida del companero. */
@@ -79,6 +87,7 @@ const initialState: SessionState = {
   roomCode: null,
   isHost: false,
   peerRom: null,
+  peerNombre: null,
   compatibility: null,
   error: null,
   remoteStream: null,
@@ -250,7 +259,7 @@ export const useSession = (
         if (password) credentialsRef.current = { roomCode, password };
         patch({ roomCode, isHost: true, phase: 'esperando-companero' });
       },
-      onRoomJoined: (roomCode, peerRom) => {
+      onRoomJoined: (roomCode, peerRom, peerNombre) => {
         const password = pendingPasswordRef.current;
         if (password) credentialsRef.current = { roomCode, password };
         // Volver a entrar bien significa que la reconexion termino.
@@ -261,21 +270,28 @@ export const useSession = (
           roomCode,
           isHost: false,
           peerRom,
+          peerNombre,
           compatibility: mine ? compareRoms(mine, peerRom) : null,
         });
         // Quien entra espera la oferta del anfitrion.
         startPeer(false);
       },
-      onPeerJoined: (peerRom) => {
+      onPeerJoined: (peerRom, peerNombre) => {
         const mine = romRef.current;
-        patch({ peerRom, compatibility: mine ? compareRoms(mine, peerRom) : null });
+        patch({ peerRom, peerNombre, compatibility: mine ? compareRoms(mine, peerRom) : null });
         // El anfitrion es quien inicia la negociacion.
         startPeer(true);
       },
       onPeerLeft: () => {
         peerRef.current?.close();
         peerRef.current = null;
-        patch({ phase: 'esperando-companero', peerRom: null, remoteStream: null, compatibility: null });
+        patch({
+          phase: 'esperando-companero',
+          peerRom: null,
+          peerNombre: null,
+          remoteStream: null,
+          compatibility: null,
+        });
       },
       onSignal: (data) => void peerRef.current?.accept(data),
       onError: (_code, message) => {
@@ -303,8 +319,17 @@ export const useSession = (
     return client;
   }, [patch, romRef, startPeer]);
 
+  /**
+   * El apodo propio, para volver a mandarlo si hay que reconectar.
+   *
+   * En una ref y no en el estado porque lo lee el camino de reconexion, que
+   * vive mas que el render donde se escribio: por ahi, leerlo del estado daria
+   * el de hace dos reconexiones.
+   */
+  const miNombreRef = useRef<string | null>(null);
+
   const createRoom = useCallback(
-    async (password: string, semilla: string | null = null) => {
+    async (password: string, semilla: string | null = null, nombre: string | null = null) => {
       const rom = romRef.current;
       if (!rom) {
         patch({ error: 'Carga primero tu ROM: la sala necesita saber a que jugais.' });
@@ -317,7 +342,8 @@ export const useSession = (
       try {
         // La semilla se queda en la sala para que el enlace de invitacion sea
         // corto: quien lo abre la pide con el codigo en vez de llevarla dentro.
-        (await connectSignaling()).createRoom(password, rom, semilla);
+        miNombreRef.current = nombre;
+        (await connectSignaling()).createRoom(password, rom, semilla, nombre);
         patch({ password });
       } catch (err) {
         patch({ error: err instanceof Error ? err.message : String(err) });
@@ -327,7 +353,7 @@ export const useSession = (
   );
 
   const joinRoom = useCallback(
-    async (roomCode: string, password: string) => {
+    async (roomCode: string, password: string, nombre: string | null = null) => {
       const rom = romRef.current;
       if (!rom) {
         patch({ error: 'Carga primero tu ROM: hay que comprobar que jugais al mismo juego.' });
@@ -338,7 +364,8 @@ export const useSession = (
       attemptsRef.current = 0;
       pendingPasswordRef.current = password;
       try {
-        (await connectSignaling()).joinRoom(roomCode, password, rom);
+        miNombreRef.current = nombre;
+        (await connectSignaling()).joinRoom(roomCode, password, rom, nombre);
       } catch (err) {
         patch({ error: err instanceof Error ? err.message : String(err) });
       }
@@ -412,7 +439,9 @@ export const useSession = (
     try {
       pendingPasswordRef.current = credentials.password;
       const client = await connectSignaling();
-      client.joinRoom(credentials.roomCode, credentials.password, rom);
+      // Con el mismo apodo: al volver de una caida, el otro tiene que seguir
+      // viendo a la misma persona y no a "tu companero".
+      client.joinRoom(credentials.roomCode, credentials.password, rom, miNombreRef.current);
       return true;
     } catch {
       return false;

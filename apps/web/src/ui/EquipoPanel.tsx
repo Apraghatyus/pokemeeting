@@ -75,6 +75,14 @@ type Props = {
    */
   tope?: TopeDeNivel | null;
   /**
+   * Como se llama el otro jugador, para la pestana.
+   *
+   * Su apodo si lo dijo al entrar en la sala, y "tu companero" si no. Lo decide
+   * quien pinta, en un solo sitio, para que no diga su nombre aqui y "tu
+   * companero" dos centimetros mas alla.
+   */
+  nombreDelOtro?: string;
+  /**
    * Por que no hay nada que enseñar.
    *
    * Sin esto la columna vacia no dice nada, que es lo que se quiere mientras
@@ -245,6 +253,7 @@ export const EquipoPanel = ({
   activo = null,
   caidosDelOtro,
   tope = null,
+  nombreDelOtro = 'Tu companero',
   onCambiar,
   motivo,
 }: Props) => {
@@ -288,7 +297,7 @@ export const EquipoPanel = ({
               className={`equipo__pestana${lado === 'companero' ? ' is-activa' : ''}`}
               onClick={lado === 'companero' ? undefined : onCambiar}
             >
-              Tu companero
+              {nombreDelOtro}
             </button>
           </div>
         ) : (
