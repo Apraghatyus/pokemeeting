@@ -54,8 +54,6 @@ type Props = {
    * copia ya no esta, que hay que rehacer desde su semilla.
    */
   onAleatorizar: () => void;
-  /** Boton para copiar la semilla, o null si esta partida no tiene. */
-  copiarSemilla: ReactNode;
   /** Si la copia de una partida sigue en este navegador. */
   existeGuardada: (fichero: string) => boolean;
   /** Abrir una partida guardada. */
@@ -300,10 +298,9 @@ export const AjustesModal = ({
                 </p>
               )}
 
-              {/* Solo la semilla. El boton de "aleatorizar" que habia aqui
-                  sobraba: los huecos libres ya llevan a ese menu, y con las
-                  tres partidas llenas no se puede crear otra de todas formas. */}
-              <div className="aleat__acciones">{copiarSemilla}</div>
+              {/* Sin botones debajo. Copiar la semilla de la partida en curso
+                  estaba aqui, y sobra: cada partida de la lista tiene el suyo,
+                  que ademas copia la de ESA y no la de la que estes jugando. */}
             </section>
           </>
         )}

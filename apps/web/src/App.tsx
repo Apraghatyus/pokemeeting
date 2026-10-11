@@ -550,7 +550,6 @@ export const App = () => {
             setMenuOpen(false);
             setRandomizerOpen(true);
           }}
-          copiarSemilla={<CopiarSemilla crc32={state.header?.crc32 ?? null} />}
           existeGuardada={emulator.existeGuardada}
           onContinuar={emulator.openSavedGame}
           onBorrarPartida={emulator.deleteSavedGame}
@@ -695,9 +694,3 @@ const nombreDeLaPartidaEnCurso = (crc32: string | null): string | null => {
   return partida ? nombreDePartida(partida) : null;
 };
 
-const CopiarSemilla = ({ crc32 }: { crc32: string | null }) => {
-
-  const semilla = semillaEnCurso(crc32);
-  if (!semilla) return null;
-
-};
