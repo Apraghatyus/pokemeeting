@@ -1,39 +1,57 @@
-# Produccion en el homelab: ~/homelab/emupoke/
-# Publico por Cloudflare Tunnel: hostname -> http://emupoke-web:80
-# Local por Tailscale en :${EMUPOKE_PORT} (sin HTTPS el emulador no arranca: usar el tunel o NPM).
+# Todo el proyecto en contenedores.
+# Publico por Cloudflare Tunnel (o NPM): hostname -> http://emupoke-web:80
+# Local en :${EMUPOKE_PORT} (sin HTTPS el emulador no arranca: usar el tunel o un proxy).
+#
+# Esta version viene del despliegue real del homelab y trae su endurecimiento,
+# que es mejor que lo que habia antes aqui:
+#   - la base NO publica ningun puerto; solo la ve la red interna
+#   - roles separados (initdb/10-roles.sh): admin solo por socket, app sin
+#     superusuario, dev con su propia base y sin acceso a la de produccion
+#   - el acceso de desarrollo va en un contenedor aparte (tunel-dev, perfil
+#     "dev") para que un fallo de bind no tumbe la base ni el juego
+#   - el Caddyfile pasa la IP real del cliente, sin la cual el limite de
+#     intentos de /cuentas seria un cupo global para todo el mundo
 name: emupoke
 
+x-endurecido: &endurecido
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
 services:
-  # La base de datos de las cuentas y el historial.
-  #
-  # NO SALE A INTERNET. Vive en la red interna y solo la ve el servidor; el
-  # proxy de delante no la enruta y no tiene ningun hostname publico. Para
-  # desarrollar contra ella desde otra maquina se abre su puerto SOLO en la
-  # direccion que diga EMUPOKE_PG_BIND -la de Tailscale-, nunca en 0.0.0.0.
-  #
-  # Lo unico que guarda son cuentas, partidas terminadas y equipos: numeros,
-  # motes y fechas. Ni ROMs ni guardados. Esa linea no la cruza nada de aqui.
   base:
+    <<: *endurecido
     image: postgres:16-alpine
     container_name: emupoke-base
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${EMUPOKE_PG_BASE:-emupoke}
-      POSTGRES_USER: ${EMUPOKE_PG_USUARIO:-emupoke}
-      # Obligatoria y sin valor por defecto: una base con contrasena conocida
-      # es una base sin contrasena.
-      POSTGRES_PASSWORD: ${EMUPOKE_PG_CLAVE:?hace falta EMUPOKE_PG_CLAVE en .env}
-      # Con esto, el primer arranque crea el cluster ya exigiendo contrasena
-      # tambien a las conexiones locales.
+      POSTGRES_USER: emupoke_admin
+      POSTGRES_PASSWORD: ${EMUPOKE_PG_ADMIN_CLAVE:?falta EMUPOKE_PG_ADMIN_CLAVE en .env}
+      POSTGRES_DB: postgres
       POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256 --auth-local=scram-sha-256
+      # Solo las lee initdb/10-roles.sh en el primer arranque.
+      EMUPOKE_PG_APP_CLAVE: ${EMUPOKE_PG_APP_CLAVE:?falta EMUPOKE_PG_APP_CLAVE en .env}
+      EMUPOKE_PG_DEV_CLAVE: ${EMUPOKE_PG_DEV_CLAVE:?falta EMUPOKE_PG_DEV_CLAVE en .env}
+    command:
+      - postgres
+      - -c
+      - password_encryption=scram-sha-256
+      - -c
+      - log_connections=on
+      - -c
+      - log_disconnections=on
+      - -c
+      - max_connections=50
     volumes:
       - base:/var/lib/postgresql/data
-    ports:
-      # Por defecto solo desde la propia maquina. Para desarrollar desde el
-      # portatil: EMUPOKE_PG_BIND=<ip de Tailscale> en el .env.
-      - "${EMUPOKE_PG_BIND:-127.0.0.1}:${EMUPOKE_PG_PUERTO:-5432}:5432"
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    # Sin "ports": no escucha en el host. Backups con docker exec.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${EMUPOKE_PG_USUARIO:-emupoke} -d ${EMUPOKE_PG_BASE:-emupoke}"]
+      test: ["CMD-SHELL", "pg_isready -U emupoke_admin -d postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -47,7 +65,42 @@ services:
     labels:
       - "com.centurylinklabs.watchtower.enable=false"
 
+  # Acceso de desarrollo a la base por Tailscale. Apagado por defecto.
+  #   abrir:  docker compose --profile dev up -d tunel-dev
+  #   cerrar: docker compose stop tunel-dev && docker compose rm -f tunel-dev
+  # Escucha SOLO en la IP de Tailscale: esa es la frontera (solo el tailnet llega).
+  # No filtrar por origen en socat: docker-proxy entrega las conexiones con la IP
+  # de la puerta de enlace de Docker, no la del cliente, y las rechazaria todas.
+  tunel-dev:
+    <<: *endurecido
+    image: alpine/socat:latest
+    container_name: emupoke-tunel-dev
+    profiles: [dev]
+    restart: "no"
+    # Cinco conexiones, que es tambien el limite del rol emupoke_dev. Si el
+    # servicio de cuentas se conecta por aqui, su CUENTAS_MAX_CONEXIONES tiene
+    # que ser menor que eso o se quedara esperando un hueco.
+    command: >-
+      TCP-LISTEN:5432,fork,reuseaddr,max-children=5
+      TCP:base:5432
+    ports:
+      - "${EMUPOKE_PG_BIND:?falta EMUPOKE_PG_BIND}:${EMUPOKE_PG_PUERTO:-5434}:5432"
+    read_only: true
+    cap_drop: [ALL]
+    depends_on:
+      base:
+        condition: service_healthy
+    networks: [interna]
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+          cpus: "0.25"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+
   servidor:
+    <<: *endurecido
     build:
       context: ${EMUPOKE_REPO:-..}
       dockerfile: deploy/Dockerfile
@@ -60,10 +113,8 @@ services:
       RANDOMIZER_CONCURRENCIA: "2"
       RANDOMIZER_MAX_COLA: "50"
       RANDOMIZER_XMX: "768M"
-      # El servicio de cuentas. Sin DATABASE_URL no arranca esa pieza y las
-      # otras dos siguen funcionando: jugar no depende de tener cuenta.
-      DATABASE_URL: postgres://${EMUPOKE_PG_USUARIO:-emupoke}:${EMUPOKE_PG_CLAVE:?hace falta EMUPOKE_PG_CLAVE en .env}@base:5432/${EMUPOKE_PG_BASE:-emupoke}
-      # Las cookies de sesion se marcan Secure: detras del tunel todo es HTTPS.
+      # Claves en hex: base64 mete / + = y rompe la URL.
+      DATABASE_URL: postgres://emupoke_app:${EMUPOKE_PG_APP_CLAVE:?falta EMUPOKE_PG_APP_CLAVE en .env}@base:5432/emupoke
       CUENTAS_COOKIE_SEGURA: "1"
     depends_on:
       base:
@@ -83,6 +134,7 @@ services:
       - "com.centurylinklabs.watchtower.enable=false"
 
   web:
+    <<: *endurecido
     build:
       context: ${EMUPOKE_REPO:-..}
       dockerfile: deploy/Dockerfile
@@ -92,6 +144,8 @@ services:
     restart: unless-stopped
     ports:
       - "${EMUPOKE_PORT:-8790}:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
     depends_on:
       - servidor
     networks: [interna, cloudflared-net]
@@ -104,7 +158,7 @@ services:
       - "com.centurylinklabs.watchtower.enable=false"
 
 volumes:
-  # Lo unico del proyecto que hay que respaldar. Hasta ahora no habia nada.
+  # Lo unico del proyecto que hay que respaldar. Como, en docs/despliegue.md.
   base:
 
 networks:

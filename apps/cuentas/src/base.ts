@@ -35,12 +35,21 @@ if (!URL_BASE) {
   process.exit(1);
 }
 
+/**
+ * Cuantas conexiones abre como mucho.
+ *
+ * Diez sobran para lo que hace esto, que son inicios de sesion y no partidas.
+ * Pero TIENE que caber dentro de lo que permita el otro lado, y el otro lado
+ * no siempre es el mismo: el rol de produccion admite 20, el de desarrollo
+ * solo 5, y si se llega a el por el tunel de socat ese tambien tiene su tope.
+ * Pedir mas de las que hay no da un error claro, da esperas que parecen un
+ * servidor lento. Por eso es configurable y no una constante.
+ */
+const MAX_CONEXIONES = Number(process.env['CUENTAS_MAX_CONEXIONES'] ?? 10);
+
 export const pool = new Pool({
   connectionString: URL_BASE,
-  // Diez sobran: esto atiende inicios de sesion, no partidas. Lo que de verdad
-  // importa es que no sean ilimitadas, para que una avalancha no deje a
-  // Postgres sin conexiones.
-  max: 10,
+  max: Number.isInteger(MAX_CONEXIONES) && MAX_CONEXIONES > 0 ? MAX_CONEXIONES : 10,
   // Una consulta de cuentas que tarda cinco segundos es una consulta rota.
   statement_timeout: 5_000,
   idleTimeoutMillis: 30_000,

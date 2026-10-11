@@ -10,16 +10,26 @@ produccion se probo arrancando el emulador con ella.
 ## Con Docker (lo mas corto)
 
 En `deploy/` hay una version en contenedores que no necesita instalar nada en
-la maquina salvo Docker: `deploy/Dockerfile` construye las dos piezas de
-servidor (con Java 8, `jjs` y el jar oficial del randomizer) y una web con Caddy
-que pone las dos cabeceras y reparte `/signaling` y `/randomizer`. El HTTPS lo
-pone lo que este delante (Cloudflare Tunnel, Nginx Proxy Manager...), apuntando
-a `http://emupoke-web:80`.
+la maquina salvo Docker: `deploy/Dockerfile` construye las piezas de servidor
+(con Java 8, `jjs` y el jar oficial del randomizer) y una web con Caddy que
+pone las dos cabeceras y reparte `/signaling`, `/randomizer` y `/cuentas`. El
+HTTPS lo pone lo que este delante (Cloudflare Tunnel, Nginx Proxy Manager...),
+apuntando a `http://emupoke-web:80`.
 
 ```bash
 docker network create cloudflared-net   # si no existe ya
+
+# Las contrasenas de la base. Si no quieres cuentas, igualmente hacen falta
+# para que el compose arranque; o quita el servicio "base".
+cp deploy/.env.ejemplo deploy/.env && chmod 600 deploy/.env
+openssl rand -hex 32   # una para cada EMUPOKE_PG_*_CLAVE
+
 docker compose -f deploy/docker-compose.yml up -d --build
 ```
+
+Antes de abrirlo al mundo, cambia `EMUPOKE_PROXY_FIABLE` por la IP de tu proxy:
+de eso depende que el limite de intentos de inicio de sesion sea por persona.
+Esta explicado mas abajo, en **La base de datos**.
 
 Sin Docker, `sudo bash deploy/instalar.sh` hace lo de este documento con Caddy
 y un dominio `<ip>.sslip.io`.
@@ -110,36 +120,98 @@ desarrollo. Sin ellas el servidor de salas no arranca.
 ## La base de datos
 
 Solo hace falta si quieres cuentas. Esta en el `docker-compose.yml` como
-servicio `base` y **no se expone a internet**: vive en la red interna de Docker
-y el proxy no la enruta.
+servicio `base` y **no publica ningun puerto**: vive en la red interna de
+Docker, el proxy no la enruta y desde fuera de la maquina no se llega a ella.
+
+### Montarla
 
 ```bash
 cp deploy/.env.ejemplo deploy/.env
-# genera una contrasena larga y ponla en EMUPOKE_PG_CLAVE
-openssl rand -base64 32
+chmod 600 deploy/.env
+
+# Tres contrasenas, EN HEX. Nada de base64: mete / + = y rompe la DATABASE_URL.
+openssl rand -hex 32   # EMUPOKE_PG_ADMIN_CLAVE
+openssl rand -hex 32   # EMUPOKE_PG_APP_CLAVE
+openssl rand -hex 32   # EMUPOKE_PG_DEV_CLAVE
 
 docker compose -f deploy/docker-compose.yml up -d base
 docker compose -f deploy/docker-compose.yml logs -f base
 ```
 
-El esquema se crea solo: el servicio de cuentas aplica las migraciones al
+El esquema se crea solo: el servicio de cuentas aplica sus migraciones al
 arrancar, en orden y cada una en su transaccion. No hay ningun paso manual.
 
-**Respaldarla.** Es lo unico del proyecto que hay que respaldar, y cabe en un
-fichero de texto:
+### Tres roles, y por que
+
+`deploy/initdb/10-roles.sh` corre **una sola vez**, en el primer arranque, con
+el volumen vacio. Para volver a aplicarlo hay que borrar el volumen.
+
+| Rol | Que puede | Donde se usa |
+|---|---|---|
+| `emupoke_admin` | Superusuario | Solo por socket, con `docker exec`. Por red esta **rechazado** |
+| `emupoke_app` | Dueno de la base `emupoke`, sin superusuario | El servicio de cuentas |
+| `emupoke_dev` | Dueno de `emupoke_dev`, y **nada** de la de produccion | Desarrollar. Es la credencial que se comparte |
+
+La gracia del tercero es que se puede pasar a quien este trabajando en el
+proyecto sin darle acceso a los datos de nadie. Y la del primero, que una
+contrasena de superusuario filtrada no sirve por red: el `pg_hba.conf` que
+escribe ese script la rechaza.
+
+### Abrir la base para desarrollar
+
+El acceso de desarrollo es un contenedor aparte con perfil `dev`, **apagado por
+defecto**. Va aparte a proposito: asi un fallo suyo no se lleva por delante ni
+la base ni la partida de nadie.
 
 ```bash
-docker exec emupoke-base pg_dump -U emupoke emupoke | gzip > emupoke-$(date +%F).sql.gz
+# en el .env: EMUPOKE_PG_BIND=<tu IP de Tailscale>  y  EMUPOKE_PG_PUERTO=5434
+docker compose -f deploy/docker-compose.yml --profile dev up -d tunel-dev
+
+# y cuando ya no haga falta
+docker compose -f deploy/docker-compose.yml stop tunel-dev
+docker compose -f deploy/docker-compose.yml rm -f tunel-dev
 ```
 
-**Para desarrollar contra ella** desde otra maquina, pon en el `.env` la IP de
-Tailscale del servidor:
+Escucha **solo en esa IP**, asi que llega quien este en tu tailnet y nadie mas.
+Esa es la frontera entera, y es suficiente.
 
-```
-EMUPOKE_PG_BIND=100.x.y.z
+**No le pongas a socat un filtro de origen.** Parece que refuerza y lo que hace
+es rechazarlo todo: Docker le entrega las conexiones con la IP de su propia
+puerta de enlace, no con la del cliente, asi que el filtro no ve nunca una
+direccion del tailnet. El sintoma es desconcertante -el puerto acepta la
+conexion y la cierra sin decir una palabra, como si no hubiera nada detras-.
+
+Al conectarte desde fuera, mira **cuantas conexiones** puedes abrir: el rol de
+desarrollo admite 5 y el tunel otras 5. El servicio de cuentas abre 10 por
+defecto, asi que en desarrollo hay que bajarlo con `CUENTAS_MAX_CONEXIONES=4`.
+Pasarse no da un error claro: da esperas que parecen un servidor lento.
+
+### Respaldarla
+
+Es lo unico del proyecto que hay que respaldar, y cabe en un fichero de texto:
+
+```bash
+docker exec emupoke-base pg_dump -U emupoke_admin emupoke | gzip > emupoke-$(date +%F).sql.gz
 ```
 
-Nunca `0.0.0.0`: eso la deja abierta a toda la red local.
+### La IP del proxy, que hay que cambiar
+
+En `deploy/Caddyfile` hay un `trusted_proxies` con **una IP de ejemplo**. Es
+quien puede decir cual es la IP del visitante, y de eso depende que el limite
+de intentos de inicio de sesion sea por persona y no un cupo global para todo
+el mundo. Ponla en `EMUPOKE_PROXY_FIABLE`:
+
+```bash
+docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' cloudflared
+```
+
+Tiene que ser la IP **exacta**, no la subred: por la subred entera entra
+tambien el trafico directo al puerto, y entonces cualquiera puede escribir la
+cabecera que quiera y saltarse el limite.
+
+Si no la cambias no se rompe nada -una IP que no existe en tu red no es nadie,
+y entonces no se cree la cabecera a nadie, que es el lado seguro de
+equivocarse-, pero el limite volvera a ser global.
 
 ## 2. Las dos piezas de servidor
 

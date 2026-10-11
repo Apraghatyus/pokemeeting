@@ -95,7 +95,8 @@
     "memoria:llenar": "npx tsx tools/memoria/llenar-equipo.mjs",
     "memoria:intercambiar": "npx tsx tools/memoria/intercambiar.mjs",
     "test:movimientos": "npx tsx tools/tests/test-movimientos.mjs",
-    "test:cuentas": "node tools/tests/test-cuentas.mjs"
+    "test:cuentas": "node tools/tests/test-cuentas.mjs",
+    "test:cuentas:ui": "node tools/tests/test-cuentas-ui.mjs"
   },
   "engines": {
     "node": ">=20"
