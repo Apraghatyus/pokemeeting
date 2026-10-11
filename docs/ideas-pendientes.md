@@ -1107,6 +1107,24 @@ comprueba-, así que el ranking de parejas de verdad necesita las cuentas; pero
 apuntar el apodo ahora es gratis y es lo único que habrá de las partidas de
 antes.
 
+### El modal de perfil de usuario
+
+Pulsar a alguien en el ranking y ver quien es: su apodo, desde cuando juega,
+cuantas partidas lleva, su porcentaje, con que juegos juega mas, que
+dificultades elige y cuantas ha descartado. Y, si es tu propio perfil, poder
+cambiar el apodo y la contrasena, y borrar la cuenta.
+
+Hoy una fila del ranking se despliega y ensena sus ultimas partidas, que es
+otra cosa: eso es "que ha hecho ultimamente" y el perfil es "quien es". Las dos
+valen y no se estorban.
+
+Un apunte que conviene decidir antes de dibujarlo: **que ve de ti alguien que
+no eres tu**. El correo no, desde luego -ni se pide-. El resto, en un proyecto
+que va de jugar con quien conoces, puede verse entero sin problema; pero es una
+decision, no un descuido.
+
+---
+
 ### Lo que hoy NO se apunta, y hace falta
 
 | Lo que pide el ranking | ¿Se apunta hoy? |

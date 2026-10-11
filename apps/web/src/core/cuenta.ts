@@ -133,6 +133,9 @@ export const subirLoDeAqui = async (): Promise<ResultadoDeSubida> => {
     resultado: f.resultado,
     porElEnlace: f.porElEnlace,
     medallas: f.medallas,
+    juego: f.juego,
+    modo: f.modo,
+    companero: f.companero,
     equipo: f.equipo,
   }));
 

@@ -44,13 +44,47 @@ export type PokemonDeLaHistoria = {
   caido: boolean;
 };
 
+/**
+ * Como acabo una partida.
+ *
+ * 'descartada' es la que se borro antes de llegar a ganar o a perder. NO cuenta
+ * para el porcentaje, pero se cuenta aparte, y eso es justo lo que hace que el
+ * porcentaje no mienta: si descartar fuera gratis e invisible, en una Nuzlocke
+ * bastaria con borrar lo que va mal antes de la pantalla de derrota para
+ * quedarse en el 100%.
+ */
+export type Resultado = 'victoria' | 'derrota' | 'descartada';
+
+/** Jugando solo, o en Soul Link con alguien al otro lado. */
+export type Modo = 'sola' | 'soullink';
+
 export type PartidaTerminada = {
   id: string;
   /** El fichero de la copia, que es lo que une esto con la partida guardada. */
   partida: string;
   /** Cuando se acabo. */
   cuando: number;
-  resultado: 'victoria' | 'derrota';
+  resultado: Resultado;
+  /**
+   * De que juego era: "Rojo Fuego", "Esmeralda"...
+   *
+   * Se apunta AQUI y no se saca de la partida guardada, aunque alli este, por
+   * una razon concreta: solo caben tres partidas guardadas y se van borrando.
+   * En cuanto alguien borra la copia, su fila del historial se quedaria sin
+   * juego para siempre.
+   */
+  juego: string | null;
+  /**
+   * Sola o en Soul Link.
+   *
+   * No es lo mismo que `porElEnlace`, y confundirlos era el fallo: aquel dice
+   * COMO acabo -si la mato una pareja caida- y este dice COMO SE JUGO. Una
+   * partida de Soul Link que se pierde por tu propia cuenta tiene
+   * `porElEnlace: false` y sigue siendo de Soul Link.
+   */
+  modo: Modo | null;
+  /** Con quien se jugo, si fue en Soul Link. Su apodo. */
+  companero: string | null;
   /**
    * Si lo que la acabo fue una pareja caida en la partida del companero.
    *
@@ -87,12 +121,19 @@ export const historial = (): PartidaTerminada[] =>
  * vez -se cierra, se sigue jugando, vuelve a caer el equipo- y el historial
  * cuenta finales, no veces que se vio el cartel.
  */
+export type Apunte = {
+  juego?: string | null;
+  modo?: Modo | null;
+  companero?: string | null;
+};
+
 export const apuntarPartidaTerminada = (
   partida: string,
-  resultado: 'victoria' | 'derrota',
+  resultado: Resultado,
   porElEnlace: boolean,
   medallas: number | null,
   equipo: EquipoResumen | null,
+  apunte: Apunte = {},
 ): PartidaTerminada | null => {
   if (!partida) return null;
 
@@ -105,6 +146,9 @@ export const apuntarPartidaTerminada = (
     partida,
     cuando: Date.now(),
     resultado,
+    juego: apunte.juego ?? null,
+    modo: apunte.modo ?? null,
+    companero: apunte.companero ?? null,
     porElEnlace,
     medallas,
     equipo: (equipo?.ranuras ?? [])
@@ -132,6 +176,23 @@ export const apuntarPartidaTerminada = (
   }
   return registro;
 };
+
+/**
+ * Apunta una partida descartada: borrada antes de ganar o de perder.
+ *
+ * Sin esto, borrar una partida no deja rastro de ninguna clase, y entonces no
+ * hay forma de saber cuantas ha descartado alguien. Eso importa aunque no
+ * cuente para el porcentaje: es lo que separa un 90% limpio de un 90% hecho a
+ * base de borrar lo que iba mal.
+ *
+ * No lleva equipo ni medallas a proposito: cuando se borra una copia ya no se
+ * puede leer su partida, asi que inventarse un equipo seria peor que no
+ * ponerlo.
+ */
+export const apuntarDescartada = (
+  partida: string,
+  apunte: Apunte = {},
+): PartidaTerminada | null => apuntarPartidaTerminada(partida, 'descartada', false, null, null, apunte);
 
 /** Borra el historial entero. Para cuando haya donde pedirlo. */
 export const olvidarHistorial = (): void => {

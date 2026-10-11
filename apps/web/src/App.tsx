@@ -20,6 +20,7 @@ import { motesDebilitados, parseGameCode } from '@emupoke/pokemon';
 import { EquipoPanel } from './ui/EquipoPanel';
 import { AjustesModal } from './ui/AjustesModal';
 import { CuentaModal } from './ui/CuentaModal';
+import { Ranking } from './ui/Ranking';
 import { useCuenta } from './core/useCuenta';
 import { IntercambioModal } from './ui/IntercambioModal';
 import { useIntercambio } from './core/useIntercambio';
@@ -82,6 +83,7 @@ export const App = () => {
   const [tratoOpen, setTratoOpen] = useState(false);
   const [randomizerOpen, setRandomizerOpen] = useState(false);
   const [cuentaOpen, setCuentaOpen] = useState(false);
+  const [rankingOpen, setRankingOpen] = useState(false);
 
   // Quien eres, si es que has entrado. No hace falta para jugar: si el
   // servicio de cuentas no esta, esto se queda en null y no se nota.
@@ -95,7 +97,15 @@ export const App = () => {
   // este en un boton: si no, las flechas moverian al personaje por detras.
   const keyboardOwner = useKeyboardOwnership(
     emulator.coreRef,
-    roomOpen || menuOpen || randomizerOpen || tratoOpen || cuentaOpen || invitacion !== null,
+    roomOpen ||
+      menuOpen ||
+      randomizerOpen ||
+      tratoOpen ||
+      cuentaOpen ||
+      // Con el ranking delante, el teclado es para buscar jugadores: si no,
+      // escribir un nombre movia al personaje por detras.
+      rankingOpen ||
+      invitacion !== null,
   );
 
   // Espacio enciende y apaga el avance rapido, como en casi cualquier emulador.
@@ -247,6 +257,14 @@ export const App = () => {
     // Por donde iba la partida cuando se acabo. No se ensena: se guarda en el
     // historial, para el dia que haya perfiles.
     miEquipo.medallas.cuantas,
+    // Y de que juego es, como se jugo y con quien. Esto solo se sabe mientras
+    // se juega: cuando la partida guardada se borre -solo caben tres- ya no
+    // habria forma de averiguarlo.
+    {
+      juego: state.platform?.label ?? null,
+      modo: conCompanero ? 'soullink' : 'sola',
+      companero: conCompanero ? session.state.peerNombre ?? null : null,
+    },
   );
 
   // Mandarle el equipo al companero. Se hace desde un solo sitio y no al
@@ -323,6 +341,7 @@ export const App = () => {
         cuenta={cuenta.cuenta}
         onOpenCuenta={() => setCuentaOpen(true)}
         cuentaOpen={cuentaOpen}
+        onOpenRanking={() => setRankingOpen(true)}
       />
 
       <main className="app__main">
@@ -598,6 +617,18 @@ export const App = () => {
         semilla={semillaEnCurso(state.header?.crc32 ?? null)}
         gameCode={state.header?.gameCode ?? null}
       />
+
+      {/* El ranking va ENCIMA, no en lugar de la partida: el emulador sigue
+          montado debajo. Desmontarlo para ensenar una tabla seria apagarle el
+          juego a alguien por mirar quien va ganando, y volver costaria cargar
+          el nucleo otra vez. */}
+      {rankingOpen && (
+        <Ranking
+          onVolver={() => setRankingOpen(false)}
+          usuario={cuenta.cuenta?.usuario ?? null}
+          especies={especies}
+        />
+      )}
     </div>
   );
 };

@@ -34,6 +34,7 @@ import {
   galletaVacia,
 } from './sesiones.ts';
 import { subir } from './subir.ts';
+import { juegosConPartidas, ranking, type Filtros } from './ranking.ts';
 
 const PORT = Number(process.env['PORT'] ?? 8789);
 const HOST = process.env['HOST'] ?? '127.0.0.1';
@@ -230,6 +231,24 @@ const atender = async (req: IncomingMessage, res: ServerResponse): Promise<void>
     // llega a su base no esta sano, esta mintiendo.
     await pool.query('select 1');
     responder(res, 200, { ok: true });
+    return;
+  }
+
+  // El ranking se puede mirar SIN cuenta. Es una tabla de resultados, no datos
+  // de nadie: pedir que te registres para ver quien va ganando seria poner una
+  // puerta donde no hace falta.
+  if (req.method === 'GET' && ruta === '/ranking') {
+    const parametros = new URLSearchParams((req.url ?? '').split('?')[1] ?? '');
+    const modo = parametros.get('modo');
+    const filtros: Filtros = {
+      modo: modo === 'sola' || modo === 'soullink' ? modo : null,
+      juego: parametros.get('juego')?.slice(0, 80) || null,
+      dificultad: parametros.get('dificultad')?.slice(0, 20) || null,
+    };
+    responder(res, 200, {
+      jugadores: await ranking(filtros),
+      juegos: await juegosConPartidas(),
+    });
     return;
   }
 

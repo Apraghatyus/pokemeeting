@@ -128,18 +128,29 @@ const guardarFinal = async (
   const llave = recortar(final.id, 400);
   if (!llave || !RESULTADOS.has(final.resultado)) return false;
 
+  // El modo tiene que ser uno de los dos o nada: un nulo dice "no se sabe",
+  // que es la verdad de las partidas apuntadas antes de que esto existiera.
+  const modo = final.modo === 'sola' || final.modo === 'soullink' ? final.modo : null;
+
   const { rows } = await cliente.query<{ id: string }>(
     `insert into partidas_terminadas
-       (usuario_id, partida_id, llave, cuando, resultado, por_el_enlace, medallas)
+       (usuario_id, partida_id, llave, cuando, resultado, por_el_enlace, medallas,
+        juego, modo, companero)
      values (
        $1,
        -- Se ata a la partida de la que salio si todavia esta. Si se borro, la
        -- fila se queda igual: el historial sobrevive a la copia.
        (select id from partidas where usuario_id = $1 and fichero = $2 limit 1),
-       $3, $4, $5, $6, $7
+       $3, $4, $5, $6, $7, $8, $9, $10
      )
-     on conflict (usuario_id, llave) do nothing
-     returning id`,
+     on conflict (usuario_id, llave) do update set
+       -- Lo que antes no se sabia y ahora si, se completa; lo que ya estaba no
+       -- se pisa con un nulo. Asi volver a subir un historial viejo desde otro
+       -- aparato no borra lo que se apunto bien.
+       juego = coalesce(partidas_terminadas.juego, excluded.juego),
+       modo = coalesce(partidas_terminadas.modo, excluded.modo),
+       companero = coalesce(partidas_terminadas.companero, excluded.companero)
+     returning (xmax = 0) as nueva, id`,
     [
       usuarioId,
       recortar(final.partida) ?? '',
@@ -148,12 +159,17 @@ const guardarFinal = async (
       final.resultado,
       final.porElEnlace === true,
       entero(final.medallas, 0, 8),
+      recortar(final.juego, 80),
+      modo,
+      recortar(final.companero, 40),
     ],
   );
 
-  const id = rows[0]?.id;
-  // Ya estaba subida. Es lo normal a partir de la segunda vez.
-  if (!id) return false;
+  // Con "do update" la fila vuelve siempre, asi que lo que dice si era nueva
+  // es xmax: en una insercion de verdad vale 0.
+  const fila = rows[0] as { nueva?: boolean; id?: string } | undefined;
+  if (!fila?.id || fila.nueva !== true) return false;
+  const id = fila.id;
 
   const equipo = (Array.isArray(final.equipo) ? final.equipo : []).slice(0, MAX_EQUIPO);
   for (const [orden, pokemon] of equipo.entries()) {

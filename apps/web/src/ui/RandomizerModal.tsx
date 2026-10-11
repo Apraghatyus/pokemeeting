@@ -22,6 +22,8 @@ import {
   todasLasPartidas,
   type PartidaGuardada,
 } from '../core/partidas';
+import { apuntarDescartada } from '../core/historial';
+import { yaTermino } from '../core/useFinDePartida';
 import { parseGameCode } from '@emupoke/pokemon';
 import { crc32 } from '../core/romHeader';
 import { codificarSemilla, descodificarSemilla } from '../core/semilla';
@@ -779,6 +781,17 @@ export const RandomizerModal = ({
                                 aria-label={`Confirmar que se borra ${nombreDePartida(partida)}`}
                                 onClick={() => {
                                   setBorrando(null);
+                                  // Borrar una partida que nunca llego a
+                                  // acabarse es DESCARTARLA, y eso se apunta.
+                                  // No cuenta para el porcentaje, pero sin
+                                  // esto no quedaria ningun rastro: es lo
+                                  // unico que separa un 90% limpio de uno
+                                  // hecho a base de borrar lo que iba mal.
+                                  if (!yaTermino(partida.fichero)) {
+                                    apuntarDescartada(partida.fichero, {
+                                      juego: juegoDePartida(partida),
+                                    });
+                                  }
                                   onBorrar(partida.fichero);
                                   olvidar(partida.id);
                                   releer();

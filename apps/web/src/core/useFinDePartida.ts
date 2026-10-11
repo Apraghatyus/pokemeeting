@@ -11,7 +11,7 @@
 // precauciones de abajo.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { apuntarPartidaTerminada } from './historial';
+import { apuntarPartidaTerminada, type Apunte } from './historial';
 import type { EquipoResumen } from '@emupoke/protocol';
 import { parejaCaida } from '@emupoke/pokemon';
 
@@ -124,6 +124,15 @@ const leer = (partida: string): Guardado => {
   }
 };
 
+/**
+ * Si esa partida ya habia terminado, de una forma o de otra.
+ *
+ * La usa el boton de borrar: una partida terminada que se borra no es una
+ * partida descartada, es una partida acabada cuya copia ya no hace falta.
+ * Apuntarla otra vez como descartada contaria dos veces el mismo final.
+ */
+export const yaTermino = (partida: string): boolean => leer(partida).terminada;
+
 const escribir = (partida: string, estado: Guardado): void => {
   try {
     localStorage.setItem(clave(partida), JSON.stringify(estado));
@@ -216,6 +225,15 @@ export const useFinDePartida = (
    * acabo, que es la mitad de lo que hace interesante un historial.
    */
   medallas: number | null = null,
+  /**
+   * De que juego es, como se jugo y con quien.
+   *
+   * Nada de esto cambia lo que se ensena: es lo que hace falta para que el
+   * ranking pueda separar una Nuzlocke en solitario de una de Soul Link, y
+   * filtrar por juego. Son datos que solo se saben MIENTRAS se juega, asi que
+   * o se apuntan aqui o no se apuntan nunca.
+   */
+  apunte: Apunte = {},
 ): FinDePartida => {
   const [estado, setEstado] = useState<Guardado>(VACIO);
   const [equipoFinal, setEquipoFinal] = useState<EquipoResumen | null>(null);
@@ -314,6 +332,7 @@ export const useFinDePartida = (
       estado.porElEnlace === true,
       medallas,
       foto,
+      apunte,
     );
   }, [
     partida,

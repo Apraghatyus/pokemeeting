@@ -24,6 +24,8 @@ type Props = {
   /** Abre la pantalla de la cuenta. */
   onOpenCuenta: () => void;
   cuentaOpen: boolean;
+  /** Abre el ranking. */
+  onOpenRanking: () => void;
 };
 
 /**
@@ -56,6 +58,7 @@ export const TopBar = ({
   cuenta,
   onOpenCuenta,
   cuentaOpen,
+  onOpenRanking,
 }: Props) => {
   // Reconectando es un estado distinto de "caido": el jugador necesita saber
   // que se esta intentando solo, para no dar la partida por perdida.
@@ -123,6 +126,24 @@ export const TopBar = ({
         <span className="status" title={status.texto} aria-label={status.texto} role="status">
           <span className={`dot${status.dot ? ` dot--${status.dot}` : ''}`} />
         </span>
+        {/* El ranking. Esta a la vista y no dentro de un menu porque es de
+            las cosas que se miran a mitad de partida -"como voy contra el"- y
+            no al final de ella. Se puede abrir sin tener cuenta: es una tabla
+            de resultados, no datos de nadie. */}
+        <button
+          type="button"
+          className="iconbutton iconbutton--ranking"
+          onClick={onOpenRanking}
+          title="Ranking"
+          aria-label="Ranking"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+            strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4Z" />
+            <path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3" />
+          </svg>
+        </button>
+
         {/* La cuenta, al lado de la tuerca y no dentro de los ajustes.
             Entrar no es configurar el emulador: es otra cosa, y buscarla
             dentro de un menu de teclas y volumen era pedirle a alguien que

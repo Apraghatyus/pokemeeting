@@ -108,6 +108,12 @@ export type FinalParaSubir = {
   resultado: 'victoria' | 'derrota' | 'descartada';
   porElEnlace: boolean;
   medallas: number | null;
+  /** De que juego era. */
+  juego?: string | null;
+  /** Sola o en Soul Link: como se JUGO, no como acabo. */
+  modo?: 'sola' | 'soullink' | null;
+  /** Con quien, si fue en Soul Link. */
+  companero?: string | null;
   equipo: {
     especie: number;
     mote: string;
