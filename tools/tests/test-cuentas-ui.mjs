@@ -61,16 +61,30 @@ await page.reload({ waitUntil: 'load' });
 await page.waitForTimeout(1200);
 
 // --- 1. crear la cuenta desde la pantalla -------------------------------
-await page.locator('.iconbutton--opciones').click();
-await page.waitForTimeout(400);
-
-const ajustes = page.locator('.modal[open]');
+//
+// La cuenta tiene su propio boton en la barra, al lado de la tuerca. Estaba
+// dentro de los ajustes y de ahi se saco: entrar no es configurar el
+// emulador, y buscarlo entre las teclas y el volumen era pedir que se
+// adivinara donde esta.
 check(
-  'en Ajustes se ofrece entrar',
-  (await ajustes.getByRole('button', { name: 'Entrar o crear una cuenta' }).count()) === 1,
+  'la cuenta tiene su boton en la barra',
+  (await page.locator('.iconbutton--cuenta').count()) === 1,
+);
+check(
+  'con una tuerca al lado, que ya no son tres puntos',
+  (await page.locator('.iconbutton--opciones svg').count()) === 1,
 );
 
-await ajustes.getByRole('button', { name: 'Entrar o crear una cuenta' }).click();
+// Y no esta ademas dentro de los ajustes: estaba en dos sitios y uno de los
+// dos sobraba.
+await page.locator('.iconbutton--opciones').click();
+await page.waitForTimeout(400);
+const tarjetas = await page.locator('.modal[open] .tarjeta__titulo h2').allTextContents();
+check('y ya no esta tambien dentro de los ajustes', !tarjetas.includes('Tu cuenta'), tarjetas.join(', '));
+await page.locator('.modal[open] .modal__close').click();
+await page.waitForTimeout(400);
+
+await page.locator('.iconbutton--cuenta').click();
 await page.waitForTimeout(400);
 
 const cartel = page.locator('.modal[open]');
@@ -144,22 +158,50 @@ check(
 
 // --- 3. que sobrevive a recargar ----------------------------------------
 await page.reload({ waitUntil: 'load' });
-await page.waitForTimeout(1500);
-await page.locator('.iconbutton--opciones').click();
+await page.waitForTimeout(2000);
+
+// El boton se enciende cuando estas dentro: es la respuesta a "sigo dentro?"
+// sin tener que abrir nada.
+check(
+  'al recargar, el boton de la cuenta dice que sigues dentro',
+  (await page.locator('.iconbutton--cuenta.is-dentro').count()) === 1,
+);
+
+await page.locator('.iconbutton--cuenta').click();
 await page.waitForTimeout(500);
 
 const despues = page.locator('.modal[open]');
 check(
-  'al recargar sigues dentro',
+  'y dentro sigue tu sesion',
   /Has entrado como/.test(((await despues.textContent()) ?? '').replace(/\s+/g, ' ')),
 );
+check('llamandote por tu nombre', /El de la UI/.test((await despues.textContent()) ?? ''));
+
+// --- 3b. la sala ya no pregunta como te llamas --------------------------
+//
+// Con cuenta, preguntarlo otra vez seria pedir dos veces lo mismo y dejar que
+// las dos respuestas se separen: "Juan" en el ranking y "juanito" en la sala
+// es la misma persona vista como dos.
+await despues.locator('.modal__close').click();
+await page.waitForTimeout(400);
+await page.locator('.roomchip').click();
+await page.waitForTimeout(500);
+
+const sala = page.locator('.modal[open]');
 check(
-  'y te llama por tu nombre',
-  /El de la UI/.test((await despues.textContent()) ?? ''),
+  'con cuenta, la sala ya no pide un nombre',
+  (await sala.locator('input').count()) > 0 &&
+    (await sala.getByPlaceholder('Como quieres que te llamen').count()) === 0,
 );
+check(
+  'lo dice en vez de preguntarlo',
+  /Entras como/.test(((await sala.textContent()) ?? '').replace(/\s+/g, ' ')),
+);
+await sala.locator('.modal__close').click();
+await page.waitForTimeout(400);
 
 // --- 4. salir -----------------------------------------------------------
-await despues.getByRole('button', { name: 'Ver tu cuenta' }).click();
+await page.locator('.iconbutton--cuenta').click();
 await page.waitForTimeout(400);
 await page.locator('.modal[open]').getByRole('button', { name: 'Cerrar sesion' }).click();
 await page.waitForTimeout(1500);
@@ -169,6 +211,20 @@ const fuera = await page.evaluate(async () => {
   return r.json();
 });
 check('al cerrar sesion ya no hay sesion', fuera.cuenta === null);
+check(
+  'y el boton deja de estar encendido',
+  (await page.locator('.iconbutton--cuenta.is-dentro').count()) === 0,
+);
+
+// Y sin cuenta la sala vuelve a preguntarlo, que para eso entrar es opcional.
+await page.locator('.modal[open] .modal__close').click().catch(() => {});
+await page.waitForTimeout(400);
+await page.locator('.roomchip').click();
+await page.waitForTimeout(500);
+check(
+  'sin cuenta, la sala vuelve a pedir el nombre',
+  (await page.locator('.modal[open]').getByPlaceholder('Como quieres que te llamen').count()) === 1,
+);
 
 // Y lo de este navegador NO se borro al subir: sigue aqui. Borrarlo seria
 // cambiar un sitio donde estaban los datos por otro, y si el servidor se cae

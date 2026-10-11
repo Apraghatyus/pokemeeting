@@ -308,6 +308,9 @@ export const App = () => {
         onVolume={emulator.setVolume}
         onToggleMute={emulator.toggleMute}
         volumeDisabled={!hasRom}
+        cuenta={cuenta.cuenta}
+        onOpenCuenta={() => setCuentaOpen(true)}
+        cuentaOpen={cuentaOpen}
       />
 
       <main className="app__main">
@@ -509,13 +512,6 @@ export const App = () => {
             setRandomizerOpen(true);
           }}
           copiarSemilla={<CopiarSemilla crc32={state.header?.crc32 ?? null} />}
-          cuenta={cuenta.cuenta}
-          onCuenta={() => {
-            // Se cierra el de ajustes: dos dialogos a la vez dejan el de
-            // abajo a medio tapar y sin forma clara de volver.
-            setMenuOpen(false);
-            setCuentaOpen(true);
-          }}
         />
       </main>
 
@@ -563,6 +559,8 @@ export const App = () => {
         onClose={() => setRoomOpen(false)}
         state={session.state}
         romReady={hasRom}
+        /* Con cuenta, la sala no vuelve a preguntar como te llamas. */
+        cuenta={cuenta.cuenta}
         /* Con el mundo que se esta jugando: se queda en la sala y asi el
            enlace que se comparte lleva solo el codigo y la contrasena. */
         onCreate={(password, nombre) =>

@@ -1,3 +1,4 @@
+import type { Cuenta } from '@emupoke/protocol';
 import type { SessionState } from '../net/useSession';
 import type { KeyboardOwner } from '../core/useKeyboardOwnership';
 import { VolumeControl } from './VolumeControl';
@@ -18,6 +19,11 @@ type Props = {
   onToggleMute: () => void;
   /** Sin ROM cargada no hay nada que oir. */
   volumeDisabled: boolean;
+  /** Quien eres, o null si no has entrado. */
+  cuenta: Cuenta | null;
+  /** Abre la pantalla de la cuenta. */
+  onOpenCuenta: () => void;
+  cuentaOpen: boolean;
 };
 
 /**
@@ -47,6 +53,9 @@ export const TopBar = ({
   onVolume,
   onToggleMute,
   volumeDisabled,
+  cuenta,
+  onOpenCuenta,
+  cuentaOpen,
 }: Props) => {
   // Reconectando es un estado distinto de "caido": el jugador necesita saber
   // que se esta intentando solo, para no dar la partida por perdida.
@@ -114,14 +123,41 @@ export const TopBar = ({
         <span className="status" title={status.texto} aria-label={status.texto} role="status">
           <span className={`dot${status.dot ? ` dot--${status.dot}` : ''}`} />
         </span>
+        {/* La cuenta, al lado de la tuerca y no dentro de los ajustes.
+            Entrar no es configurar el emulador: es otra cosa, y buscarla
+            dentro de un menu de teclas y volumen era pedirle a alguien que
+            adivinara donde esta. Ademas asi se ve de un vistazo si estas
+            dentro, que es la pregunta que de verdad se hace. */}
+        <button
+          type="button"
+          className={`iconbutton iconbutton--cuenta${cuenta ? ' is-dentro' : ''}${
+            cuentaOpen ? ' is-active' : ''
+          }`}
+          onClick={onOpenCuenta}
+          title={cuenta ? `Tu cuenta: ${cuenta.apodo}` : 'Entrar o crear una cuenta'}
+          aria-label={cuenta ? `Tu cuenta: ${cuenta.apodo}` : 'Entrar o crear una cuenta'}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+            strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
+          </svg>
+        </button>
+
+        {/* Una tuerca y no tres puntos: tres puntos significan "hay mas
+            cosas", que es justo lo que no son. Son los ajustes. */}
         <button
           type="button"
           className={`iconbutton iconbutton--opciones${menuOpen ? ' is-active' : ''}`}
           onClick={onToggleMenu}
-          title="Opciones"
-          aria-label="Opciones"
+          title="Ajustes"
+          aria-label="Ajustes"
         >
-          ⋮
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+            strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
         </button>
       </div>
     </header>

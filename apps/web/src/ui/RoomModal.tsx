@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { describeGame, type RomCompatibility } from '@emupoke/pokemon';
+import type { Cuenta } from '@emupoke/protocol';
 import { apodoGuardado, guardarApodo, MAX_APODO } from '../core/apodo';
 import { textoDeInvitacion } from '../core/invitacion';
 import type { Semilla } from '../core/semilla';
@@ -26,6 +27,15 @@ type Props = {
   semilla: Semilla | null;
   /** Codigo del juego que jugamos, para decir en el mensaje cual hace falta. */
   gameCode: string | null;
+  /**
+   * Quien eres, si has entrado.
+   *
+   * Con cuenta, el nombre ya no se pregunta: lo pone ella. Preguntarlo seria
+   * pedir dos veces lo mismo y dejar que las dos respuestas se separen -
+   * "Juan" en el ranking y "juanito" en la sala es la misma persona vista como
+   * dos-. Sin cuenta se sigue pidiendo, porque entrar no es obligatorio.
+   */
+  cuenta: Cuenta | null;
 };
 
 /**
@@ -55,13 +65,15 @@ export const RoomModal = (props: Props) => {
 
 /* ---------- sin sala: crear o entrar ---------- */
 
-const RoomSetup = ({ romReady, state, onCreate, onJoin }: Props) => {
+const RoomSetup = ({ romReady, state, onCreate, onJoin, cuenta }: Props) => {
   const [mode, setMode] = useState<'crear' | 'unirme'>('crear');
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
   // Con el de la ultima vez puesto: el apodo no cambia de una partida a otra y
-  // volver a escribirlo cada vez es un paso que no aporta nada.
+  // volver a escribirlo cada vez es un paso que no aporta nada. Con cuenta ni
+  // se pregunta: manda el nombre de la cuenta.
   const [nombre, setNombre] = useState(() => apodoGuardado() ?? '');
+  const comoTeLlamas = cuenta ? cuenta.apodo : nombre;
 
   const ready = romReady && password.length > 0 && (mode === 'crear' || code.length === 6);
 
@@ -88,9 +100,9 @@ const RoomSetup = ({ romReady, state, onCreate, onJoin }: Props) => {
         className="form"
         onSubmit={(event) => {
           event.preventDefault();
-          guardarApodo(nombre);
-          if (mode === 'crear') onCreate(password, nombre);
-          else onJoin(code, password, nombre);
+          if (!cuenta) guardarApodo(nombre);
+          if (mode === 'crear') onCreate(password, comoTeLlamas);
+          else onJoin(code, password, comoTeLlamas);
         }}
       >
         {mode === 'unirme' && (
@@ -106,19 +118,26 @@ const RoomSetup = ({ romReady, state, onCreate, onJoin }: Props) => {
             />
           </label>
         )}
-        {/* El nombre no es obligatorio: sin el, el otro ve "tu companero", que
+        {/* Con cuenta no se pregunta el nombre: ya lo tiene. Sin cuenta se
+            pide, y no es obligatorio: sin el, el otro ve "tu companero", que
             es lo que veia antes. Pedirlo como requisito seria un paso mas para
             entrar en una sala, que es justo lo que se quiere que cueste poco. */}
-        <label>
-          Tu nombre <span className="hint hint--linea">opcional</span>
-          <input
-            value={nombre}
-            onChange={(event) => setNombre(event.target.value)}
-            placeholder="Como quieres que te llamen"
-            maxLength={MAX_APODO}
-            autoComplete="off"
-          />
-        </label>
+        {cuenta ? (
+          <p className="sala__quien">
+            Entras como <strong>{cuenta.apodo}</strong>
+          </p>
+        ) : (
+          <label>
+            Tu nombre <span className="hint hint--linea">opcional</span>
+            <input
+              value={nombre}
+              onChange={(event) => setNombre(event.target.value)}
+              placeholder="Como quieres que te llamen"
+              maxLength={MAX_APODO}
+              autoComplete="off"
+            />
+          </label>
+        )}
         <label>
           Contrasena
           <input

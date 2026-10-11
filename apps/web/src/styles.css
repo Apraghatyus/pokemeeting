@@ -4940,3 +4940,18 @@ details.partidas[open] > summary::before {
 .cuenta__quien strong {
   color: var(--text);
 }
+
+/* Los iconos de la barra que son dibujo y no simbolo de texto. */
+.iconbutton svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+  margin: auto;
+}
+
+/* Entrado: el boton de la cuenta se enciende. Es la respuesta a "sigo dentro?"
+   sin tener que abrir nada. */
+.iconbutton--cuenta.is-dentro {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 45%, transparent);
+}
