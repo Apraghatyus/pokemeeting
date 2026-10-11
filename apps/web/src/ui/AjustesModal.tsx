@@ -13,7 +13,15 @@
 // es, como se aleatorizo-. Es la division que hace que no haya que leerlo todo
 // para encontrar una cosa.
 
-import type { ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode, type RefObject } from 'react';
+import {
+  MAX_PARTIDAS,
+  partidasDe,
+  todasLasPartidas,
+  type PartidaGuardada,
+} from '../core/partidas';
+import { PartidasGuardadas } from './PartidasGuardadas';
+import { exportarPartida } from '../core/exportar';
 import type { EmulatorState } from '../core/useEmulator';
 import type { MandoTactil, ModoMando } from '../core/useMandoTactil';
 import { BOTONES, nombreVisible, type Teclas } from '../core/useTeclas';
@@ -38,10 +46,33 @@ type Props = {
   mando: MandoTactil;
   hasRom: boolean;
   conCompanero: boolean;
-  /** Abre el menu del aleatorizador. */
+  /**
+   * Abre el menu del aleatorizador.
+   *
+   * Desde aqui se llega por dos sitios: pulsando un hueco libre -crear una
+   * partida es elegir que se cambia, y eso se hace alli- o pulsando una cuya
+   * copia ya no esta, que hay que rehacer desde su semilla.
+   */
   onAleatorizar: () => void;
   /** Boton para copiar la semilla, o null si esta partida no tiene. */
   copiarSemilla: ReactNode;
+  /** Si la copia de una partida sigue en este navegador. */
+  existeGuardada: (fichero: string) => boolean;
+  /** Abrir una partida guardada. */
+  onContinuar: (fichero: string) => Promise<void> | void;
+  /** Quitar su copia del sistema de ficheros. */
+  onBorrarPartida: (fichero: string) => void;
+  /** Para poder llevarse una partida: lee su guardado. */
+  leerGuardado: (fichero: string) => Uint8Array | null;
+  /**
+   * La ROM ORIGINAL, no la que se esta jugando.
+   *
+   * Es lo que decide que partidas son de este juego. Jugando una copia
+   * aleatorizada, el CRC de lo cargado es el de la copia, y comparando con ese
+   * ninguna partida se reconoceria como tuya: ni se podrian abrir ni
+   * descargar.
+   */
+  baseRom: RefObject<{ bytes: Uint8Array; fileName: string; crc32: string } | null>;
 };
 
 const MODOS: { valor: ModoMando; etiqueta: string }[] = [
@@ -61,7 +92,33 @@ export const AjustesModal = ({
   conCompanero,
   onAleatorizar,
   copiarSemilla,
-}: Props) => (
+  existeGuardada,
+  onContinuar,
+  onBorrarPartida,
+  leerGuardado,
+  baseRom,
+}: Props) => {
+  // La lista se relee al abrir el menu: puede haber cambiado desde la vez
+  // anterior -se creo una, se borro otra- y una lista vieja aqui dentro
+  // enseñaria partidas que ya no estan.
+  const crc = baseRom.current?.crc32 ?? null;
+  const [partidas, setPartidas] = useState<PartidaGuardada[]>([]);
+  // Lo unico que puede fallar aqui es llevarse una partida sin guardado, y se
+  // dice en el sitio en vez de en una ventana aparte.
+  const [problema, setProblema] = useState<string | null>(null);
+
+  const releer = useCallback(() => {
+    const mias = partidasDe(crc ?? '');
+    const otras = todasLasPartidas().filter((p) => p.baseCrc32 !== (crc ?? ''));
+    // Las de esta ROM primero: son las que se pueden abrir ahora mismo.
+    setPartidas([...mias, ...otras]);
+  }, [crc]);
+
+  useEffect(() => {
+    if (open) releer();
+  }, [open, releer]);
+
+  return (
   <Modal
     open={open}
     onClose={onClose}
@@ -195,44 +252,67 @@ export const AjustesModal = ({
               </button>
             </section>
 
+            {/* Tus partidas, aqui y no escondidas detras de "Aleatorizar".
+                Gestionarlas -seguir una, renombrarla, llevartela, borrarla- es
+                lo que se hace a diario; aleatorizar es lo que se hace una vez
+                por partida. Tenerlo al reves obligaba a entrar en el menu de
+                crear para poder seguir jugando una que ya existia. */}
             <section className="tarjeta">
-              <Titulo tono="azul">Aleatorizar</Titulo>
+              <Titulo
+                tono="azul"
+                accion={
+                  <span className="cuenta">
+                    {partidas.length}/{MAX_PARTIDAS}
+                  </span>
+                }
+              >
+                Tus partidas
+              </Titulo>
 
-              <div className="aleat">
-                <span className="aleat__icono" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                    />
-                  </svg>
-                </span>
-                <div>
-                  <div className="aleat__que">
-                    {state.romSource === 'generada' ? 'Partida aleatorizada' : 'Partida tal cual'}
-                  </div>
-                  <div className="aleat__nota">
-                    {state.romSource === 'generada'
-                      ? 'Aleatorizar otra vez parte de tu ROM original, no de esta'
-                      : 'Cambia que Pokemon, objetos y entrenadores aparecen'}
-                  </div>
-                </div>
-              </div>
+              <PartidasGuardadas
+                partidas={partidas}
+                crcBase={crc}
+                existeGuardada={existeGuardada}
+                libres={MAX_PARTIDAS - partidas.length}
+                puedeCrear
+                tituloCrear="Abre el menu de aleatorizar para crear una partida nueva"
+                onCrear={onAleatorizar}
+                onAbrir={(partida, aqui) => {
+                  // Si su copia sigue aqui, se abre y ya. Si no, hay que
+                  // rehacerla desde su semilla, y eso lo sabe hacer el menu de
+                  // aleatorizar: se manda alli en vez de fingir que no pasa
+                  // nada.
+                  if (aqui) {
+                    onClose();
+                    void onContinuar(partida.fichero);
+                  } else {
+                    onAleatorizar();
+                  }
+                }}
+                onBorrarFichero={onBorrarPartida}
+                onExportar={(partida) => setProblema(exportarPartida(partida, leerGuardado))}
+                releer={releer}
+                visible={open}
+              />
 
-              <div className="aleat__acciones">
-                <button type="button" className="boton-ancho" onClick={onAleatorizar}>
-                  Opciones
-                </button>
-                {copiarSemilla}
-              </div>
+              {problema && (
+                <p className="alert" role="alert">
+                  {problema}
+                </p>
+              )}
+
+              {/* Solo la semilla. El boton de "aleatorizar" que habia aqui
+                  sobraba: los huecos libres ya llevan a ese menu, y con las
+                  tres partidas llenas no se puede crear otra de todas formas. */}
+              <div className="aleat__acciones">{copiarSemilla}</div>
             </section>
           </>
         )}
       </div>
     </div>
-  </Modal>
-);
+    </Modal>
+  );
+};
 
 /** Titulo de tarjeta: la marca de color, el texto y una accion opcional. */
 const Titulo = ({

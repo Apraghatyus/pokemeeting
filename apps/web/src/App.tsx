@@ -545,6 +545,11 @@ export const App = () => {
             setRandomizerOpen(true);
           }}
           copiarSemilla={<CopiarSemilla crc32={state.header?.crc32 ?? null} />}
+          existeGuardada={emulator.existeGuardada}
+          onContinuar={emulator.openSavedGame}
+          onBorrarPartida={emulator.deleteSavedGame}
+          leerGuardado={emulator.leerGuardado}
+          baseRom={emulator.baseRomRef}
         />
       </main>
 

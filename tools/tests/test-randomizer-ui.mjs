@@ -84,11 +84,14 @@ await modal.locator('.interruptor').first().waitFor({ timeout: 20_000 });
 
 const total = await modal.locator('.interruptor').count();
 // --- la forma: dos columnas, interruptores y huecos ---
-const forma = await modal.evaluate(() => ({
-  columnas: getComputedStyle(document.querySelector('.aleatorizar__rejilla'))
+// Dentro de ESTE modal y no en la pagina entera: la lista de partidas se
+// enseña tambien en Ajustes, que vive en el documento aunque este cerrado, asi
+// que un selector global cuenta los huecos de los dos.
+const forma = await modal.evaluate((caja) => ({
+  columnas: getComputedStyle(caja.querySelector('.aleatorizar__rejilla'))
     .gridTemplateColumns.split(' ').length,
-  libres: document.querySelectorAll('.hueco--libre').length,
-  palancas: document.querySelectorAll('.interruptor__palanca').length,
+  libres: caja.querySelectorAll('.hueco--libre').length,
+  palancas: caja.querySelectorAll('.interruptor__palanca').length,
   pie: document.querySelector('.modal__pie') !== null,
   // Lo que de verdad hay que comprobar de un modal nuevo: que entra entero.
   bajar: (() => {
@@ -220,7 +223,9 @@ check('el emulador sigue dibujando con la ROM nueva', Buffer.compare(antes, desp
 
 // --- aleatorizar otra vez debe partir de la ROM original, no de la generada ---
 await page.locator('.iconbutton--opciones').click();
-await page.locator('.boton-ancho', { hasText: 'Opciones' }).click();
+// Al menu de aleatorizar se llega por un hueco libre de "Tus partidas": crear
+// una partida es elegir que se cambia, y eso se hace alli.
+await page.locator('.modal[open] .hueco--libre').first().click();
 const modal2 = page.locator('dialog.modal[open]');
 await modal2.locator('.interruptor').first().waitFor({ timeout: 25_000 });
 // El nombre que se le puso tiene que ser el que la identifica en la lista:

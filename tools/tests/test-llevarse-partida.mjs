@@ -77,12 +77,14 @@ await primero.evaluate(
 );
 
 // --- se descarga la partida ---
+// Desde Ajustes directamente: la lista de partidas vive ahi, que es donde se
+// gestionan. Antes habia que entrar en el menu de aleatorizar para poder
+// llevarse una partida que ya existia.
 await primero.locator('.iconbutton--opciones').click();
-await primero.locator('.boton-ancho', { hasText: 'Opciones' }).click();
-await primero.waitForSelector('.hueco--partida', { timeout: 20_000 });
+await primero.waitForSelector('.modal[open] .hueco--partida', { timeout: 20_000 });
 
 const descarga = primero.waitForEvent('download', { timeout: 30_000 });
-await primero.locator('.hueco--partida').first().getByRole('button', { name: /Descargar esta partida/ }).click();
+await primero.locator('.modal[open] .hueco--partida').first().getByRole('button', { name: /Descargar esta partida/ }).click();
 const fichero = await descarga;
 const destino = join(tmpdir(), fichero.suggestedFilename());
 await fichero.saveAs(destino);

@@ -61,7 +61,12 @@ check('el avance rapido ya no esta en el menu',
 check('el registro del nucleo ya no se enseña',
   (await page.locator('.modal').getByText('Registro del nucleo').count()) === 0);
 check('el boton de cambiar dice "Cambiar ROM"', await hay('Cambiar ROM'));
-check('aleatorizar tiene su boton de opciones', await hay('Opciones'));
+// Las partidas se gestionan aqui, no detras de "Aleatorizar": seguir una,
+// renombrarla o borrarla es lo que se hace a diario.
+check('las partidas guardadas estan en el menu',
+  (await page.locator('.modal .tarjeta__titulo h2').allTextContents()).includes('Tus partidas'));
+check('con sus huecos para crear una nueva',
+  (await page.locator('.modal .hueco--libre').count()) > 0);
 
 // --- la forma nueva: dos columnas y tarjetas ---
 const forma = await page.evaluate(() => {

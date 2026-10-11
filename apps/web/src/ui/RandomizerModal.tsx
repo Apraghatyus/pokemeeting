@@ -8,27 +8,22 @@ import {
   type RandomizeSummary,
 } from '../net/randomizer';
 import {
-  cuando,
   MAX_PARTIDAS,
-  juegoDePartida,
-  nombreDePartida,
   nombreParaNueva,
-  olvidar,
   renombrar,
   partidasDe,
   registrar,
-  sePuedeRehacer,
   tocar,
   todasLasPartidas,
   type PartidaGuardada,
 } from '../core/partidas';
-import { apuntarDescartada } from '../core/historial';
-import { yaTermino } from '../core/useFinDePartida';
 import { parseGameCode } from '@emupoke/pokemon';
 import { crc32 } from '../core/romHeader';
 import { codificarSemilla, descodificarSemilla } from '../core/semilla';
 import { rehacerDesdeSemilla } from '../core/rehacer';
-import { empaquetar, leerPaquete, nombreDeFichero } from '../core/paquete';
+import { PartidasGuardadas } from './PartidasGuardadas';
+import { exportarPartida as exportar } from '../core/exportar';
+import { leerPaquete } from '../core/paquete';
 import { Modal } from './Modal';
 
 type Props = {
@@ -138,48 +133,6 @@ export const textoDeEspera = (cola: PuestoEnCola): string => {
   );
 };
 
-/*
- * Los tres iconos de la fila de una partida.
- *
- * Dibujados y no con una letra: la equis que habia antes se leia como "cerrar"
- * -es la misma que cierra el menu, dos centimetros mas arriba- y lo que hace es
- * borrar una partida para siempre. Una papelera no se confunde con nada.
- *
- * `currentColor` para que hereden el color del boton, incluido el rojo que coge
- * al pasar por encima.
- */
-const IconoPapelera = () => (
-  <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none"
-    stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M2.5 4h11" />
-    <path d="M6.5 4V2.5h3V4" />
-    <path d="M4 4l.7 9a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9L12 4" />
-    <path d="M6.6 6.8v4.6M9.4 6.8v4.6" />
-  </svg>
-);
-
-const IconoLapiz = () => (
-  <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none"
-    stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M11.2 2.3l2.5 2.5-8 8-3.2.7.7-3.2z" />
-    <path d="M10 3.5l2.5 2.5" />
-  </svg>
-);
-
-const IconoSi = () => (
-  <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none"
-    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3.5 8.5l3 3 6-7" />
-  </svg>
-);
-
-const IconoNo = () => (
-  <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none"
-    stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-    <path d="M4 4l8 8M12 4l-8 8" />
-  </svg>
-);
-
 export const RandomizerModal = ({
   open,
   onClose,
@@ -208,27 +161,6 @@ export const RandomizerModal = ({
   const [partidas, setPartidas] = useState<PartidaGuardada[]>([]);
   const [otras, setOtras] = useState<PartidaGuardada[]>([]);
   const [semillaPegada, setSemillaPegada] = useState('');
-  /**
-   * La partida que esta preguntando si de verdad se borra, o null.
-   *
-   * Borrar una partida no se puede deshacer: se va su copia y su guardado, y si
-   * es una Soul Link se lleva por delante horas de dos personas. El boton esta
-   * a cinco pixeles del de descargar, asi que un roce no puede bastar.
-   *
-   * Se guarda el id y no un booleano porque hay hasta tres partidas en la
-   * lista: con un booleano, preguntar por una preguntaba por todas.
-   */
-  const [borrando, setBorrando] = useState<string | null>(null);
-  /**
-   * La partida a la que se le esta cambiando el nombre, y el nombre a medias.
-   *
-   * El nombre se pone al crearla, en la pantalla de resultado, y hasta ahora no
-   * habia forma de cambiarlo despues: una partida mal nombrada se quedaba asi
-   * para siempre, y con tres partidas de la misma ROM el nombre es lo unico que
-   * las distingue.
-   */
-  const [renombrando, setRenombrando] = useState<string | null>(null);
-  const [nombreNuevo, setNombreNuevo] = useState('');
 
   // La lista se relee al abrir: puede haber cambiado desde la vez anterior.
   const releer = useCallback(() => {
@@ -242,10 +174,6 @@ export const RandomizerModal = ({
 
   useEffect(() => {
     if (open) releer();
-    // Una pregunta a medias no sobrevive a cerrar el menu: al volver, lo que
-    // habria es una ficha pidiendo confirmacion de algo que ya no se recuerda.
-    setBorrando(null);
-    setRenombrando(null);
   }, [open, releer]);
 
   useEffect(() => {
@@ -366,40 +294,8 @@ export const RandomizerModal = ({
    * ROM original, que es la tuya y ya la tienes.
    */
   const exportarPartida = (partida: PartidaGuardada) => {
-    const sav = leerGuardado(partida.fichero);
-    if (!sav) {
-      setProgress({
-        fase: 'error',
-        message:
-          'Esa partida todavia no tiene guardado. Guarda dentro del juego, desde su propio menu, y vuelve a intentarlo.',
-      });
-      return;
-    }
-    if (!partida.semilla || !partida.ajustes || !partida.crc32) {
-      setProgress({
-        fase: 'error',
-        message: 'De esa partida no se guardo la semilla, asi que no se puede rehacer en otro sitio.',
-      });
-      return;
-    }
-
-    const bytes = empaquetar({
-      semilla: {
-        baseCrc32: partida.baseCrc32,
-        crc32: partida.crc32,
-        semilla: partida.semilla,
-        ajustes: partida.ajustes,
-      },
-      sav,
-      nombre: partida.baseNombre,
-    });
-
-    const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/octet-stream' }));
-    const enlace = document.createElement('a');
-    enlace.href = url;
-    enlace.download = nombreDeFichero(partida.baseNombre);
-    enlace.click();
-    URL.revokeObjectURL(url);
+    const problema = exportar(partida, leerGuardado);
+    if (problema) setProgress({ fase: 'error', message: problema });
   };
 
   /**
@@ -676,210 +572,26 @@ export const RandomizerModal = ({
                       * Cada una dice de que juego es, que es lo que las
                       * distingue cuando conviven una de Rojo Fuego y otra de
                       * Cristal. */}
-                  <div className="huecos">
-                    {[...partidas, ...otras].map((partida) => {
-                      const mia = partida.baseCrc32 === (baseRom.current?.crc32 ?? '');
-                      const aqui = existeGuardada(partida.fichero);
-                      const rehacible = sePuedeRehacer(partida);
-                      // Solo se puede entrar en una partida del juego que esta
-                      // cargado: para las demas haria falta su ROM.
-                      const sePuedeAbrir = mia && (aqui || rehacible);
-
-                      return (
-                        <div
-                          className={`hueco hueco--partida${mia ? '' : ' hueco--ajena'}`}
-                          key={partida.id}
-                        >
-                          {renombrando === partida.id ? (
-                            /* El nombre se edita en el sitio del nombre, no en
-                               una ventana aparte: lo que se esta cambiando es
-                               esa linea y ahi se ve lo que queda. */
-                            <form
-                              className="hueco__renombrar"
-                              onSubmit={(event) => {
-                                event.preventDefault();
-                                renombrar(partida.id, nombreNuevo);
-                                setRenombrando(null);
-                                releer();
-                              }}
-                            >
-                              <input
-                                className="hueco__nombre-campo"
-                                value={nombreNuevo}
-                                maxLength={40}
-                                autoFocus
-                                aria-label={`Nombre de ${nombreDePartida(partida)}`}
-                                onChange={(event) => setNombreNuevo(event.target.value)}
-                                onKeyDown={(event) => {
-                                  if (event.key === 'Escape') setRenombrando(null);
-                                }}
-                              />
-                              <button
-                                type="submit"
-                                className="hueco__accion hueco__accion--guardar"
-                                title="Guardar el nombre"
-                                aria-label="Guardar el nombre"
-                              >
-                                <IconoSi />
-                              </button>
-                              <button
-                                type="button"
-                                className="hueco__accion"
-                                title="Dejarlo como estaba"
-                                aria-label="Dejar el nombre como estaba"
-                                onClick={() => setRenombrando(null)}
-                              >
-                                <IconoNo />
-                              </button>
-                            </form>
-                          ) : (
-                          <button
-                            type="button"
-                            className="hueco__abrir"
-                            disabled={!sePuedeAbrir}
-                            // Lo de "hay que rehacerla" no se enseña en la
-                            // linea: es jerga nuestra y asustaba sin aportar,
-                            // porque al pulsar se rehace sola. Se queda aqui,
-                            // para quien pase el raton y se pregunte por que
-                            // esta tarda mas.
-                            title={
-                              !mia
-                                ? `Para jugarla, carga ${juegoDePartida(partida)} desde "Cambiar ROM"`
-                                : aqui
-                                  ? undefined
-                                  : rehacible
-                                    ? 'Su copia ya no esta en este navegador: al abrirla se vuelve a generar desde su semilla.'
-                                    : 'Su copia ya no esta y no tiene semilla, asi que no se puede recuperar.'
-                            }
-                            onClick={() => {
-                              if (aqui) {
-                                tocar(partida.id);
-                                void onContinuar(partida.fichero).then(onClose);
-                              } else {
-                                void rehacer(partida);
-                              }
-                            }}
-                          >
-                            <span className="hueco__nombre">{nombreDePartida(partida)}</span>
-                            <span className="hueco__datos">
-                              <span className="hueco__juego">{juegoDePartida(partida)}</span>
-                              <span>{cuando(partida.creada)}</span>
-                            </span>
-                          </button>
-                          )}
-
-                          {/* O las acciones, o la pregunta. En el mismo sitio y
-                              no debajo: asi la ficha no cambia de alto y las de
-                              abajo no dan un salto al preguntar. */}
-                          {renombrando === partida.id ? null : borrando === partida.id ? (
-                            <div className="hueco__acciones hueco__acciones--seguro">
-                              <span className="hueco__seguro">¿Seguro?</span>
-                              <button
-                                type="button"
-                                className="hueco__accion hueco__accion--si"
-                                title="Si, borrarla"
-                                aria-label={`Confirmar que se borra ${nombreDePartida(partida)}`}
-                                onClick={() => {
-                                  setBorrando(null);
-                                  // Borrar una partida que nunca llego a
-                                  // acabarse es DESCARTARLA, y eso se apunta.
-                                  // No cuenta para el porcentaje, pero sin
-                                  // esto no quedaria ningun rastro: es lo
-                                  // unico que separa un 90% limpio de uno
-                                  // hecho a base de borrar lo que iba mal.
-                                  if (!yaTermino(partida.fichero)) {
-                                    apuntarDescartada(partida.fichero, {
-                                      juego: juegoDePartida(partida),
-                                    });
-                                  }
-                                  onBorrar(partida.fichero);
-                                  olvidar(partida.id);
-                                  releer();
-                                }}
-                              >
-                                <IconoSi />
-                              </button>
-                              <button
-                                type="button"
-                                className="hueco__accion"
-                                title="No, dejarla"
-                                aria-label="Dejar la partida como esta"
-                                /* Enfocado al aparecer: asi la tecla de espacio
-                                   -o un segundo toque sin mirar- cancela en vez
-                                   de borrar. */
-                                autoFocus
-                                onClick={() => setBorrando(null)}
-                              >
-                                <IconoNo />
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="hueco__acciones">
-                              {/* Cambiar el nombre vale para cualquiera, tambien
-                                  para las de otra ROM: un nombre es una
-                                  etiqueta tuya, no algo del juego. */}
-                              <button
-                                type="button"
-                                className="hueco__accion"
-                                title="Cambiarle el nombre"
-                                aria-label={`Cambiar el nombre de ${nombreDePartida(partida)}`}
-                                onClick={() => {
-                                  // Con el nombre que ya tiene dentro, para
-                                  // retocarlo en vez de escribirlo entero.
-                                  setNombreNuevo(partida.nombre ?? nombreDePartida(partida));
-                                  setBorrando(null);
-                                  setRenombrando(partida.id);
-                                }}
-                              >
-                                <IconoLapiz />
-                              </button>
-                              {mia && <BotonSemilla partida={partida} />}
-                              {mia && (
-                                <button
-                                  type="button"
-                                  className="hueco__accion"
-                                  onClick={() => exportarPartida(partida)}
-                                  title={
-                                    'Descargar esta partida entera: el guardado y la semilla.\n' +
-                                    'Es lo que te llevas a otro aparato para seguir ahi.'
-                                  }
-                                  aria-label="Descargar esta partida para otro aparato"
-                                >
-                                  ⤓
-                                </button>
-                              )}
-                              <button
-                                type="button"
-                                className="hueco__accion hueco__accion--borrar"
-                                title="Borrar esta partida"
-                                aria-label={`Borrar ${nombreDePartida(partida)}`}
-                                onClick={() => setBorrando(partida.id)}
-                              >
-                                <IconoPapelera />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-
-                    {/* Los huecos libres se enseñan en vez de esconderlos: ver
-                        cuantas caben todavia es lo que evita la sorpresa de
-                        "no puedes, estan llenas" cuando ya habias elegido. */}
-                    {Array.from({ length: Math.max(0, MAX_PARTIDAS - guardadas) }, (_, i) => (
-                      <button
-                        key={`libre-${i}`}
-                        type="button"
-                        className="hueco hueco--libre"
-                        disabled={!canRandomize}
-                        onClick={() => void run()}
-                        title="Aleatoriza con las opciones marcadas y guarda la partida aqui"
-                      >
-                        + Crear partida
-                      </button>
-                    ))}
-                  </div>
-
+                  <PartidasGuardadas
+                    partidas={[...partidas, ...otras]}
+                    crcBase={baseRom.current?.crc32 ?? null}
+                    existeGuardada={existeGuardada}
+                    libres={MAX_PARTIDAS - guardadas}
+                    puedeCrear={canRandomize}
+                    tituloCrear="Aleatoriza con las opciones marcadas y guarda la partida aqui"
+                    onCrear={() => void run()}
+                    onAbrir={(partida, aqui) => {
+                      // Aqui SI se sabe rehacer una partida cuya copia ya no
+                      // esta: este es el menu del aleatorizador. En Ajustes no,
+                      // y por eso alli una partida sin copia manda aqui.
+                      if (aqui) void onContinuar(partida.fichero).then(onClose);
+                      else void rehacer(partida);
+                    }}
+                    onBorrarFichero={onBorrar}
+                    onExportar={exportarPartida}
+                    releer={releer}
+                    visible={open}
+                  />
                 </section>
 
                 {/* La vuelta de la semilla: alguien que juega desde otro
@@ -979,48 +691,6 @@ export const RandomizerModal = ({
         </div>
       )}
     </Modal>
-  );
-};
-
-/**
- * Copia al portapapeles la semilla de una partida ya creada.
- *
- * Existe porque antes la semilla solo se veia en el momento de generarla: quien
- * cerraba la pestaña se quedaba sin forma de volver a copiarla, y es justo lo
- * que hace falta para seguir en otro ordenador o para darsela al companero.
- */
-const BotonSemilla = ({ partida }: { partida: PartidaGuardada }) => {
-  const [copiada, setCopiada] = useState(false);
-
-  if (!sePuedeRehacer(partida) || !partida.crc32) return null;
-
-  const semilla = codificarSemilla({
-    baseCrc32: partida.baseCrc32,
-    crc32: partida.crc32,
-    semilla: partida.semilla!,
-    ajustes: partida.ajustes!,
-  });
-
-  const copiar = async () => {
-    try {
-      await navigator.clipboard.writeText(semilla);
-      setCopiada(true);
-      setTimeout(() => setCopiada(false), 2200);
-    } catch {
-      // Si el navegador no deja, al menos queda seleccionable en el titulo.
-    }
-  };
-
-  return (
-    <button
-      type="button"
-      className={`partida__semilla${copiada ? ' is-copiada' : ''}`}
-      onClick={() => void copiar()}
-      title={copiada ? 'Copiada' : `Copiar la semilla de esta partida:\n${semilla}`}
-      aria-label="Copiar la semilla de esta partida"
-    >
-      {copiada ? '✓' : '⧉'}
-    </button>
   );
 };
 
