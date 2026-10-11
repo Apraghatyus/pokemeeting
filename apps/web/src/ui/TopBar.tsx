@@ -9,8 +9,8 @@ type Props = {
   onOpenRoom: () => void;
   /** Abre el intercambio. */
   onOpenTrade: () => void;
-  /** Si hay partida en marcha. Sin juego no hay nada que intercambiar. */
-  hayPartida: boolean;
+  /** Si quedo un intercambio sin terminar. Se puede rematar sin el companero. */
+  tratoAMedias: boolean;
   onToggleMenu: () => void;
   menuOpen: boolean;
   /** Volumen del juego, de 0 a 200. */
@@ -48,7 +48,7 @@ export const TopBar = ({
   keyboardOwner,
   onOpenRoom,
   onOpenTrade,
-  hayPartida,
+  tratoAMedias,
   onToggleMenu,
   menuOpen,
   volume,
@@ -62,6 +62,10 @@ export const TopBar = ({
 }: Props) => {
   // Reconectando es un estado distinto de "caido": el jugador necesita saber
   // que se esta intentando solo, para no dar la partida por perdida.
+  // Hay sala abierta en cuanto se crea o se entra, aunque el companero no haya
+  // llegado todavia: el intercambio se prepara antes de que aparezca.
+  const conSala = session.phase !== 'sin-sala';
+
   const status = session.reconnect.trying
     ? { texto: 'Reconectando', dot: 'busy' }
     : STATUS[session.phase];
@@ -79,40 +83,54 @@ export const TopBar = ({
         </div>
       </div>
 
-      <button type="button" className="roomchip" onClick={onOpenRoom}>
-        {session.roomCode ? (
-          <>
-            <span className="roomchip__label">Sala</span>
-            <span className="roomchip__code mono">{session.roomCode}</span>
-          </>
-        ) : (
-          <span className="roomchip__label">Jugar con un amigo</span>
-        )}
-      </button>
+      {/* La sala y el intercambio, juntos y en el centro. Van en el mismo
+          grupo para que el boton quede PEGADO a la sala: con el chip centrado
+          por su cuenta, lo que viniera detras se iba al otro extremo. */}
+      <div className="topbar__centro">
+        <button type="button" className="roomchip" onClick={onOpenRoom}>
+          {session.roomCode ? (
+            <>
+              <span className="roomchip__label">Sala</span>
+              <span className="roomchip__code mono">{session.roomCode}</span>
+            </>
+          ) : (
+            <span className="roomchip__label">Jugar con un amigo</span>
+          )}
+        </button>
 
-      <div className="topbar__right">
-        {/* Existe AQUI y no escondido en un menu a proposito: quien quiere
-            intercambiar lo primero que hace es irse a la sala de union del
-            juego, que busca un cable que aqui no hay y se queda esperando para
-            siempre. Un boton a la vista es lo unico que evita ese viaje.
-            *
-            * Y sale con partida, no solo con companero. Si un intercambio se
-            * quedo a medias hay que poder rematarlo, y eso se hace sin el otro:
-            * atarlo a estar conectado dejaba el boton de terminarlo fuera de
-            * alcance justo cuando hacia falta. Sin companero, el propio cartel
-            * explica que hace falta una sala. */}
-        {hayPartida && (
+      {/* Al lado de la sala, y solo con sala abierta.
+          *
+          * Esta aqui y no escondido en un menu porque quien quiere
+          * intercambiar lo primero que hace es irse a la sala de union del
+          * juego, que busca un cable que aqui no hay y se queda esperando para
+          * siempre. Un boton a la vista es lo unico que evita ese viaje.
+          *
+          * Pero jugando solo no pinta nada: no hay con quien, y ocupaba sitio
+          * en la barra prometiendo algo que no se podia hacer. Por eso va
+          * pegado a la sala, que es de lo que depende.
+          *
+          * La excepcion es un trato a medias. Eso se remata SIN el otro -el
+          * Pokemon ya esta apuntado- y si el boton dependiera solo de la sala,
+          * quien cierre la pestana a mitad de un intercambio se quedaria sin
+          * forma de terminarlo, que es justo como se pierde un Pokemon. */}
+        {(conSala || tratoAMedias) && (
           <button
             type="button"
-            className="iconbutton"
+            className="iconbutton iconbutton--trato"
             onClick={onOpenTrade}
-            title="Intercambiar un Pokemon"
+            title={
+              tratoAMedias && !conSala
+                ? 'Termina el intercambio que quedo a medias'
+                : 'Intercambiar un Pokemon'
+            }
             aria-label="Intercambiar un Pokemon"
           >
             ⇄
           </button>
         )}
+      </div>
 
+      <div className="topbar__right">
         <VolumeControl
           volume={volume}
           onVolume={onVolume}

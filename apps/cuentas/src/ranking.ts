@@ -34,6 +34,14 @@ export type PokemonDelRanking = {
   mote: string;
   nivel: number;
   caido: boolean;
+  /**
+   * Sus cuatro movimientos, por numero.
+   *
+   * Numeros y no nombres, igual que la especie: el nombre lo pone quien mira,
+   * con SU copia del juego. Es la misma frontera de siempre, y aqui ademas
+   * hace falta -los nombres cambian con el idioma de cada copia-.
+   */
+  movimientos: number[];
 };
 
 export type PartidaDelRanking = {
@@ -154,7 +162,8 @@ export const ranking = async (filtros: Filtros): Promise<JugadorDelRanking[]> =>
           select json_agg(
                    json_build_object(
                      'especie', k.especie, 'mote', k.mote,
-                     'nivel', k.nivel, 'caido', k.caido
+                     'nivel', k.nivel, 'caido', k.caido,
+                     'movimientos', k.movimientos
                    ) order by k.orden
                  ) as equipo
             from pokemon_del_final k

@@ -184,7 +184,12 @@ await ana.waitForFunction(() => !document.querySelector('.dropzone button')?.dis
 await ana.setInputFiles('input[type=file][accept*=".gba"]', ROM);
 await ana.getByRole('button', { name: 'Jugar tal cual' }).click({ timeout: 20_000 }).catch(() => {});
 await ana.waitForTimeout(4000);
-// El boton sale con partida aunque no haya companero, justo para esto.
+// El boton NO sale jugando solo: sin sala no hay con quien intercambiar. La
+// unica excepcion es esta, un trato a medias, y es la que importa: se remata
+// sin el otro -el Pokemon ya esta apuntado- y sin boton no habria forma de
+// terminarlo, que es justo como se pierde un Pokemon.
+check('sin sala pero con un trato a medias, el boton sigue estando',
+  (await ana.locator(botonTrato).count()) === 1);
 await ana.locator(botonTrato).click();
 await ana.waitForTimeout(1000);
 

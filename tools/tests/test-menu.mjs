@@ -68,6 +68,11 @@ check('las partidas guardadas estan en el menu',
 check('con sus huecos para crear una nueva',
   (await page.locator('.modal .hueco--libre').count()) > 0);
 
+// Jugando solo no hay con quien intercambiar, asi que el boton no esta: antes
+// ocupaba sitio en la barra prometiendo algo que no se podia hacer.
+check('jugando solo no hay boton de intercambio en la barra',
+  (await page.locator('.iconbutton--trato').count()) === 0);
+
 // --- la forma nueva: dos columnas y tarjetas ---
 const forma = await page.evaluate(() => {
   const rejilla = document.querySelector('.ajustes');

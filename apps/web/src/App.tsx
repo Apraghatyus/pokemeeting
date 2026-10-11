@@ -265,7 +265,10 @@ export const App = () => {
     // se juega: cuando la partida guardada se borre -solo caben tres- ya no
     // habria forma de averiguarlo.
     {
-      juego: state.platform?.label ?? null,
+      // El JUEGO, no la consola: "Rojo Fuego", no "Game Boy Advance". La
+      // etiqueta de la plataforma es la misma para los cinco, asi que como
+      // filtro no separaba nada.
+      juego: parseGameCode(state.header?.gameCode ?? '').game?.label ?? null,
       modo: conCompanero ? 'soullink' : 'sola',
       companero: conCompanero ? session.state.peerNombre ?? null : null,
     },
@@ -337,7 +340,7 @@ export const App = () => {
         keyboardOwner={keyboardOwner}
         onOpenRoom={() => setRoomOpen(true)}
         onOpenTrade={() => setTratoOpen(true)}
-        hayPartida={hasRom}
+        tratoAMedias={hasRom && intercambio.estado.aMedias}
         onToggleMenu={() => setMenuOpen((v) => !v)}
         menuOpen={menuOpen}
         volume={state.volume}

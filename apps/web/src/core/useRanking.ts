@@ -16,6 +16,8 @@ export type PokemonDelRanking = {
   mote: string;
   nivel: number;
   caido: boolean;
+  /** Sus cuatro movimientos, por numero. El nombre lo pone TU ROM. */
+  movimientos: number[];
 };
 
 export type PartidaDelRanking = {

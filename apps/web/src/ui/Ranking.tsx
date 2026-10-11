@@ -19,8 +19,10 @@ import {
   useRanking,
   type JugadorDelRanking,
   type PartidaDelRanking,
+  type PokemonDelRanking,
 } from '../core/useRanking';
 import type { Especies } from '../core/useEspecies';
+import { SpriteEspecie, SpriteMedalla } from './Sprite';
 
 type Props = {
   /** Cierra el ranking y devuelve a la partida. */
@@ -73,13 +75,13 @@ const iniciales = (texto: string): string =>
     .join('') || '?';
 
 /**
- * Un color estable para cada Pokemon.
+ * De que generacion se piden los sprites.
  *
- * Sale de su numero de especie, asi que el mismo Pokemon es siempre del mismo
- * color y dos distintos casi nunca coinciden. No pretende ser su tipo: es solo
- * para poder distinguir seis circulos de un vistazo.
+ * Tercera: es la unica que juega este emulador hoy. Se deja dicho aqui porque
+ * el dato de que juego era si viaja, y el dia que haya segunda generacion esto
+ * tendra que salir de ahi y no de una constante.
  */
-const colorDeEspecie = (especie: number): string => `hsl(${(especie * 47) % 360} 55% 45%)`;
+const GENERACION = 3;
 
 const cuando = (iso: string): string => {
   const fecha = new Date(iso);
@@ -87,13 +89,94 @@ const cuando = (iso: string): string => {
   return fecha.toLocaleDateString('es', { day: '2-digit', month: 'short' });
 };
 
+/**
+ * Las ocho medallas, las ganadas a color y las que faltaron apagadas.
+ *
+ * Son las mismas imagenes que en la partida, y por la misma razon: una fila de
+ * circulos no dice por donde ibas, y las medallas si se reconocen de un
+ * vistazo aunque no se lea nada.
+ */
 const Medallas = ({ cuantas }: { cuantas: number | null }) => (
   <div className="rank__medallas" aria-label={`${cuantas ?? 0} de ${TOTAL_MEDALLAS} medallas`}>
     {Array.from({ length: TOTAL_MEDALLAS }, (_, i) => (
-      <span key={i} className={`rank__medalla${i < (cuantas ?? 0) ? ' is-ganada' : ''}`} />
+      <span
+        key={i}
+        className={`rank__medalla${i < (cuantas ?? 0) ? ' is-ganada' : ''}`}
+        title={`Medalla ${i + 1}`}
+      >
+        <SpriteMedalla numero={i + 1} nombre={`Medalla ${i + 1}`} />
+      </span>
     ))}
   </div>
 );
+
+/**
+ * Un Pokemon del equipo: su sprite, y al pulsarlo lo que llevaba.
+ *
+ * El nivel y los movimientos estaban guardados desde el principio y no se
+ * veian en ningun sitio. Son la diferencia entre "perdio con un Pidgey" y
+ * "perdio con un Pidgey de nivel 40 que solo sabia Ataque Rapido".
+ */
+const PokemonDelEquipo = ({
+  pokemon,
+  generacion,
+  especies,
+  abierto,
+  onPulsar,
+}: {
+  pokemon: PokemonDelRanking;
+  generacion: number;
+  especies: Especies;
+  abierto: boolean;
+  onPulsar: () => void;
+}) => {
+  const especie = especies.nombre(pokemon.especie) || `#${pokemon.especie}`;
+
+  return (
+    <li className={`rank__poke${pokemon.caido ? ' is-caido' : ''}`}>
+      <button
+        type="button"
+        className={`rank__poke-boton${abierto ? ' is-abierto' : ''}`}
+        onClick={onPulsar}
+        aria-expanded={abierto}
+        title={`${pokemon.mote} · ${especie} · Nv.${pokemon.nivel}${pokemon.caido ? ' · cayo' : ''}`}
+      >
+        <SpriteEspecie
+          nacional={especies.nacional(pokemon.especie)}
+          generacion={generacion}
+          inicial={iniciales(pokemon.mote)}
+          tonoDe={pokemon.especie}
+          className="rank__sprite"
+        />
+      </button>
+
+      {abierto && (
+        <div className="rank__ficha">
+          <strong className="rank__ficha-mote">{pokemon.mote}</strong>
+          <span className="rank__ficha-quien">
+            {especie} · Nv.{pokemon.nivel}
+            {pokemon.caido ? ' · cayó' : ''}
+          </span>
+          <ul className="rank__movimientos">
+            {(pokemon.movimientos ?? [])
+              // El hueco vacio es el 0: un Pokemon de nivel bajo tiene dos
+              // movimientos y dos huecos, y enseñar "—" cuatro veces no dice
+              // nada que no diga el espacio en blanco.
+              .filter((id) => id > 0)
+              .map((id, i) => (
+                <li key={i} className="rank__movimiento">
+                  {especies.movimiento(id) || `#${id}`}
+                </li>
+              ))}
+            {(pokemon.movimientos ?? []).filter((id) => id > 0).length === 0 && (
+              <li className="rank__movimiento rank__movimiento--sin">sin movimientos apuntados</li>
+            )}
+          </ul>
+        </div>
+      )}
+    </li>
+  );
+};
 
 const Partida = ({
   partida,
@@ -104,6 +187,9 @@ const Partida = ({
 }) => {
   const gano = partida.resultado === 'victoria';
   const descartada = partida.resultado === 'descartada';
+  // Cual de los seis esta abierto. Uno a la vez: con los seis abiertos la
+  // tarjeta se hace mas alta que la pantalla.
+  const [abierto, setAbierto] = useState<number | null>(null);
 
   return (
     <article className={`rank__partida rank__partida--${partida.resultado}`}>
@@ -128,14 +214,14 @@ const Partida = ({
       {partida.equipo.length > 0 && (
         <ul className="rank__equipo">
           {partida.equipo.map((pokemon, i) => (
-            <li
+            <PokemonDelEquipo
               key={i}
-              className={`rank__poke${pokemon.caido ? ' is-caido' : ''}`}
-              style={{ background: colorDeEspecie(pokemon.especie) }}
-              title={`${pokemon.mote} · ${especies.nombre(pokemon.especie) || `#${pokemon.especie}`} · Nv.${pokemon.nivel}${pokemon.caido ? ' · cayo' : ''}`}
-            >
-              {iniciales(pokemon.mote)}
-            </li>
+              pokemon={pokemon}
+              generacion={GENERACION}
+              especies={especies}
+              abierto={abierto === i}
+              onPulsar={() => setAbierto((previo) => (previo === i ? null : i))}
+            />
           ))}
         </ul>
       )}

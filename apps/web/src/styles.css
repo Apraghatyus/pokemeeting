@@ -160,11 +160,20 @@ body {
 }
 
 /* Pastilla central con el codigo de sala, que abre el modal de credenciales. */
+/* La sala y el boton de intercambio viajan juntos, centrados en la barra. El
+   "auto" vive aqui y no en el chip: estando en el chip, lo que fuera detras se
+   iba al otro extremo de la barra en vez de quedarse al lado. */
+.topbar__centro {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 auto;
+}
+
 .roomchip {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 0 auto;
   padding: 8px 14px;
   background: var(--bg-raised);
   border: 1px solid var(--border);
@@ -5512,4 +5521,155 @@ details.partidas[open] > summary::before {
   .rank__flecha {
     grid-area: flecha;
   }
+}
+
+/* --- El equipo del ranking, con sprites -----------------------------------
+   Las fichas dejan de ser circulos con dos letras: se reconoce antes un
+   Charizard que un "CH". El circulo sigue de respaldo para cuando la imagen
+   no esta -o no hay ROM cargada con la que saber que especie es-. */
+
+.rank__equipo {
+  align-items: flex-start;
+}
+
+.rank__poke {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  background: none;
+}
+
+.rank__poke-boton {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--bg-raised);
+  cursor: pointer;
+}
+
+.rank__poke-boton:hover {
+  border-color: var(--accent-dim);
+}
+
+.rank__poke-boton.is-abierto {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.rank__sprite {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: hsl(calc(var(--tono) * 47) 55% 45%);
+  color: #fff;
+  font-size: 9px;
+}
+
+.rank__sprite--imagen {
+  background: none;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+/* Quien cayo se ve apagado: en una Nuzlocke eso es la mitad de la historia. */
+.rank__poke.is-caido .rank__sprite {
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+
+/* Lo que llevaba: nivel y movimientos. Se abre debajo de su fila, ocupando el
+   ancho entero de la tarjeta, para que no empuje a los otros cinco de lado. */
+.rank__ficha {
+  order: 1;
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-raised);
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+}
+
+.rank__ficha-mote {
+  font-size: 12px;
+}
+
+.rank__ficha-quien {
+  font-family: var(--tipo-texto);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.rank__movimientos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rank__movimiento {
+  padding: 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 10px;
+  color: var(--text);
+}
+
+.rank__movimiento--sin {
+  color: var(--muted);
+  border-style: dashed;
+}
+
+/* --- Las medallas, con su imagen --- */
+
+.rank__medalla {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  /* Las que faltaron, apagadas pero presentes: ensenar solo las ganadas
+     esconde cuanto faltaba. */
+  opacity: 0.25;
+  filter: grayscale(1);
+}
+
+.rank__medalla.is-ganada {
+  background: none;
+  opacity: 1;
+  filter: none;
+}
+
+.rank__medalla .medalla__imagen {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* El respaldo, cuando la imagen de la medalla no esta. */
+.rank__medalla .medalla__marca {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+}
+
+.rank__medalla.is-ganada .medalla__marca {
+  background: var(--accent);
+  border-color: var(--accent);
 }
