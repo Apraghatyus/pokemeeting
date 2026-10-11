@@ -696,31 +696,8 @@ const nombreDeLaPartidaEnCurso = (crc32: string | null): string | null => {
 };
 
 const CopiarSemilla = ({ crc32 }: { crc32: string | null }) => {
-  const [copiada, setCopiada] = useState(false);
 
   const semilla = semillaEnCurso(crc32);
   if (!semilla) return null;
 
-  const texto = codificarSemilla(semilla);
-
-  const copiar = async () => {
-    try {
-      await navigator.clipboard.writeText(texto);
-      setCopiada(true);
-      setTimeout(() => setCopiada(false), 2200);
-    } catch {
-      // Si el navegador no deja copiar, al menos queda a la vista en el titulo.
-    }
-  };
-
-  return (
-    <button
-      type="button"
-      className={copiada ? 'is-active' : undefined}
-      onClick={() => void copiar()}
-      title={copiada ? 'Copiada' : texto}
-    >
-      {copiada ? 'Semilla copiada' : 'Copiar semilla'}
-    </button>
-  );
 };

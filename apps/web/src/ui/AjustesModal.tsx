@@ -91,7 +91,6 @@ export const AjustesModal = ({
   hasRom,
   conCompanero,
   onAleatorizar,
-  copiarSemilla,
   existeGuardada,
   onContinuar,
   onBorrarPartida,
