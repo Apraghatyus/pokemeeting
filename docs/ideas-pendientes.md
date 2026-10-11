@@ -936,29 +936,25 @@ vuelve a jugar, así que un historial que empiece a llenarse el día que se
 escriba su pantalla nace vacío. Lo que falta por hacer es enseñarlo, no
 recogerlo.
 
-**Lo que falta, por orden:**
+**Ya está hecho**, en Ajustes → Historial: la lista de partidas terminadas, de
+la más reciente a la más vieja, el porcentaje de victorias y cada fila
+desplegable con hasta dónde llegó, qué equipo tenía y **los cuatro movimientos
+de cada Pokémon, con su nombre**. `HistorialModal`, `test:historial`.
 
-1. **Manejo de usuarios.** Cuentas, sesión iniciada y un sitio donde vivan los
-   datos. Es lo que convierte "mi historial en este navegador" en "mi
-   historial". Lee el aviso de abajo antes de empezar: esto cambia el proyecto
-   de categoría.
-2. **Historial de partidas.** La lista de lo que ya se guarda, de la más
-   reciente a la más vieja.
-3. **Porcentaje de victorias.** Sale de dos datos que ya se apuntan -cómo acabó
-   y cuándo-, pero hay que decidir antes qué cuenta (más abajo).
-4. **Cada partida, desplegable.** Al abrir una fila: hasta dónde llegó -las
-   medallas-, qué equipo tenía y **qué cuatro movimientos tenía cada Pokémon**.
-   Todo eso está ya guardado; lo único que falta es ponerle nombre a los
-   números, que se hace con la ROM del jugador igual que en el panel del equipo
-   (`encontrarTablaNombres` para las especies; para los movimientos haría falta
-   su tabla, que aún no se ha localizado).
+Dos decisiones que se tomaron al hacerlo y conviene no deshacer:
 
-**Una cosa que hay que resolver para el desplegable:** los nombres de los
-movimientos no están guardados, solo sus números. Eso es deliberado -es la misma
-frontera de siempre: por aquí no viaja nada de la ROM- pero significa que para
-enseñarlos hace falta tener cargada una copia del juego. Si alguien mira su
-historial sin ROM puesta, o se enseñan los números, o se guarda también el
-nombre el día que se apunta. Decidirlo antes de dibujar la pantalla.
+- **El porcentaje solo con cinco partidas o más.** Con tres jugadas un 33% no
+  dice nada y parece que sí; hasta entonces se enseña la cuenta cruda.
+- **Los nombres los pone la ROM del jugador.** Lo guardado son números, como en
+  todo lo demás. Sin ROM puesta se ven los Pokémon pero no cómo se llaman: es el
+  precio de no guardar nada del juego. La tabla de nombres de movimiento, que
+  aquí se daba por no localizada, **ya se encuentra** (`test:movimientos`).
+
+**Lo que falta: manejo de usuarios.** Cuentas, sesión iniciada y un sitio donde
+vivan los datos. Es lo que convierte "mi historial en este navegador" en "mi
+historial", y lo que permite comparar con tu compañera o recuperarlo desde otro
+aparato. Lee el aviso de abajo antes de empezar: eso sí cambia el proyecto de
+categoría.
 
 **Lo que hay que saber antes de empezar es que esto cambia el proyecto de
 categoría.** Hoy el servidor no guarda absolutamente nada: ni partidas, ni
