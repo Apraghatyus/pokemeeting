@@ -956,6 +956,10 @@ historial", y lo que permite comparar con tu compañera o recuperarlo desde otro
 aparato. Lee el aviso de abajo antes de empezar: eso sí cambia el proyecto de
 categoría.
 
+El sitio donde vivan es una base de datos, y tiene su propia sección más abajo:
+**"La base de datos: llevar todo esto a PostgreSQL"**. Ahí está qué se sube, qué
+no, y lo que arrastra consigo.
+
 **Lo que hay que saber antes de empezar es que esto cambia el proyecto de
 categoría.** Hoy el servidor no guarda absolutamente nada: ni partidas, ni
 guardados, ni ROMs, ni quién eres. Esa es la razón de que no haya base de datos,
@@ -1005,6 +1009,119 @@ Tres cosas que conviene fijar antes de dibujar nada:
 - **Si el porcentaje se enseña con pocas partidas.** Con tres jugadas, un 33% no
   dice nada y parece que sí. Suele ser mejor enseñar el número crudo hasta tener
   unas cuantas.
+
+---
+
+## La base de datos: llevar todo esto a PostgreSQL
+
+Con cuentas y perfiles hace falta un sitio donde vivan los datos, y ese sitio es
+una base de datos de verdad. Esto es lo que se sabe antes de empezar.
+
+### Lo que hoy se guarda, y dónde
+
+Todo está en el navegador. Nueve claves en `localStorage`:
+
+| Clave | Qué es | ¿A la base de datos? |
+| --- | --- | --- |
+| `emupoke.partidas` | Las partidas aleatorizadas: nombre, semilla, ajustes, CRC, de qué juego, cuándo se jugó | **Sí.** Es el catálogo de lo que has jugado |
+| `emupoke.historial` | Las partidas terminadas: resultado, medallas, equipo y movimientos | **Sí.** Es el motivo de todo esto |
+| `emupoke.fin.<partida>` | Si una partida está dada por terminada, y cómo | **Sí**, pegado a su partida |
+| `emupoke.trato.<partida>` | El diario de un intercambio a medias | **No.** Es un apaño para que un intercambio cortado no pierda un Pokémon; muere con la sesión |
+| `emupoke.apodo` | Cómo quieres que te llamen | **Sí**, pasa a ser parte de la cuenta |
+| `emupoke.teclas`, `emupoke.mando`, `emupoke.volumen`, `emupoke.esquina` | Cómo tienes configurado ESTE aparato | **No.** Sincronizar el mando entre el móvil y el PC es empeorarlo |
+
+Y en IndexedDB, por debajo del sistema de ficheros de mGBA: **las copias
+aleatorizadas** (16 MB cada una, hasta tres) y **los guardados** de cada una.
+
+### Lo que NO sube, y es la regla que no se negocia
+
+**Las ROMs no salen de tu ordenador.** Ni la original ni las copias
+aleatorizadas. Eso es lo que mantiene limpia la línea legal de todo el proyecto
+y no cambia porque haya base de datos: una copia aleatorizada es el juego con
+otros datos dentro, y subirla sería repartir el juego.
+
+No hace falta, además: una copia se **rehace** desde su semilla, que son cuatro
+campos de texto. Es justo para lo que se diseñó así desde el principio.
+
+**Los guardados (`.sav`) son otra cosa y hay que decidirlo aparte.** No son el
+juego: son lo que ha hecho el jugador. Guardarlos en el servidor es lo que
+permitiría seguir tu partida desde otro aparato, que es de las cosas más útiles
+que podría dar una cuenta. Son unos 128 KB cada uno. La decisión no es técnica,
+y conviene tomarla a propósito en vez de que salga sola al escribir el esquema.
+
+### El problema de identidad, que es el que muerde
+
+Hoy una partida se identifica por **el nombre del fichero de su copia**
+-`Pokemon...-aleatoria-mv24cpl8.gba`-, que se inventa con el reloj al crearla.
+Eso vale dentro de un navegador y no vale para nada fuera: el mismo mundo jugado
+desde otro aparato tendría otro nombre.
+
+**Lo que identifica una partida de verdad es su semilla**: CRC de la ROM
+original, CRC de la copia, el número y los ajustes. Dos personas con la misma
+semilla están jugando el mismo mundo, que es lo que hace que el enlace de
+invitación funcione. Al llevar esto a la base de datos, la clave tiene que ser
+esa, no el nombre del fichero.
+
+Lo mismo con el historial: hoy cada partida terminada se identifica con
+`fichero:resultado:enlace`, que es un apaño para no apuntarla dos veces en el
+mismo navegador. Como clave de verdad no sirve.
+
+### Un esquema de partida
+
+Cinco tablas bastan para lo que se ha pedido:
+
+- **`usuarios`** — quién eres. Lo mínimo: un identificador, un apodo y cómo
+  entras (ver más abajo).
+- **`partidas`** — una por mundo jugado: usuario, semilla completa, de qué juego
+  es, qué se aleatorizó, cuándo se creó y cuándo se jugó por última vez.
+- **`partidas_terminadas`** — resultado, si fue por el enlace, cuántas medallas,
+  cuándo. Una fila por final.
+- **`pokemon_del_final`** — el equipo de ese momento: especie, mote, nivel, si
+  cayó y sus cuatro movimientos. Puede ir como tabla o como JSON dentro de la
+  anterior; con Postgres, `jsonb` es perfectamente razonable aquí porque nunca
+  se consulta por dentro, solo se enseña entero.
+- **`guardados`** — solo si se decide subir los `.sav`.
+
+Nada de eso lleva un byte del juego: números, textos cortos y fechas.
+
+### Y la migración de lo que ya hay
+
+**Esto es lo que no se puede olvidar.** Se empezó a recoger el historial antes
+de tener dónde guardarlo justamente para que el día de las cuentas hubiera algo
+que contar. Si al iniciar sesión por primera vez no se sube lo que ya está en el
+navegador, todo eso se pierde y el esfuerzo de haberlo guardado antes no sirvió
+de nada.
+
+O sea: la primera vez que alguien entra con su cuenta, lo que haya en
+`emupoke.partidas`, `emupoke.historial` y `emupoke.fin.*` se manda y se funde
+con lo que haya en el servidor. Y conviene que se pueda repetir sin duplicar,
+porque la gente entra desde dos aparatos.
+
+### Lo que esto arrastra, y no es poco
+
+Hoy el servidor no guarda absolutamente nada. Pasar a tener base de datos trae
+consigo, todo a la vez:
+
+- **Autenticación.** Contraseñas con su cifrado, o entrar con un tercero. Lo
+  segundo quita de encima la parte más fácil de hacer mal.
+- **Datos personales.** Un apodo y un correo ya lo son. Eso significa poder
+  borrar la cuenta y lo que cuelga de ella, y decir en algún sitio qué se
+  guarda.
+- **Copias de seguridad y migraciones.** Hoy no hay nada que respaldar ni
+  esquema que versionar. A partir de aquí, las dos cosas.
+- **Un sitio donde corra Postgres**, que hay que actualizar en
+  [despliegue.md](despliegue.md) y dimensionar en [capacidad.md](capacidad.md).
+
+**Un apunte sobre las salas:** viven en memoria y se pierden al reiniciar el
+servidor -está en las deudas técnicas, más abajo-. Postgres por sí solo no
+arregla eso: una sala es un par de WebSockets abiertos, y si el proceso se cae,
+las conexiones se caen con él. Guardarlas serviría para que los dos pudieran
+volver a entrar en la misma sala, no para que la conexión sobreviva.
+
+**Y la recomendación de orden:** lo que hay hoy en el navegador ya da el
+historial y el porcentaje. La base de datos no añade una función nueva, añade
+que te siga a otro aparato y que puedas compararte con tu compañera. Vale la
+pena, pero conviene tener claro que se paga con todo lo de la lista de arriba.
 
 ---
 
