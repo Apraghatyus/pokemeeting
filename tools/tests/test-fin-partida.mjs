@@ -40,7 +40,10 @@ check('el modulo de la regla se puede cargar', fuente !== null);
 // --- la condicion, replicada desde el modulo ---
 // Se copia a proposito en vez de exportarla: lo que se quiere fijar aqui es el
 // COMPORTAMIENTO esperado, para que si alguien cambia la del modulo salte.
-const seAcabo = (equipo, { loDiceElJuego = false, vistos = null, caidosSuyos = [] } = {}) => {
+const seAcabo = (
+  equipo,
+  { loDiceElJuego = false, vistos = null, caidosSuyos = [], elOtroPerdio = false } = {},
+) => {
   // Camino bueno: el juego lo ha dicho. No hace falta nada mas.
   if (loDiceElJuego) return true;
 
@@ -59,14 +62,17 @@ const seAcabo = (equipo, { loDiceElJuego = false, vistos = null, caidosSuyos = [
   });
   if (!todos) return false;
 
-  // Si lo que lo acabo fue el enlace, no se exige el minimo: ese minimo guarda
-  // contra el combate del laboratorio, que es cosa de TU partida.
-  if (porElEnlace) return true;
-
   // Camino de respaldo: dos Pokemon distintos vistos alguna vez. Por defecto,
-  // los que hay ahora mismo.
+  // los que hay ahora mismo. Dos es la forma de decir "esto no es el combate
+  // del laboratorio" sin tener que reconocerlo.
   const conocidos = vistos ?? new Set(pelean.map((r) => r.personalidad));
-  return conocidos.size >= 2;
+  if (conocidos.size >= 2) return true;
+
+  // Y con uno solo, una pareja caida acaba la partida unicamente si a la otra
+  // persona se lo dijo SU juego. Que su Pokemon este a cero no basta: en el
+  // laboratorio se queda a cero por guion, y eso le acababa la partida al de
+  // enfrente en el minuto dos.
+  return porElEnlace && elOtroPerdio;
 };
 
 const pk = (personalidad, estado = null, huevo = false) => ({
@@ -147,16 +153,19 @@ const conMote = (mote, estado = null) => ({
   ranura: 0, especie: 1, mote, nivel: 10, estado, tipos: null, huevo: false, personalidad: 99,
 });
 
+// Con UN solo Pokemon hace falta ademas que a la otra persona se lo dijera su
+// juego: ver el apartado del combate del laboratorio, mas abajo. Aqui la
+// pareja murio de verdad, que es lo que describen estas tres.
 check('si a tu unico Pokemon le cae la pareja, se acabo',
-  seAcabo(equipo(conMote('Rayo')), { caidosSuyos: ['Rayo'] }) === true);
+  seAcabo(equipo(conMote('Rayo')), { caidosSuyos: ['Rayo'], elOtroPerdio: true }) === true);
 
 check('aunque en tu partida este perfectamente',
-  seAcabo(equipo(conMote('Rayo', null)), { caidosSuyos: ['Rayo'] }) === true);
+  seAcabo(equipo(conMote('Rayo', null)), { caidosSuyos: ['Rayo'], elOtroPerdio: true }) === true);
 
 // Mayusculas y espacios no pueden separar una pareja: uno escribio "Rayo" y el
 // otro "RAYO ".
 check('el mote se compara sin distinguir mayusculas ni espacios',
-  seAcabo(equipo(conMote('Rayo')), { caidosSuyos: ['  rayo '] }) === true);
+  seAcabo(equipo(conMote('Rayo')), { caidosSuyos: ['  rayo '], elOtroPerdio: true }) === true);
 
 // Y mezclado: uno debilitado en tu partida y al otro le cayo la pareja.
 check('mezclando las dos formas de morir, tambien se acaba',
@@ -176,6 +185,38 @@ check('jugando solo, el enlace no acaba nada',
 // Un Pokemon sin mote no tiene pareja que buscar: emparejar dos vacios juntaria
 // cosas que no van juntas.
 check('sin mote no hay pareja', seAcabo(equipo(conMote('')), { caidosSuyos: [''] }) === false);
+
+// --- EL COMBATE DEL LABORATORIO, POR EL LADO DEL ENLACE ---
+//
+// Lo que se reporto: en el primer combate, a ella le ganaron, su inicial se
+// quedo a cero, y a EL le salto la pantalla de fin de partida. Los dos tenian
+// un solo Pokemon y el mismo mote, que es como se emparejan.
+//
+// Desde aqui ese caso y una muerte de verdad se ven IGUAL: un Pokemon suyo a
+// cero con el mote de uno mio. Lo unico que los separa es si a ella se lo dijo
+// su juego, y en el laboratorio no lo dice: el rival se burla y te quedas
+// donde estabas.
+check('el primer combate del companero NO acaba tu partida',
+  seAcabo(equipo(conMote('Rayo')), { caidosSuyos: ['Rayo'], elOtroPerdio: false }) === false);
+
+// Y el caso que protegia la version anterior, que tiene que seguir en pie: con
+// un solo Pokemon, si a ella la derrotaron de verdad, se acabo.
+check('pero si a ella se lo dijo su juego, si',
+  seAcabo(equipo(conMote('Rayo')), { caidosSuyos: ['Rayo'], elOtroPerdio: true }) === true);
+
+// Pasado el tutorial ya no hace falta preguntarle a nadie: con dos Pokemon
+// vistos, una pareja caida basta. Es lo normal a partir de la primera captura.
+check('con dos Pokemon vistos, una pareja caida basta sin preguntar',
+  seAcabo(equipo(conMote('Rayo')), {
+    caidosSuyos: ['Rayo'],
+    vistos: new Set([99, 100]),
+    elOtroPerdio: false,
+  }) === true);
+
+// Y tu propio primer combate tampoco acaba la tuya, que es el caso de siempre
+// visto desde el otro lado: lo mismo da que el Pokemon a cero sea el tuyo.
+check('ni tu propio primer combate acaba la tuya',
+  seAcabo(equipo(pk(1, 'debilitado')), { elOtroPerdio: true }) === false);
 
 console.log(fallos === 0 ? '\nLA REGLA NO SE INVENTA FINALES' : `\n${fallos} COMPROBACIONES FALLIDAS`);
 process.exit(fallos === 0 ? 0 : 1);

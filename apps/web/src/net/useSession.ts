@@ -55,6 +55,14 @@ export type SessionState = {
    * equipo lleven su nombre en vez de "tu companero".
    */
   peerNombre: string | null;
+  /**
+   * Si al companero su juego le ha cantado una derrota.
+   *
+   * Se queda en true una vez dicho, para el resto de la sala: el mensaje del
+   * juego dura unos segundos y la lectura del equipo puede caer despues. Lo que
+   * importa es que paso, no que siga pasando.
+   */
+  peerPerdio: boolean;
   compatibility: RomCompatibility | null;
   error: string | null;
   /** Video en directo de la partida del companero. */
@@ -88,6 +96,7 @@ const initialState: SessionState = {
   isHost: false,
   peerRom: null,
   peerNombre: null,
+  peerPerdio: false,
   compatibility: null,
   error: null,
   remoteStream: null,
@@ -231,7 +240,11 @@ export const useSession = (
             const anterior = ultimoEquipoRef.current;
             if (anterior !== null && mensaje.equipo.momento < anterior) return;
             ultimoEquipoRef.current = mensaje.equipo.momento;
-            patch({ equipoCompanero: mensaje.equipo });
+            patch({
+              equipoCompanero: mensaje.equipo,
+              // Una vez dicho, no se desdice: ver `peerPerdio`.
+              ...(mensaje.perdio ? { peerPerdio: true } : {}),
+            });
           },
           sendSignal: (data) => signaling.signal(data),
         },
@@ -537,8 +550,8 @@ export const useSession = (
    * siguiente cambio mandara el estado completo otra vez, que es lo que hay en
    * ese momento. No hace falta cola ni reintentos para esto.
    */
-  const enviarEquipo = useCallback((equipo: EquipoResumen) => {
-    peerRef.current?.send(JSON.stringify({ type: 'equipo', equipo }));
+  const enviarEquipo = useCallback((equipo: EquipoResumen, perdio = false) => {
+    peerRef.current?.send(JSON.stringify({ type: 'equipo', equipo, perdio }));
   }, []);
 
   /**

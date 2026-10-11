@@ -266,7 +266,17 @@ export type OfertaIntercambio = {
 };
 
 export type PeerMessage =
-  | { type: 'equipo'; equipo: EquipoResumen }
+  /**
+   * Mi equipo, y si mi juego ha cantado una derrota.
+   *
+   * `perdio` no es "mis Pokemon estan a cero": es que el JUEGO lo ha dicho, con
+   * su mensaje de ir corriendo al Centro Pokemon. Viaja porque al otro lado
+   * hace falta para distinguir dos cosas que desde fuera se ven igual: que se
+   * me haya muerto el unico Pokemon que tenia, y que me acaben de ganar el
+   * combate del laboratorio, donde el Pokemon tambien se queda a cero y no ha
+   * pasado nada.
+   */
+  | { type: 'equipo'; equipo: EquipoResumen; perdio?: boolean }
   | { type: 'oferta'; oferta: OfertaIntercambio }
   /** "Por mi adelante": el que lo manda ya ha confirmado. */
   | { type: 'trato-listo'; trato: string }
@@ -380,5 +390,9 @@ export const parsePeerMessage = (crudo: string): PeerMessage | null => {
     // lista de mil elementos ahi dentro se queda para siempre.
     .map((r) => (sonMovimientos(r.movimientos) ? r : { ...r, movimientos: undefined }));
 
-  return { type: 'equipo', equipo: { ...equipo, ranuras } };
+  return {
+    type: 'equipo',
+    equipo: { ...equipo, ranuras },
+    perdio: (mensaje as { perdio?: unknown }).perdio === true,
+  };
 };

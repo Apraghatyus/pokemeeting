@@ -257,6 +257,10 @@ export const App = () => {
     // Por donde iba la partida cuando se acabo. No se ensena: se guarda en el
     // historial, para el dia que haya perfiles.
     miEquipo.medallas.cuantas,
+    // Si a ELLA se lo dijo su juego. Sin esto, el combate del laboratorio de
+    // uno acababa la partida del otro: su inicial se queda a cero por guion y
+    // desde aqui se ve igual que una muerte de verdad.
+    session.state.peerPerdio,
     // Y de que juego es, como se jugo y con quien. Esto solo se sabe mientras
     // se juega: cuando la partida guardada se borre -solo caben tres- ya no
     // habria forma de averiguarlo.
@@ -273,9 +277,11 @@ export const App = () => {
   // asi el recien llegado no se quedaba sin verlo.
   const { enviarEquipo } = session;
   const equipoPropio = miEquipo.equipo;
+  // Con `derrota`: que el juego haya cantado la derrota es lo unico que
+  // distingue, al otro lado, una muerte de verdad del combate del laboratorio.
   useEffect(() => {
-    if (equipoPropio) enviarEquipo(equipoPropio);
-  }, [equipoPropio, session.state.canalListo, enviarEquipo]);
+    if (equipoPropio) enviarEquipo(equipoPropio, miEquipo.derrota);
+  }, [equipoPropio, session.state.canalListo, enviarEquipo, miEquipo.derrota]);
 
   // Soul Link: las parejas se reconocen por el mote, que es el mismo en las dos
   // partidas. Si a uno se le cae el suyo, al otro se le marca el emparejado.

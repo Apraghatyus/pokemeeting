@@ -15,9 +15,9 @@ import { apuntarPartidaTerminada, type Apunte } from './historial';
 import type { EquipoResumen } from '@emupoke/protocol';
 import { parejaCaida } from '@emupoke/pokemon';
 
-// ESTA REGLA SE HA EQUIVOCADO DOS VECES, UNA EN CADA DIRECCIÓN. Las dos están
-// aquí porque la forma de la regla de ahora es la consecuencia de las dos, y sin
-// ellas parece complicada de más.
+// ESTA REGLA SE HA EQUIVOCADO TRES VECES. Las tres están aquí porque la forma
+// de la regla de ahora es la consecuencia de todas, y sin ellas parece
+// complicada de más.
 //
 //   1. Exigía haber tenido DOS Pokémon distintos, para que el combate del
 //      laboratorio -donde solo tienes al inicial- quedara fuera por
@@ -45,6 +45,24 @@ import { parejaCaida } from '@emupoke/pokemon';
 //   - **Lo deduce el equipo caído** -> respaldo, por si el mensaje no se
 //     reconoce, y entonces sí se exigen dos Pokémon. Esto deja fuera el caso (2)
 //     por construcción, porque en el laboratorio solo puedes tener uno.
+//
+//   3. Y faltaba la mitad del problema: el Soul Link. Una pareja caída la
+//      reporta el compañero desde SU partida, y a ese camino se le quitó el
+//      mínimo de dos Pokémon porque, con uno solo, un Soul Link no acababa
+//      nunca. Entonces pasó esto: en el combate del laboratorio, a ella le
+//      ganaron, su inicial se quedó a cero, y a ÉL le saltó la pantalla de fin
+//      de partida en el minuto dos. El primer combate no cuenta para nadie, y
+//      hasta aquí contaba para el de enfrente.
+//
+// LO QUE SEPARA ESE CASO del de verdad tampoco es contar Pokémon: desde fuera
+// se ven igual -un único Pokémon a cero-. Es, otra vez, **quién lo dice**. Si a
+// ella la derrotaron de verdad, su juego se lo dijo; en el laboratorio no. Así
+// que esa señal viaja: el mensaje del equipo lleva `perdio`, que no es "mis
+// Pokémon están a cero" sino "mi juego ha cantado la derrota".
+//
+// Con eso, una pareja caída acaba tu partida si **el juego del otro lo dijo**, o
+// si ya has pasado del tutorial por tu cuenta. En el laboratorio no se cumple
+// ninguna de las dos, y eso es exactamente lo que se quería.
 //
 // La ✕ sigue estando para lo que la regla no pueda saber -las cajas no se leen,
 // así que quien guarde Pokémon sanos ahí vería un final que no lo es-, pero ya
@@ -226,6 +244,15 @@ export const useFinDePartida = (
    */
   medallas: number | null = null,
   /**
+   * Si al companero su juego le ha cantado una derrota.
+   *
+   * Es lo que separa "se le murio su unico Pokemon" de "le ganaron el combate
+   * del laboratorio": desde aqui las dos se ven igual, un Pokemon suyo a cero
+   * con el mote de uno mio. Sin esto, el tutorial de uno acababa la partida del
+   * otro.
+   */
+  companeroPerdio = false,
+  /**
    * De que juego es, como se jugo y con quien.
    *
    * Nada de esto cambia lo que se ensena: es lo que hace falta para que el
@@ -250,11 +277,17 @@ export const useFinDePartida = (
   // El equipo cambia en cada lectura; se mira por referencia para no reaccionar
   // a lecturas que dicen lo mismo.
   const ultimo = useRef<EquipoResumen | null>(null);
+  // Y lo ultimo que se supo del companero: si dice que perdio despues de la
+  // ultima lectura del equipo, hay que volver a decidir aunque el equipo sea
+  // el mismo de antes. En una partida que ya se acabo puede no haber mas
+  // lecturas distintas, y entonces el final no llegaria nunca.
+  const perdioVisto = useRef(false);
 
   useEffect(() => {
     if (!partida || !equipo) return;
-    if (ultimo.current === equipo) return;
+    if (ultimo.current === equipo && perdioVisto.current === companeroPerdio) return;
     ultimo.current = equipo;
+    perdioVisto.current = companeroPerdio;
 
     setEstado((previo) => {
       // Se apuntan los que van apareciendo. La personalidad no cambia nunca, asi
@@ -267,17 +300,21 @@ export const useFinDePartida = (
       // La victoria manda: si el juego esta ensenando el Salon de la Fama, da
       // igual como este el equipo. Y lo que ya se decidio no se cambia, para
       // que una partida continuada no reescriba su propio final.
-      // El respaldo pide dos Pokémon; el mensaje del juego no pide ninguno.
-      // El minimo de dos Pokemon guarda contra el combate del laboratorio, y eso
-      // es cosa de TU partida. Una pareja caida la reporta el companero desde la
-      // suya, y para que llegue tienen que coincidir el mote y que el suyo este
-      // de verdad debilitado: es una condicion mucho mas concreta que "mi unico
-      // Pokemon esta a cero", que en el tutorial pasa por guion. Asi que por ahi
-      // no se exige el minimo, o un Soul Link de un solo Pokemon no acabaria
-      // nunca, que es justo lo que se reporto.
+      //
+      // Deducir que se acabo pide una de dos cosas, y ninguna se cumple en el
+      // combate del laboratorio -que es justo lo que se busca-:
+      //
+      //   - Haber pasado del tutorial por tu cuenta: dos Pokemon distintos, que
+      //     ahi no puedes tener.
+      //   - O que al companero se lo haya dicho SU juego. Que su Pokemon este a
+      //     cero no basta: en el laboratorio se queda a cero por guion.
+      //
+      // Cuando lo dice tu propio juego no hace falta deducir nada, y por eso
+      // `derrota` va por su lado: ese camino si vale con un solo Pokemon.
       const sinNadie = equipoCaido(equipo, caidosDelCompanero);
       const loDeduzco =
-        sinNadie.caido && (sinNadie.porElEnlace || vistos.size >= MINIMO_PARA_DEDUCIRLO);
+        sinNadie.caido &&
+        (vistos.size >= MINIMO_PARA_DEDUCIRLO || (sinNadie.porElEnlace && companeroPerdio));
       const acabaAhora = victoria || derrota || loDeduzco;
 
       const siguiente: Guardado = {
@@ -342,6 +379,10 @@ export const useFinDePartida = (
     estado.resultado,
     estado.porElEnlace,
     medallas,
+    // Si el companero dice que perdio DESPUES de la ultima lectura del equipo,
+    // hay que volver a mirar: si no, el final llegaria con el siguiente cambio
+    // de equipo, que en una partida acabada puede no llegar nunca.
+    companeroPerdio,
   ]);
 
   // Se guarda aqui y no dentro del updater: un updater tiene que ser puro, y
