@@ -1316,5 +1316,9 @@ Ciudad Celeste, ven" sin escribirlo. No toca la ROM.
   al repetirla sin tocar nada: es una carrera, no una rotura. Se midieron las
   búsquedas en la ROM por si eran ellas y no lo son (233 ms los nombres, 52 las
   estadísticas, 16 la tabla de Pokédex).
+  *(Ojo, no confundir con lo otro: `test:paneles` y `test:equipo` fallaban
+  SIEMPRE con cualquier partida que no fuera aquella contra la que se
+  escribieron. Eso ya está arreglado -ahora leen del propio estado lo que
+  esperan-; esto de aquí es otra cosa y sigue viva.)*
 - **El ruido de `unwind`.** Al cambiar de ROM, emscripten lanza una excepción
   `unwind` que aparece en la consola. Es normal y no rompe nada, pero ensucia.

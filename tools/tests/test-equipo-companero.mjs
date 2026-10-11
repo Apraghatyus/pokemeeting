@@ -9,6 +9,7 @@
 //
 // Uso: node tools/tests/test-equipo-companero.mjs <rom.gba> <estado.bin>
 import { readFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
 
 const [, , ROM, ESTADO] = process.argv;
@@ -117,7 +118,19 @@ if (leLlego) {
   )
     .replace(/\s+/g, ' ')
     .trim();
-  check('con su mote y su nivel', /CCC/.test(texto) && /Nv\./.test(texto), texto);
+  // El mote sale del propio estado y no de una lista escrita aqui: esta prueba
+  // se escribio contra la partida de alguien -un Pokemon apodado CCC- y esa
+  // partida no esta en el repositorio, asi que con cualquier otra fallaba y
+  // parecia que algo estaba roto.
+  const pk = await import(pathToFileURL(`${process.cwd()}/packages/pokemon/src/index.ts`).href);
+  const suyo = pk.resumirEquipo(new Uint8Array(readFileSync(ESTADO)))?.resumen.ranuras[0];
+  check('con su mote y su nivel',
+    suyo !== undefined &&
+      texto.includes(suyo.mote) &&
+      // Sin \b al final: el nivel va pegado al tipo -"Nv.10Normal"- y ahi no
+      // hay frontera de palabra. Lo que hace falta es que no siga otro digito.
+      new RegExp(`Nv\\.${suyo.nivel}(?!\\d)`).test(texto),
+    `${texto} | ${suyo?.mote} Nv.${suyo?.nivel}`);
 }
 
 await navegador.close();
