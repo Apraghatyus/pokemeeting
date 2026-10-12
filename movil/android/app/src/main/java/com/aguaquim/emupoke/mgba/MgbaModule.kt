@@ -12,6 +12,8 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.modules.core.DeviceEventManagerModule
+import com.oney.WebRTCModule.PistaDelEmulador
+import com.oney.WebRTCModule.WebRTCModule
 import java.io.File
 import java.util.concurrent.Executors
 
@@ -30,6 +32,8 @@ class MgbaModule(private val contexto: ReactApplicationContext) :
   /** Para no leer ni copiar dieciseis megas en el hilo de la interfaz. */
   private val trabajo = Executors.newSingleThreadExecutor()
   private var esperandoRom: Promise? = null
+  /** El fichero de guardado de la partida que corre, para leerlo desde JavaScript. */
+  private var guardadoActual: File? = null
 
   init {
     contexto.addActivityEventListener(this)
@@ -157,8 +161,9 @@ class MgbaModule(private val contexto: ReactApplicationContext) :
   fun cargar(ruta: String, promesa: Promise) {
     trabajo.execute {
       val base = File(ruta).nameWithoutExtension
-      val guardado = File(carpetaGuardados, "$base.sav").absolutePath
-      val ok = Nativo.cargar(ruta, guardado)
+      val guardado = File(carpetaGuardados, "$base.sav")
+      guardadoActual = guardado
+      val ok = Nativo.cargar(ruta, guardado.absolutePath)
       Nativo.jugando = ok
       promesa.resolve(ok)
     }
@@ -189,6 +194,31 @@ class MgbaModule(private val contexto: ReactApplicationContext) :
   @ReactMethod
   fun cargarEstado(base64: String, promesa: Promise) {
     trabajo.execute { promesa.resolve(Nativo.cargarEstado(Base64.decode(base64, Base64.DEFAULT))) }
+  }
+
+  /**
+   * La pantalla del emulador como pista de WebRTC, para mandarla al companero.
+   * Devuelve lo mismo que `getDisplayMedia`: `{streamId, track}`.
+   */
+  @ReactMethod
+  fun pistaDePantalla(promesa: Promise) {
+    val webrtc = contexto.getNativeModule(WebRTCModule::class.java)
+    if (webrtc == null) {
+      promesa.reject("sin-webrtc", "WebRTC no esta disponible")
+      return
+    }
+    PistaDelEmulador.crear(webrtc, promesa)
+  }
+
+  /** El fichero de guardado de la partida que corre, en base64, o null si no hay. */
+  @ReactMethod
+  fun guardado(promesa: Promise) {
+    trabajo.execute {
+      val fichero = guardadoActual
+      promesa.resolve(
+          if (fichero != null && fichero.exists()) Base64.encodeToString(fichero.readBytes(), Base64.NO_WRAP)
+          else null)
+    }
   }
 
   private companion object {

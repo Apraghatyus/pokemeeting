@@ -31,7 +31,7 @@ import {leerEspecies, SIN_ESPECIES, type Especies} from './src/especies';
 import {Mando} from './src/Mando';
 import {eventosDelEmulador, Mgba, Pantalla, type Rom} from './src/nativo';
 import {PanelDelMando} from './src/PanelDelMando';
-import {useSala} from './src/sala';
+import {MAX_REINTENTOS, useSala} from './src/sala';
 
 type Partida = {rom: Rom; huella: RomFingerprint; especies: Especies};
 
@@ -174,6 +174,11 @@ const Juego = ({partida, onSalir}: {partida: Partida; onSalir: () => void}) => {
       {mirandoLoSuyo && suPantalla && (
         <RTCView streamURL={suPantalla.toURL()} style={estilos.pantalla} objectFit="contain" />
       )}
+      {mirandoLoSuyo && sala.estado.companeroSinVideo && (
+        <View style={[estilos.pantalla, estilos.sinVideo]}>
+          <Text style={estilos.nota}>{nombreDelOtro} no manda su pantalla: su móvil va justo.</Text>
+        </View>
+      )}
     </>
   );
 
@@ -309,23 +314,67 @@ const PanelDeSala = ({sala, onCerrar}: {sala: ReturnType<typeof useSala>; onCerr
   const {estado} = sala;
 
   if (estado.fase !== 'sin-sala') {
+    const {reconexion} = estado;
+    const nombre = estado.companero ?? 'tu compañero';
     return (
-      <View style={estilos.panel}>
+      <ScrollView contentContainerStyle={estilos.panel}>
         <Text style={estilos.seccion}>
           {estado.fase === 'conectada'
-            ? `Jugando con ${estado.companero ?? 'tu compañero'}`
-            : estado.fase === 'perdida'
-              ? 'Se perdio la conexion'
-              : 'Esperando a tu compañero…'}
+            ? `Jugando con ${nombre}`
+            : reconexion.intentando
+              ? `Reconectando… (intento ${reconexion.intentos} de ${MAX_REINTENTOS})`
+              : estado.fase === 'perdida'
+                ? 'Se perdio la conexion'
+                : estado.fase === 'conectando'
+                  ? 'Conectando…'
+                  : 'Esperando a tu compañero…'}
         </Text>
+        {reconexion.agotada && (
+          <>
+            <Text style={estilos.error}>No se pudo volver a entrar. Cuando vuelva la red, reintenta.</Text>
+            <Boton texto="Reintentar ahora" principal onPress={sala.reintentar} />
+          </>
+        )}
         {estado.codigo && <Text style={estilos.codigo}>{estado.codigo}</Text>}
         <Text style={estilos.nota}>
           Tu compañero entra con este codigo y la contraseña, desde otro telefono o desde
           emupoke.aguaquim.com.
         </Text>
-        <Boton texto="Volver al juego" principal onPress={onCerrar} />
+
+        {/* La voz y la pantalla, como en la web. */}
+        <Boton
+          texto={
+            estado.micro === 'encendido'
+              ? '🎤 Apagar el micrófono'
+              : estado.micro === 'pidiendo'
+                ? '🎤 Pidiendo permiso…'
+                : '🎤 Encender el micrófono'
+          }
+          principal={estado.micro !== 'encendido'}
+          onPress={() => void sala.cambiarMicro()}
+        />
+        {estado.micro === 'denegado' && (
+          <Text style={estilos.error}>
+            Sin permiso para el micrófono. Puedes darlo en los ajustes de Android, en Pokemeeting.
+          </Text>
+        )}
+        <Boton
+          texto={estado.companeroSilenciado ? `🔈 Volver a oír a ${nombre}` : `🔇 Silenciar a ${nombre}`}
+          onPress={sala.cambiarSilencio}
+        />
+        <Boton
+          texto={estado.enviandoVideo ? 'Dejar de mandar mi pantalla' : 'Volver a mandar mi pantalla'}
+          onPress={() => sala.cambiarEnvioDeVideo(!estado.enviandoVideo)}
+        />
+        {!estado.enviandoVideo && (
+          <Text style={estilos.nota}>
+            Tu compañero no ve tu partida, pero sigue viendo tu equipo y oyéndote. Útil si el móvil va justo.
+          </Text>
+        )}
+
+        <Boton texto="Volver al juego" onPress={onCerrar} />
         <Boton texto="Salir de la sala" onPress={sala.salir} />
-      </View>
+      </ScrollView>
     );
   }
 
@@ -377,6 +426,7 @@ const estilos = StyleSheet.create({
   consola: {width: '100%', aspectRatio: 3 / 2, backgroundColor: '#000'},
   pantalla: {position: 'absolute', top: 0, left: 0, right: 0, bottom: 0},
   oculta: {opacity: 0},
+  sinVideo: {alignItems: 'center', justifyContent: 'center', padding: 16, backgroundColor: '#000'},
   cambiar: {position: 'absolute', right: 8, bottom: 8, padding: 8, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.6)'},
   tumbado: {flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center'},
   consolaTumbada: {backgroundColor: '#000'},

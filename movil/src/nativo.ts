@@ -25,6 +25,10 @@ type MgbaNativo = {
   restaurarMando(): void;
   /** Se ha vuelto a enseñar el mando tactil: la proxima vez que se use el fisico, avisa. */
   mandoTactilVisible(): void;
+  /** La pantalla del emulador como pista de WebRTC: lo que devuelve getDisplayMedia. */
+  pistaDePantalla(): Promise<{streamId: string; track: unknown}>;
+  /** El fichero de guardado de la partida que corre, en base64. */
+  guardado(): Promise<string | null>;
 };
 
 export const Mgba = NativeModules.Mgba as MgbaNativo;

@@ -38,4 +38,10 @@ object Nativo {
 
   /** Donde se pinta. Null cuando la vista desaparece. */
   external fun superficie(surface: Surface?)
+
+  /**
+   * Copia el ultimo fotograma (RGBX) en `destino`, que tiene que ser directo y
+   * caber 256x256x4. Devuelve ancho << 16 | alto, o 0 si no hay partida.
+   */
+  external fun copiarPantalla(destino: java.nio.ByteBuffer): Int
 }
