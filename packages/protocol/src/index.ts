@@ -226,6 +226,21 @@ export type PokemonResumen = {
    * esto, cambiar de sitio dos Pokemon pareceria que uno se transformo en otro.
    */
   personalidad: number;
+  /**
+   * La zona donde se capturo, o null si no se capturo en ninguna: salio de un
+   * huevo, llego por un intercambio del juego o de un evento.
+   *
+   * Es lo que permite vigilar la regla de "solo el primero de cada ruta" sin
+   * apuntar nada a mano: cada Pokemon lleva su sitio dentro. Ausente en los
+   * resumenes que no lo leen, como los de segunda generacion.
+   */
+  lugar?: number | null;
+  /**
+   * El numero de su entrenador original. Sirve para no contar como captura
+   * tuya lo que te llego por un intercambio: ese trae la zona de la partida
+   * del otro.
+   */
+  entrenador?: number;
 };
 
 /** El equipo entero en un momento dado. */

@@ -7,6 +7,7 @@ import { useSession } from './net/useSession';
 import { useEquipo } from './core/useEquipo';
 import { useTopeDeNivel } from './core/useTopeDeNivel';
 import { reglasActivas, tiposPrimariosRepetidos } from './core/dificultad';
+import { useReglasNuzlocke } from './core/reglasNuzlocke';
 import { useFinDePartida } from './core/useFinDePartida';
 import { useEquipoOrdenado } from './core/ordenEquipo';
 import { useEsEstrecha } from './core/useEsEstrecha';
@@ -332,6 +333,14 @@ export const App = () => {
   // Lo que vigila la dificultad, y solo mientras el reto siga vivo: despues de
   // caer se puede seguir jugando, pero ya no hay reglas que cumplir.
   const reglas = reglasActivas(dificultad, fin.acabada);
+  // Las dos de Nuzlocke que se ven en el equipo: segunda captura en una zona
+  // gastada, y un muerto que vuelve a estar en pie. Solo del equipo propio: las
+  // del companero las vigila su navegador, con su partida.
+  const infracciones = useReglasNuzlocke(
+    state.romName,
+    miEquipo.equipo,
+    reglas.primeraCaptura || reglas.muertoEsMuerto,
+  );
   const tiposRepetidos = useMemo(
     () =>
       reglas.tipoPrimarioUnico
@@ -443,6 +452,8 @@ export const App = () => {
             /* La regla mira los dos equipos a la vez, asi que la marca sale en
                los dos lados: tu ves cual de los tuyos choca y cual de los suyos. */
             tiposRepetidos={tiposRepetidos}
+            /* Solo en la columna propia, como el tope. */
+            infracciones={unoSolo && verSuEquipo ? undefined : infracciones}
             onCambiar={unoSolo ? () => setVerSuEquipo((v) => !v) : undefined}
             nombreDelOtro={nombreDelCompanero}
             nombrePropio={miNombre}

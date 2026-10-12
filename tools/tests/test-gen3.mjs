@@ -18,7 +18,10 @@ const u32 = (b, i, v) => { b[i] = v & 0xff; b[i+1] = (v>>>8)&0xff; b[i+2] = (v>>
 const u16 = (b, i, v) => { b[i] = v & 0xff; b[i+1] = (v>>>8)&0xff; };
 
 /** Construye un Pokemon valido: cifra los datos y pone bien el checksum. */
-const fabricar = ({ personalidad, idEntrenador, especie, objeto, experiencia, movimientos, nivel }) => {
+const fabricar = ({
+  personalidad, idEntrenador, especie, objeto, experiencia, movimientos, nivel,
+  lugar = 0, nivelEncontrado = 0,
+}) => {
   const bloque = new Uint8Array(100);
   u32(bloque, 0x00, personalidad);
   u32(bloque, 0x04, idEntrenador);
@@ -31,6 +34,11 @@ const fabricar = ({ personalidad, idEntrenador, especie, objeto, experiencia, mo
   u16(claro, g + 2, objeto);
   u32(claro, g + 4, experiencia);
   movimientos.forEach((m, i) => u16(claro, a + i*2, m));
+  // Origen, en la subestructura M: la zona en el byte 1 y el nivel al que se
+  // encontro en los siete bits de abajo de la palabra siguiente.
+  const m = g3.posicionDe(personalidad, 'M');
+  claro[m + 1] = lugar;
+  u16(claro, m + 2, nivelEncontrado & 0x7f);
 
   // Checksum sobre los datos EN CLARO, antes de cifrar.
   let suma = 0;
@@ -69,6 +77,12 @@ check('los movimientos se recuperan', leido.movimientos.join(',') === ejemplo.mo
   leido.movimientos.join(','));
 check('el nivel se recupera', leido.nivel === ejemplo.nivel, `${leido.nivel}`);
 check('se reconoce como Pokemon de verdad', g3.pareceValido(bloque));
+
+// --- donde se capturo ---
+const capturado = g3.leerPokemon(fabricar({ ...ejemplo, lugar: 101, nivelEncontrado: 4 }));
+check('la zona de captura se recupera', capturado.lugar === 101, `${capturado.lugar}`);
+check('y el nivel al que se encontro', capturado.nivelEncontrado === 4, `${capturado.nivelEncontrado}`);
+check('sigue cuadrando el checksum', capturado.valido);
 
 // --- el orden de subestructuras depende de la personalidad ---
 const ordenes = new Set();

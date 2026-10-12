@@ -46,6 +46,19 @@ const leerEstado = (bloque: Uint8Array): EstadoPokemon | null => {
   return null;
 };
 
+/** Lo que no es una zona: un intercambio dentro del juego y un evento. */
+const INTERCAMBIO_DEL_JUEGO = 254;
+const EVENTO = 255;
+
+/**
+ * La zona donde se capturo, o null si no se capturo en ninguna.
+ *
+ * Nivel cero es que salio de un huevo, y entonces el lugar es donde eclosiono:
+ * contarlo como captura gastaria la ruta en la que se dio un paseo.
+ */
+const lugarDeCaptura = (lugar: number, nivelEncontrado: number): number | null =>
+  nivelEncontrado === 0 || lugar === INTERCAMBIO_DEL_JUEGO || lugar === EVENTO ? null : lugar;
+
 const resumirBloque = (bloque: Uint8Array, ranura: number): PokemonResumen => {
   const p = leerPokemon(bloque);
   return {
@@ -61,6 +74,8 @@ const resumirBloque = (bloque: Uint8Array, ranura: number): PokemonResumen => {
     movimientos: p.movimientos,
     huevo: p.esHuevo,
     personalidad: p.personalidad,
+    lugar: lugarDeCaptura(p.lugar, p.nivelEncontrado),
+    entrenador: p.idEntrenador,
   };
 };
 

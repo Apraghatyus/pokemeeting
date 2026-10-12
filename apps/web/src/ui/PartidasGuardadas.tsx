@@ -25,6 +25,7 @@ import {
   type PartidaGuardada,
 } from '../core/partidas';
 import { apuntarDescartada } from '../core/historial';
+import { olvidarReglas } from '../core/reglasNuzlocke';
 import { yaTermino } from '../core/useFinDePartida';
 import { codificarSemilla } from '../core/semilla';
 
@@ -271,10 +272,16 @@ export const PartidasGuardadas = ({
                     // lo unico que separa un 90% limpio de uno hecho a base de
                     // borrar lo que iba mal.
                     if (!yaTermino(partida.fichero)) {
-                      apuntarDescartada(partida.fichero, { juego: juegoDePartida(partida) });
+                      apuntarDescartada(partida.fichero, {
+                        juego: juegoDePartida(partida),
+                        // Una Nuzlocke descartada cuenta en la columna de las
+                        // Nuzlocke: es justo donde descartar sale a cuenta.
+                        dificultad: partida.dificultad ?? null,
+                      });
                     }
                     onBorrarFichero(partida.fichero);
                     olvidar(partida.id);
+                    olvidarReglas(partida.fichero);
                     releer();
                   }}
                 >

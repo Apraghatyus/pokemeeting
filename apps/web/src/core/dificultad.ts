@@ -67,11 +67,19 @@ export type Reglas = {
   topeDeNivel: boolean;
   /** Avisar de dos Pokemon con el mismo tipo primario, contando los dos equipos. */
   tipoPrimarioUnico: boolean;
+  /** Avisar de una segunda captura en una zona que ya tenia la suya. */
+  primeraCaptura: boolean;
+  /** Avisar de un Pokemon que cayo y vuelve a estar en pie. */
+  muertoEsMuerto: boolean;
 };
 
 export const reglasActivas = (dificultad: Dificultad, terminada: boolean): Reglas => ({
   topeDeNivel: !terminada && dificultad === 'nivelada',
   tipoPrimarioUnico: !terminada && dificultad === 'nivelada',
+  // Las dos de Nuzlocke valen tambien en Nivelada, que es "todo lo de
+  // Nuzlocke" y algo mas.
+  primeraCaptura: !terminada && dificultad !== 'normal',
+  muertoEsMuerto: !terminada && dificultad !== 'normal',
 });
 
 /**

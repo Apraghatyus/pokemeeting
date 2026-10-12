@@ -1349,6 +1349,8 @@ una vive en `apps/web/src/core/dificultad.ts` y lo vigila `test:dificultad`.
 | Fin de partida al caer el equipo | Si | Si | Si |
 | Apagar al que se pasa del tope | No | No | **Si** |
 | Avisar de tipo primario repetido (los dos equipos) | No | No | **Si** |
+| Avisar de segunda captura en una zona ("RUTA") | No | **Si** | **Si** |
+| Avisar de un muerto en pie ("REVIVIDO") | No | **Si** | **Si** |
 | El numero del tope bajo las medallas | Se ve | Se ve | Se ve |
 
 Decisiones tomadas, para no volver a discutirlas:
@@ -1369,10 +1371,25 @@ Decisiones tomadas, para no volver a discutirlas:
   otro objeto que esa ROM ya vendia (`quitarRevivir` en `tiendas.ts`).
 - **El ranking filtra por dificultad.** Lo jugado antes cuenta como Normal.
 
-**Lo que falta** son las dos reglas de Nuzlocke que hoy no se pueden ni mirar:
-"solo el primer Pokemon de cada ruta" -hace falta leer donde se capturo cada
-uno, ver mas abajo- y "no curar con debilitados en el equipo", que es un guion
-del juego y no un dato. Se explican en el menu, pero el programa no las vigila.
+**Las dos de Nuzlocke tambien se vigilan**, en `reglasNuzlocke.ts`:
+
+- **Solo el primero de cada ruta.** Cada Pokemon lleva la zona donde se
+  capturo (byte 1 de la subestructura M). Es la zona con nombre y no el mapa,
+  asi que las plantas de una cueva cuentan como una, que es como se juega. Se
+  apunta que Pokemon gasto cada zona, asi que liberarlo no la deja libre. No
+  cuentan los huevos, los intercambios del juego, los eventos ni lo que te llega
+  por intercambio, que trae la zona de la partida del otro: se reconoce porque
+  su entrenador original no eres tu.
+- **Debilitado = muerto.** Curarse en el Centro con debilitados es un guion y
+  no se ve, pero su resultado si: un Pokemon que estuvo debilitado vuelve a
+  estar en pie, por un Revivir o por el Centro. Se apunta quien cayo, asi que
+  tambien se pilla si se curo en el PC y vuelve despues. El combate del
+  laboratorio no cuenta: hasta haber visto dos Pokemon distintos una caida no
+  es muerte, la misma regla que el fin de partida.
+
+Lo que no se puede: impedirlo, y avisar ANTES de lanzar la ball en una zona
+gastada, que pide saber en que mapa esta el jugador ahora mismo. Ver "Que rutas
+estan gastadas", mas abajo.
 
 Lo que sigue es como se penso antes de hacerlo.
 

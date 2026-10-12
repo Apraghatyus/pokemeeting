@@ -21,6 +21,7 @@ import {
 } from '@emupoke/pokemon';
 import type { Especies } from '../core/useEspecies';
 import { SpriteEspecie } from './Sprite';
+import type { Infracciones } from '../core/reglasNuzlocke';
 import type { EquipoResumen, EstadoPokemon, PokemonResumen } from '@emupoke/protocol';
 
 type Props = {
@@ -82,6 +83,12 @@ type Props = {
    * en la computadora es su dueno.
    */
   tiposRepetidos?: ReadonlySet<number>;
+  /**
+   * Las dos reglas de Nuzlocke que se ven en el equipo: capturado en una zona
+   * que ya tenia el suyo, y un muerto que vuelve a estar en pie. Ver
+   * `reglasNuzlocke.ts`. Solo para el equipo propio.
+   */
+  infracciones?: Infracciones;
   /**
    * Como se llama el otro jugador, para la pestana.
    *
@@ -160,6 +167,8 @@ const Ficha = ({
   parejaRota,
   tope,
   tipoRepetido,
+  rutaRepetida,
+  revivido,
 }: {
   pokemon: PokemonResumen;
   especies: Especies;
@@ -169,6 +178,10 @@ const Ficha = ({
   tope: TopeDeNivel | null;
   /** Si su tipo primario lo lleva otro Pokemon de los dos equipos. */
   tipoRepetido: boolean;
+  /** Si se capturo en una zona que ya habia dado su Pokemon. */
+  rutaRepetida: boolean;
+  /** Si estuvo debilitado y vuelve a estar en pie. */
+  revivido: boolean;
 }) => {
   const nombre = pokemon.huevo ? 'Huevo' : especies.nombre(pokemon.especie);
   // Cuantos niveles se ha pasado del tope, si se lo ha pasado. Un huevo no
@@ -183,6 +196,8 @@ const Ficha = ({
     // porque para el reto es lo mismo: no se puede usar. Lo que no se toca es
     // la partida: ahi sigue vivo y quien decide es su dueno.
     sobra > 0 ? 'ficha--pasado' : '',
+    // Un muerto en pie se apaga igual: para el reto no se puede usar.
+    revivido ? 'ficha--pasado' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -239,6 +254,25 @@ const Ficha = ({
               TIPO
             </span>
           )}
+          {/* Cayo antes y ahora esta en pie: en una Nuzlocke esta muerto, lo
+              haya levantado un Revivir o el Centro Pokemon. */}
+          {revivido && (
+            <span
+              className="estado estado--pasado"
+              title="Estuvo debilitado: en una Nuzlocke esta muerto y va al PC"
+            >
+              REVIVIDO
+            </span>
+          )}
+          {/* Segunda captura en una zona que ya habia dado su Pokemon. */}
+          {rutaRepetida && (
+            <span
+              className="estado estado--repetido"
+              title="En esa zona ya habias capturado a otro: solo cuenta el primero"
+            >
+              RUTA
+            </span>
+          )}
           {/* En un Soul Link un debilitado no es un detalle: suele ser el final
               de una pareja. Por eso el estado se ve antes que nada. */}
           {pokemon.estado && (
@@ -264,6 +298,8 @@ const Ficha = ({
         {pokemon.estado ? `, ${pokemon.estado}` : ''}
         {sobra > 0 ? `, ${sobra} niveles por encima del tope` : ''}
         {tipoRepetido ? ', tipo primario repetido' : ''}
+        {rutaRepetida ? ', segunda captura en la misma zona' : ''}
+        {revivido ? ', estuvo debilitado y vuelve a estar en pie' : ''}
       </span>
     </li>
   );
@@ -278,6 +314,7 @@ export const EquipoPanel = ({
   caidosDelOtro,
   tope = null,
   tiposRepetidos,
+  infracciones,
   nombreDelOtro = 'Tu companero',
   nombrePropio = 'Tu equipo',
   onCambiar,
@@ -368,6 +405,8 @@ export const EquipoPanel = ({
                   tiposRepetidos !== undefined &&
                   tiposRepetidos.has(pokemon.tipos[0])
                 }
+                rutaRepetida={infracciones?.rutaRepetida.has(pokemon.personalidad) ?? false}
+                revivido={infracciones?.revividos.has(pokemon.personalidad) ?? false}
               />
             ) : (
               <li key={`hueco-${i}`} className="ficha ficha--hueco" aria-hidden="true" />
