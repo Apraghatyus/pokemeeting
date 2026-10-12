@@ -79,8 +79,8 @@ type Props = {
    * Los tipos primarios que estan repetidos, contando tambien el equipo del
    * otro. Es la regla de la Nivelada; fuera de ella llega vacio o no llega.
    *
-   * Como el tope, AVISA y no impide: se marca la ficha y quien decide cual deja
-   * en la computadora es su dueno.
+   * Se apaga la ficha, y no se deja salir del Centro con el hasta guardarlo:
+   * quien decide cual deja en la computadora es su dueno.
    */
   tiposRepetidos?: ReadonlySet<number>;
   /**
@@ -198,12 +198,22 @@ const Ficha = ({
     sobra > 0 ? 'ficha--pasado' : '',
     // Un muerto en pie se apaga igual: para el reto no se puede usar.
     revivido ? 'ficha--pasado' : '',
+    // Y el que repite tipo primario entre los dos equipos: hay que guardarlo,
+    // y no se deja salir del Centro con el.
+    tipoRepetido ? 'ficha--pasado' : '',
   ]
     .filter(Boolean)
     .join(' ');
 
   return (
-    <li className={clases}>
+    <li
+      className={clases}
+      title={
+        tipoRepetido && pokemon.tipos
+          ? `Su tipo primario (${TIPOS_GEN3[pokemon.tipos[0]] ?? '?'}) ya lo lleva otro Pokémon de los equipos: hay que dejarlo en el PC`
+          : undefined
+      }
+    >
       {/* Un huevo no enseña quien es dentro, asi que ni sprite ni nombre. */}
       {pokemon.huevo ? (
         <span
@@ -244,16 +254,9 @@ const Ficha = ({
               +{sobra}
             </span>
           )}
-          {/* Su tipo primario lo lleva otro, aqui o en el equipo del companero.
-              Dice cual, que es lo que hace falta para decidir a quien guardar. */}
-          {tipoRepetido && pokemon.tipos && (
-            <span
-              className="estado estado--repetido"
-              title={`Otro Pokemon de los dos equipos tambien es de tipo ${TIPOS_GEN3[pokemon.tipos[0]] ?? '?'} primario`}
-            >
-              TIPO
-            </span>
-          )}
+          {/* El tipo primario repetido NO lleva etiqueta: ese sitio es de los
+              estados. Se ve en que la ficha sale apagada, y el porque va en el
+              titulo de la ficha. */}
           {/* Cayo antes y ahora esta en pie: en una Nuzlocke esta muerto, lo
               haya levantado un Revivir o el Centro Pokemon. */}
           {revivido && (

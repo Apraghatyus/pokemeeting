@@ -8,8 +8,13 @@ import type {
 
 export type SignalingHandlers = {
   onRoomCreated: (roomCode: string) => void;
-  onRoomJoined: (roomCode: string, peerRom: RomFingerprint, peerNombre: string | null) => void;
-  onPeerJoined: (peerRom: RomFingerprint, peerNombre: string | null) => void;
+  onRoomJoined: (
+    roomCode: string,
+    peerRom: RomFingerprint,
+    peerNombre: string | null,
+    peerUsuario: string | null,
+  ) => void;
+  onPeerJoined: (peerRom: RomFingerprint, peerNombre: string | null, peerUsuario: string | null) => void;
   onPeerLeft: () => void;
   onSignal: (data: unknown) => void;
   onError: (code: ErrorCode, message: string) => void;
@@ -71,10 +76,15 @@ export class SignalingClient {
         h.onRoomCreated(message.roomCode);
         break;
       case 'room-joined':
-        h.onRoomJoined(message.roomCode, message.peerRom, message.peerNombre ?? null);
+        h.onRoomJoined(
+          message.roomCode,
+          message.peerRom,
+          message.peerNombre ?? null,
+          message.peerUsuario ?? null,
+        );
         break;
       case 'peer-joined':
-        h.onPeerJoined(message.peerRom, message.peerNombre ?? null);
+        h.onPeerJoined(message.peerRom, message.peerNombre ?? null, message.peerUsuario ?? null);
         break;
       case 'peer-left':
         h.onPeerLeft();

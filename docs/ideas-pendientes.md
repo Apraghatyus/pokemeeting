@@ -1246,6 +1246,29 @@ comprueba-, así que el ranking de parejas de verdad necesita las cuentas; pero
 apuntar el apodo ahora es gratis y es lo único que habrá de las partidas de
 antes.
 
+### Cuándo una partida es Soul Link, y con quién — HECHO
+
+- **Se pregunta, no se deduce.** Abrir una sala ya no convierte la partida en
+  Soul Link. Cuando entra el compañero y la partida está empezando (sin medallas
+  y como mucho con el inicial) sale la pregunta: "Sí, Soul Link" o "No, solo
+  jugar juntos". Lo elegido se manda al otro (mensaje `soullink`) y vale para
+  las dos partidas. Más tarde ya no se ofrece. Sin Soul Link se juega junto pero
+  sin parejas: lo que caiga en su partida no toca la tuya.
+- **La Soul Link es con quien se empezó.** El servidor de salas comprueba la
+  cuenta de cada uno con su sesión (pregunta a `/yo` del servicio de cuentas con
+  la galleta del socket) y se la pasa al otro como `peerUsuario`. El apodo no
+  vale para esto: lo escribe cada uno. La partida guarda `companeroSoullink`.
+- **Con otra persona** se puede jugar junto, pero sin parejas y con un aviso.
+- **Para el ranking**, una Soul Link de alguien con cuenta solo cuenta si se
+  termina con la misma cuenta con la que se empezó. Si no, el final se apunta en
+  el historial con el motivo (`fueraDelRanking`) y no se sube. Sin cuenta no se
+  valida nada: tampoco se sube.
+- **Decidido así y fácil de cambiar:** si la Soul Link se empezó con alguien
+  sin cuenta, no hay a quién comprobar y cuenta igual.
+
+**Falta comprobar** en el servidor real que la galleta llega al socket por el
+túnel (Caddy la pasa tal cual; debería).
+
 ### El modal de perfil de usuario
 
 Pulsar a alguien en el ranking y ver quien es: su apodo, desde cuando juega,
@@ -1633,25 +1656,47 @@ Dos cosas que conviene recordar de cómo se hizo:
 
 `apps/randomizer/src/tiendas.ts`, `test:tiendas`.
 
-### Las reglas del Centro Pokémon, que sí se hacen cumplir
+### Las reglas que sí se hacen cumplir
 
-Excepción a "se avisa, no se impide", pedida a propósito:
+Excepción a "se avisa, no se impide", pedida a propósito. Con el reto vivo:
 
-- **La enfermera no cura con un muerto en el equipo.** Si se cura al equipo con
-  un debilitado dentro -o se revive con un objeto-, se vuelve a cargar el estado
-  de unos segundos antes y sale un aviso: hay que dejarlo en el PC o liberarlo.
-- **No se sale del Centro** con un muerto, ni en Nivelada con alguien por encima
-  del tope del siguiente líder. Subir a la planta de arriba sí se puede.
+| Regla | Dificultad | Qué pasa si se rompe |
+|---|---|---|
+| La enfermera no cura con un muerto en el equipo (ni vale revivirlo con un objeto) | Nuzlocke, Nivelada | Se vuelve a antes de hablar con ella |
+| No se sale del Centro con un muerto | Nuzlocke, Nivelada | Se vuelve a justo antes de salir |
+| No se sale del Centro con un Pokémon de tipo primario repetido entre los equipos (su ficha sale apagada) | Nivelada | Se vuelve a justo antes de salir |
+| No se pelea contra el siguiente líder con alguien por encima de su tope | Nivelada | Se vuelve a antes del combate |
+| Solo el primer encuentro de cada zona: si no se captura, se pierde. Si es de una familia que ya llevas en el equipo, no cuenta y vale el siguiente | Nuzlocke, Nivelada | Capturar otro se deshace volviendo a antes de ese combate |
 
-Cómo se sabe que es un Centro: todos comparten la misma disposición por dentro,
-y se aprende la primera vez que la enfermera cura al equipo (la casa del jugador
-también cura, pero es única y no cuenta). Hasta esa primera cura, la regla de
-salir no puede vigilarse. Lo que se carga es el estado que el propio programa
-guardó al mirar el equipo: no se escribe nada en la partida.
-`apps/web/src/core/centroPokemon.ts`, `test:centro`.
+**Cómo se impide.** El equipo se mira cada tres segundos guardando un estado, y
+se conservan los del último minuto. Al romperse una regla se carga uno de esos,
+lo bastante atrás para no caer otra vez en lo mismo nada más cargar; si la misma
+regla salta otra vez enseguida, se va más atrás. Sale un aviso con el porqué,
+también a pantalla completa. No se escribe nada en la partida.
 
-**Falta comprobarlo jugando**: que la cura de la enfermera se detecte, y que
-volver unos segundos atrás no deje al jugador en un bucle incómodo.
+**Cómo se sabe cada cosa**, sin direcciones a mano salvo la de combate:
+
+- **El Centro**: todos comparten disposición por dentro; se aprende en la
+  primera cura de la enfermera. Hasta entonces la regla de salir no se vigila.
+- **El rival del combate**: la copia de combate que va justo después de la tuya
+  (`rivalEnCombate`). Salvaje si lleva tu número de entrenador, que es como el
+  juego crea a los salvajes.
+- **El líder**: lo que saca es exactamente uno de su equipo, leído de la ROM
+  (`equiposDeLosLideres`). Solo Kanto, como el tope.
+- **Los repetidos**: familias evolutivas de la tabla de evoluciones de la ROM
+  (`familiasEvolutivas`), que en una aleatorizada es la que vale.
+- **Primer encuentro**: empieza a contar con la primera captura (antes no hay Poké
+  Balls). Por zona se apunta el primer salvaje en
+  `emupoke.encuentros.<partida>`.
+
+`apps/web/src/core/reglasEnVivo.ts`, `test:reglas:vivo`.
+
+**Lo que no se ve:** una captura con el equipo lleno va directa al PC, y el PC no
+se lee; esa no se puede deshacer. La bandera de combate solo se conoce de Rojo
+Fuego en español: en los demás juegos el rival se reconoce igual, por su
+personalidad nueva, pero con menos certeza.
+
+**Falta comprobarlo jugando**: todo esto está probado con datos fabricados.
 
 ### En un Soul Link, la dificultad viene en la invitación
 

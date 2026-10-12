@@ -42,6 +42,8 @@ type Props = {
    */
   mirandoLoSuyo: boolean;
   onCambiarPantalla: () => void;
+  /** Abre el mapa de rutas. Sin el no se pinta el boton. */
+  onAbrirMapa?: () => void;
 };
 
 /**
@@ -254,6 +256,7 @@ export const Stage = ({
   marcoCompleto,
   mirandoLoSuyo,
   onCambiarPantalla,
+  onAbrirMapa,
 }: Props) => {
   const marcoRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -426,6 +429,24 @@ export const Stage = ({
         >
           {fullscreen ? '⤡' : '⤢'}
         </button>
+
+        {/* El mapa, en la esquina de la partida y al lado de pantalla completa:
+            se mira jugando, sin salir de ella. */}
+        {hasRom && onAbrirMapa && (
+          <button
+            type="button"
+            className="pantalla__boton pantalla__boton--mapa"
+            onClick={onAbrirMapa}
+            title="Mapa de rutas"
+            aria-label="Mapa de rutas"
+          >
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z" />
+              <path d="M9 4v14M15 6v14" />
+            </svg>
+          </button>
+        )}
 
         {/* El boton de intercambiar va en las dos pantallas y el CSS lo enseña
             solo en la pequena. Si estuviera solo en la del companero, al

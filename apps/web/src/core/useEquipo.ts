@@ -20,6 +20,7 @@ import {
   enCombate,
   enDerrota,
   mapaActual,
+  rivalEnCombate,
   enSalonDeLaFama,
   leerCabecera,
   quienPelea,
@@ -32,7 +33,7 @@ import {
   type Medallas,
   type TablaMapas,
 } from '@emupoke/pokemon';
-import type { Lectura } from './centroPokemon';
+import type { Lectura, Veredicto } from './reglasEnVivo';
 import type { MgbaModule } from './mgbaCore';
 import type { Especies } from './useEspecies';
 
@@ -84,7 +85,7 @@ export type EstadoEquipo = {
   mapa: MapaEnMemoria | null;
   /**
    * La ultima vez que se deshizo algo por romper una regla, con el aviso para
-   * el jugador. Ver `centroPokemon.ts`.
+   * el jugador. Ver `reglasEnVivo.ts`.
    */
   deshecho: { motivo: string; momento: number } | null;
 };
@@ -92,14 +93,26 @@ export type EstadoEquipo = {
 /**
  * Quien mira cada lectura y decide si hay que deshacerla.
  *
- * Recibe la ultima lectura buena y la de ahora; si devuelve un aviso, se vuelve
- * a cargar el estado de la buena. Ver `centroPokemon.ts`.
+ * Recibe la ultima lectura buena y la de ahora; si devuelve un veredicto, se
+ * vuelve a cargar uno de los estados buenos de antes. Ver `reglasEnVivo.ts`.
  */
 export type Vigilante = (
   antes: Lectura | null,
   ahora: Lectura,
   tabla: TablaMapas | null,
-) => string | null;
+) => Veredicto | null;
+
+/**
+ * Cuantas lecturas buenas se guardan para poder volver atras: un minuto.
+ *
+ * Una sola no basta. Para deshacer una cura hay que volver a ANTES de hablar
+ * con la enfermera -si no, el dialogo sigue solo y vuelve a curar-, y para
+ * deshacer una captura, a antes del combate. Son unos 400 KB cada una.
+ */
+const HISTORIAL = 20;
+
+/** Si la misma regla salta otra vez en este tiempo, se vuelve mas atras. */
+const REPETICION_MS = 60_000;
 
 /**
  * @param coreRef   el nucleo, cuando ya este arrancado
@@ -129,8 +142,10 @@ export const useEquipo = (
   const tablaRef = useRef<{ rom: Uint8Array; tabla: TablaMapas | null } | null>(null);
   /** Donde estaba la cabecera del mapa la ultima vez. */
   const pistaMapaRef = useRef<number | null>(null);
-  /** La ultima lectura que no rompia ninguna regla, con su estado. */
-  const buenaRef = useRef<{ lectura: Lectura; estado: Uint8Array } | null>(null);
+  /** Las ultimas lecturas que no rompian ninguna regla, con su estado. */
+  const historialRef = useRef<{ lectura: Lectura; estado: Uint8Array; momento: number }[]>([]);
+  /** La ultima vez que se deshizo algo, para ir mas atras si se repite. */
+  const ultimoDeshechoRef = useRef<{ motivo: string; momento: number; veces: number } | null>(null);
 
   const direccionRef = useRef<number | null>(null);
   const juegoRef = useRef<string>('');
@@ -213,19 +228,45 @@ export const useEquipo = (
       const donde = tabla ? mapaActual(estado, tabla, pistaMapaRef.current) : null;
       if (donde) pistaMapaRef.current = donde.direccion;
 
+      // Lo que se tiene delante si hay combate.
+      const rival = leido ? rivalEnCombate(estado, leido, juegoRef.current || leido.juego) : null;
+
       // Las reglas que se hacen cumplir. Si esta lectura rompe una, se vuelve
-      // a la ultima buena y aqui se acaba: lo leido ya no es la partida.
-      const ahora: Lectura = { equipo: leido, mapa: donde };
-      const motivo = vigilanteRef.current?.(buenaRef.current?.lectura ?? null, ahora, tabla) ?? null;
-      const buena = buenaRef.current;
-      if (motivo && buena) {
-        core.FS.writeFile(ruta, buena.estado);
+      // a un estado bueno de antes y aqui se acaba: lo leido ya no es la partida.
+      const ahora: Lectura = { equipo: leido, mapa: donde, rival };
+      const historial = historialRef.current;
+      const veredicto =
+        vigilanteRef.current?.(historial.at(-1)?.lectura ?? null, ahora, tabla) ?? null;
+      if (veredicto && historial.length > 0) {
+        const momento = Date.now();
+        // La misma regla otra vez enseguida: lo de antes no fue bastante atras.
+        const previo = ultimoDeshechoRef.current;
+        const veces =
+          previo && previo.motivo === veredicto.motivo && momento - previo.momento < REPETICION_MS
+            ? previo.veces + 1
+            : 0;
+        const segundos = veces === 0 ? veredicto.atras : Math.max(veredicto.atras, 3) * 2 ** veces;
+        const limite = momento - segundos * 1000;
+        let elegido = 0;
+        for (let i = historial.length - 1; i >= 0; i -= 1) {
+          const h = historial[i]!;
+          if (h.momento > limite) continue;
+          if (veredicto.antesDe !== undefined && h.lectura.rival?.personalidad === veredicto.antesDe) {
+            continue;
+          }
+          elegido = i;
+          break;
+        }
+        core.FS.writeFile(ruta, historial[elegido]!.estado);
         if (core.loadStateSlot(RANURA_ESPIA, 0)) {
-          setDeshecho({ motivo, momento: Date.now() });
+          historialRef.current = historial.slice(0, elegido + 1);
+          ultimoDeshechoRef.current = { motivo: veredicto.motivo, momento, veces };
+          setDeshecho({ motivo: veredicto.motivo, momento });
           return;
         }
       }
-      buenaRef.current = { lectura: ahora, estado };
+      historial.push({ lectura: ahora, estado, momento: Date.now() });
+      if (historial.length > HISTORIAL) historial.shift();
       setMapa((antes) =>
         antes?.grupo === donde?.grupo && antes?.numero === donde?.numero && antes?.zona === donde?.zona
           ? antes
@@ -271,7 +312,8 @@ export const useEquipo = (
     // Al cambiar de juego no vale nada de lo aprendido del anterior.
     direccionRef.current = null;
     pistaMapaRef.current = null;
-    buenaRef.current = null;
+    historialRef.current = [];
+    ultimoDeshechoRef.current = null;
     setMapa(null);
     setDeshecho(null);
     juegoRef.current = '';

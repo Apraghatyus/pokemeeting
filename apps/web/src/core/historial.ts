@@ -101,6 +101,14 @@ export type PartidaTerminada = {
   medallas: number | null;
   /** El equipo del momento exacto en que se acabo. */
   equipo: PokemonDeLaHistoria[];
+  /**
+   * Por que este final NO cuenta para el ranking, o ausente si cuenta.
+   *
+   * Una Soul Link de alguien con cuenta solo cuenta si se termina con la misma
+   * persona con la que se empezo. Se apunta igual -es lo que paso-, pero no se
+   * sube.
+   */
+  fueraDelRanking?: string;
 };
 
 const leerTodas = (): PartidaTerminada[] => {
@@ -131,6 +139,7 @@ export type Apunte = {
   modo?: Modo | null;
   companero?: string | null;
   dificultad?: Dificultad | null;
+  fueraDelRanking?: string | null;
 };
 
 export const apuntarPartidaTerminada = (
@@ -156,6 +165,7 @@ export const apuntarPartidaTerminada = (
     modo: apunte.modo ?? null,
     companero: apunte.companero ?? null,
     dificultad: apunte.dificultad ?? null,
+    ...(apunte.fueraDelRanking ? { fueraDelRanking: apunte.fueraDelRanking } : {}),
     porElEnlace,
     medallas,
     equipo: (equipo?.ranuras ?? [])

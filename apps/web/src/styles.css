@@ -521,6 +521,17 @@ body {
   right: 56px;
 }
 
+/* El mapa, al lado de pantalla completa: la misma esquina, que no se disputa
+   con nada del navegador. */
+.pantalla__boton--mapa {
+  bottom: 12px;
+  left: 56px;
+}
+
+.pantalla--pequena > .pantalla__boton--mapa {
+  display: none;
+}
+
 /* Intercambiar solo tiene sentido desde la pequena: desde la grande ya estas
    viendo lo que quieres ver. */
 .pantalla--grande > .pantalla__boton--intercambiar,
@@ -6418,4 +6429,45 @@ details.partidas[open] > summary::before {
     opacity: 0;
     transform: translate(-50%, 8px);
   }
+}
+
+/* Los avisos que solo informan -el primer encuentro de una zona- no son una
+   regla rota: otro color y otra marca. */
+.aviso-regla--info {
+  border-color: var(--accent);
+}
+
+.aviso-regla--info .aviso-regla__marca {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* ------------------------------------------- pregunta de Soul Link --- */
+
+.soullink-pregunta {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.soullink-pregunta p {
+  margin: 0;
+}
+
+.soullink-pregunta ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+}
+
+.soullink-pregunta__acciones {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
 }

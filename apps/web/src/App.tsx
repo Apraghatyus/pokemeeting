@@ -6,12 +6,18 @@ import { useKeyboardOwnership } from './core/useKeyboardOwnership';
 import { useSession } from './net/useSession';
 import { useEquipo, type Vigilante } from './core/useEquipo';
 import {
+  apuntarEncuentro,
   guardarDisposicionDelCentro,
-  juzgar,
+  guardarEncuentros,
+  juzgarCaptura,
+  juzgarCentro,
+  juzgarLider,
   leerDisposicionDelCentro,
+  leerEncuentros,
   seCuroElEquipo,
-} from './core/centroPokemon';
-import { zonaCanonica } from './core/zonas';
+  type MemoriaDeEncuentros,
+} from './core/reglasEnVivo';
+import { nombreDeZona, zonaCanonica } from './core/zonas';
 import { useTopeDeNivel } from './core/useTopeDeNivel';
 import { reglasActivas, tiposPrimariosRepetidos } from './core/dificultad';
 import { useReglasNuzlocke } from './core/reglasNuzlocke';
@@ -26,15 +32,26 @@ import { apodoGuardado, comoSeLlama } from './core/apodo';
 import { codificarSemilla, type Semilla } from './core/semilla';
 import { leerInvitacion, olvidarInvitacion, type Invitacion } from './core/invitacion';
 import {
+  companeroDeSoullink,
+  descartarSoullink,
   dificultadDe,
   esSoullink,
   marcarSoullink,
+  modoSoullink,
   nombreDePartida,
   semillaDePartida,
   sePuedeRehacer,
   todasLasPartidas,
 } from './core/partidas';
-import { aprenderCentro, motesDebilitados, parseGameCode } from '@emupoke/pokemon';
+import {
+  aprenderCentro,
+  encontrarTablaEvoluciones,
+  equiposDeLosLideres,
+  familiasEvolutivas,
+  motesDebilitados,
+  parseGameCode,
+  type PokemonDeEntrenador,
+} from '@emupoke/pokemon';
 import { EquipoPanel } from './ui/EquipoPanel';
 import { AjustesModal } from './ui/AjustesModal';
 import { CuentaModal } from './ui/CuentaModal';
@@ -55,6 +72,7 @@ import { Stage } from './ui/Stage';
 import { TouchControls } from './ui/TouchControls';
 import { TopBar } from './ui/TopBar';
 import { MapaModal } from './ui/MapaModal';
+import { SoulLinkModal } from './ui/SoulLinkModal';
 import { VoiceBar } from './ui/VoiceBar';
 
 export const App = () => {
@@ -224,18 +242,7 @@ export const App = () => {
     return () => clearInterval(reloj);
   }, [hayCuenta, juegoEnCurso, enSala]);
 
-  // Abrir una sala con una partida puesta la convierte en una Soul Link, y eso
-  // se marca EN LA PARTIDA y no se deduce al final.
-  //
-  // Se marca al abrir la sala, no al conectar: invitar a alguien ya es jugar
-  // una Soul Link aunque tarde en llegar. Y no se desmarca nunca -`marcarSoullink`
-  // solo enciende-: una Soul Link que un dia se juega un rato sola sigue
-  // siendolo, y el ranking tiene que seguir contandola donde va.
   const partidaEnCurso = state.romName;
-  const haySala = session.state.phase !== 'sin-sala';
-  useEffect(() => {
-    if (haySala && partidaEnCurso) marcarSoullink(partidaEnCurso);
-  }, [haySala, partidaEnCurso]);
 
   // Con companero la pantalla comparte sitio con su equipo; sin el, se lo
   // queda. Se mira la conexion y no si ha mandado equipo, para que la columna
@@ -266,6 +273,30 @@ export const App = () => {
   // equipo. Quien decide se define mas abajo, cuando ya se saben la dificultad
   // y el tope; aqui solo se le hace sitio.
   const vigilanteRef = useRef<Vigilante | null>(null);
+  /** Los encuentros apuntados de la partida que corre. */
+  const encuentrosRef = useRef<{ partida: string; memoria: MemoriaDeEncuentros } | null>(null);
+  /**
+   * Lo que las reglas necesitan de la ROM: los equipos de los lideres y las
+   * familias evolutivas. Se busca la primera vez que hace falta, una por ROM.
+   */
+  const datosRomRef = useRef<{
+    rom: Uint8Array;
+    lideres: PokemonDeEntrenador[][] | null;
+    familia: (especie: number) => number;
+  } | null>(null);
+  const datosDeLaRom = () => {
+    const rom = emulator.romBytesRef.current;
+    if (!rom) return { lideres: null, familia: (especie: number) => especie };
+    if (datosRomRef.current?.rom !== rom) {
+      const evoluciones = encontrarTablaEvoluciones(rom);
+      datosRomRef.current = {
+        rom,
+        lideres: equiposDeLosLideres(rom),
+        familia: evoluciones ? familiasEvolutivas(evoluciones) : (especie: number) => especie,
+      };
+    }
+    return datosRomRef.current;
+  };
   const miEquipo = useEquipo(
     emulator.coreRef,
     state.status === 'running',
@@ -305,10 +336,106 @@ export const App = () => {
     session.escucharTrato,
   );
 
+  // Si esta partida es una Soul Link. Ya no basta con abrir una sala: al entrar
+  // el companero, si la partida esta empezando, se pregunta. Lo que se elige
+  // se le manda al otro para que las dos partidas vayan iguales. Despues del
+  // principio ya no se ofrece: una Soul Link empieza con las parejas desde la
+  // primera captura.
+  const [versionSoullink, setVersionSoullink] = useState(0);
+  /** Lo elegido sin cuenta: no hay partida apuntada donde guardarlo. */
+  const [soullinkSinCuenta, setSoullinkSinCuenta] = useState<{
+    partida: string;
+    activo: boolean;
+  } | null>(null);
+  const partidaApuntada = useMemo(
+    () => partidaEnCurso !== null && todasLasPartidas().some((p) => p.fichero === partidaEnCurso),
+    [partidaEnCurso, versionSoullink],
+  );
+  const modoGuardado = useMemo(
+    () => modoSoullink(partidaEnCurso),
+    [partidaEnCurso, versionSoullink],
+  );
+  const modoSoul =
+    soullinkSinCuenta && soullinkSinCuenta.partida === partidaEnCurso
+      ? soullinkSinCuenta.activo
+        ? 'si'
+        : 'no'
+      : modoGuardado;
+  // Empezando: sin medallas y como mucho con el inicial.
+  const empezando =
+    (miEquipo.medallas.cuantas ?? 0) === 0 &&
+    (miEquipo.equipo?.ranuras.filter((p) => !p.huevo).length ?? 0) <= 1;
+  const preguntarSoullink =
+    conCompanero && hasRom && partidaEnCurso !== null && modoSoul === 'sin-decidir' && empezando;
+  // Con quien se empezo la Soul Link: con esa persona hay que seguirla. Solo
+  // se vigila con cuenta, que es lo unico que el servidor puede comprobar.
+  const companeroInicial = useMemo(
+    () => companeroDeSoullink(partidaEnCurso),
+    [partidaEnCurso, versionSoullink],
+  );
+  const peerUsuario = session.state.peerUsuario;
+  const otraPersona =
+    hayCuenta && modoSoul === 'si' && companeroInicial !== null && peerUsuario !== companeroInicial;
+  // Con otra persona no hay parejas: la Soul Link es con quien se empezo.
+  const enSoulLink = conCompanero && modoSoul === 'si' && !otraPersona;
+
+  const { enviarSoullink } = session;
+  const aplicarSoullink = (activo: boolean) => {
+    if (!partidaEnCurso) return;
+    if (partidaApuntada) {
+      if (activo) marcarSoullink(partidaEnCurso, session.state.peerUsuario);
+      else descartarSoullink(partidaEnCurso);
+    } else {
+      setSoullinkSinCuenta({ partida: partidaEnCurso, activo });
+    }
+    setVersionSoullink((v) => v + 1);
+  };
+  const elegirSoullink = (activo: boolean) => {
+    aplicarSoullink(activo);
+    enviarSoullink(activo);
+  };
+
+  // Lo que elige el companero vale tambien aqui, si esto esta empezando.
+  const soullinkDelOtro = session.state.soullinkCompanero;
+  useEffect(() => {
+    if (!soullinkDelOtro || !partidaEnCurso) return;
+    if (!empezando && modoSoul !== 'sin-decidir') return;
+    if ((modoSoul === 'si') === soullinkDelOtro.activo && modoSoul !== 'sin-decidir') return;
+    aplicarSoullink(soullinkDelOtro.activo);
+    setAvisoRegla({
+      texto: soullinkDelOtro.activo
+        ? `${nombreDelCompanero} ha hecho la partida Soul Link: vale también para la tuya.`
+        : `${nombreDelCompanero} prefiere jugar sin Soul Link: jugáis juntos, sin parejas.`,
+      tipo: 'info',
+    });
+    // Solo al llegar un aviso nuevo del companero.
+  }, [soullinkDelOtro]);
+
+  // Una Soul Link que nacio de una invitacion ya es Soul Link pero no sabe con
+  // quien: se apunta con el primero que entra mientras esta empezando.
+  useEffect(() => {
+    if (!conCompanero || !partidaApuntada || !partidaEnCurso || !peerUsuario) return;
+    if (modoSoul !== 'si' || companeroInicial !== null || !empezando) return;
+    marcarSoullink(partidaEnCurso, peerUsuario);
+    setVersionSoullink((v) => v + 1);
+  }, [conCompanero, partidaApuntada, partidaEnCurso, peerUsuario, modoSoul, companeroInicial, empezando]);
+
+  // Y si entra otra persona, se dice: con ella no cuenta.
+  useEffect(() => {
+    if (!conCompanero || !otraPersona) return;
+    setAvisoRegla({
+      texto: `Esta Soul Link la empezaste con ${companeroInicial}. Con ${
+        peerUsuario ?? nombreDelCompanero
+      } podéis jugar juntos, pero sin parejas, y si la terminas así no contará en el ranking.`,
+      tipo: 'error',
+    });
+  }, [conCompanero, otraPersona, companeroInicial, peerUsuario, nombreDelCompanero]);
+
   // Quien ha caido a cada lado. Va antes de la regla de fin de partida porque
-  // ahora forma parte de ella: en un Soul Link, una pareja caida cuenta.
+  // ahora forma parte de ella: en un Soul Link, una pareja caida cuenta. Sin
+  // Soul Link, lo que le pase al otro no toca a tus Pokemon.
   const caidosMios = motesDebilitados(miEquipo.equipo);
-  const caidosSuyos = motesDebilitados(session.state.equipoCompanero);
+  const caidosSuyos = motesDebilitados(enSoulLink ? session.state.equipoCompanero : null);
 
   // Con que reglas se juega esta partida. Se relee al llegar equipo nuevo y no
   // solo al cambiar de ROM: la partida se apunta en la lista justo DESPUES de
@@ -332,7 +459,7 @@ export const App = () => {
     // Si a ELLA se lo dijo su juego. Sin esto, el combate del laboratorio de
     // uno acababa la partida del otro: su inicial se queda a cero por guion y
     // desde aqui se ve igual que una muerte de verdad.
-    session.state.peerPerdio,
+    enSoulLink && session.state.peerPerdio,
     // Y de que juego es, como se jugo y con quien. Esto solo se sabe mientras
     // se juega: cuando la partida guardada se borre -solo caben tres- ya no
     // habria forma de averiguarlo.
@@ -348,6 +475,13 @@ export const App = () => {
       modo: esSoullink(state.romName) ? 'soullink' : 'sola',
       companero: conCompanero ? session.state.peerNombre ?? null : null,
       dificultad,
+      // Una Soul Link con cuenta solo cuenta si se termina con quien se empezo.
+      fueraDelRanking:
+        hayCuenta && modoSoul === 'si' && companeroInicial !== null && (!conCompanero || otraPersona)
+          ? `Soul Link empezada con ${companeroInicial} y terminada ${
+              conCompanero && peerUsuario ? `con ${peerUsuario}` : 'sin esa persona'
+            }`
+          : null,
     },
   );
 
@@ -363,7 +497,7 @@ export const App = () => {
     reglas.primeraCaptura || reglas.muertoEsMuerto,
   );
   // Las reglas del Centro Pokemon: no curar ni salir con un muerto, ni en
-  // Nivelada con alguien por encima del tope. Ver `centroPokemon.ts`.
+  // Nivelada con alguien por encima del tope. Ver `reglasEnVivo.ts`.
   const codigoJuego = state.header?.gameCode ?? '';
   vigilanteRef.current = (antes, ahora, tabla) => {
     // Donde cura la enfermera es un Centro: asi se aprende cual es.
@@ -371,13 +505,53 @@ export const App = () => {
       const aprendida = aprenderCentro(ahora.mapa, tabla);
       if (aprendida !== null) guardarDisposicionDelCentro(codigoJuego, aprendida);
     }
-    if (!reglas.muertoEsMuerto && !reglas.topeDeNivel) return null;
-    return juzgar(antes, ahora, {
+    const partida = state.romName;
+    const propio = infracciones.memoria.propio;
+
+    // --- Centro: curar y salir ---
+    const delCentro = juzgarCentro(antes, ahora, {
       muertoEsMuerto: reglas.muertoEsMuerto,
       muertos: infracciones.memoria.muertos,
-      tope: reglas.topeDeNivel ? (topes.siguiente?.nivel ?? null) : null,
+      tiposRepetidos: reglas.tipoPrimarioUnico ? (tiposRepetidos ?? null) : null,
       disposicionDelCentro: codigoJuego ? leerDisposicionDelCentro(codigoJuego) : null,
     });
+    if (delCentro) return delCentro;
+
+    // --- Nivelada: el lider, con todos dentro del tope ---
+    if (reglas.topeDeNivel && topes.siguiente) {
+      const veredicto = juzgarLider(
+        antes,
+        ahora,
+        {
+          nombre: topes.siguiente.lider,
+          tope: topes.siguiente.nivel,
+          equipo: datosDeLaRom().lideres?.[topes.siguiente.gimnasio - 1] ?? [],
+        },
+        propio,
+      );
+      if (veredicto) return veredicto;
+    }
+
+    // --- solo el primer encuentro de cada zona ---
+    // Empieza a contar con la primera captura: antes no hay Poke Balls.
+    if (!reglas.primeraCaptura || !partida || infracciones.memoria.vistos.length < 2) return null;
+    const contexto = {
+      propio,
+      rutas: infracciones.memoria.rutas,
+      familia: datosDeLaRom().familia,
+    };
+    const memoria = encuentrosRef.current?.partida === partida
+      ? encuentrosRef.current.memoria
+      : leerEncuentros(partida);
+    const captura = juzgarCaptura(antes, ahora, memoria, contexto, nombreDeZona);
+    if (captura) return captura;
+    const apuntado = apuntarEncuentro(memoria, ahora, contexto, especies.nombre);
+    if (apuntado.memoria !== memoria) {
+      encuentrosRef.current = { partida, memoria: apuntado.memoria };
+      guardarEncuentros(partida, apuntado.memoria);
+    }
+    if (apuntado.aviso) setAvisoRegla({ texto: apuntado.aviso, tipo: 'info' });
+    return null;
   };
 
   // Lo que se ve en el mapa: las zonas donde ya se capturo -las apuntadas y
@@ -407,14 +581,20 @@ export const App = () => {
   }, [miEquipo.equipo]);
 
   // El aviso de una regla que se acaba de hacer cumplir. Se va solo.
-  const [avisoRegla, setAvisoRegla] = useState<string | null>(null);
+  const [avisoRegla, setAvisoRegla] = useState<{ texto: string; tipo: 'error' | 'info' } | null>(
+    null,
+  );
   const deshecho = miEquipo.deshecho;
   useEffect(() => {
     if (!deshecho) return;
-    setAvisoRegla(deshecho.motivo);
-    const quitar = setTimeout(() => setAvisoRegla(null), 9000);
-    return () => clearTimeout(quitar);
+    setAvisoRegla({ texto: deshecho.motivo, tipo: 'error' });
   }, [deshecho]);
+  // Se va solo: los de una regla rota tardan mas, que hay que leerlos.
+  useEffect(() => {
+    if (!avisoRegla) return;
+    const quitar = setTimeout(() => setAvisoRegla(null), avisoRegla.tipo === 'error' ? 9000 : 6000);
+    return () => clearTimeout(quitar);
+  }, [avisoRegla]);
 
   // Y se le cuenta al companero, igual que el equipo.
   const { enviarMapa } = session;
@@ -510,11 +690,27 @@ export const App = () => {
         onOpenCuenta={() => setCuentaOpen(true)}
         cuentaOpen={cuentaOpen}
         onOpenRanking={() => setRankingOpen(true)}
-        onOpenMapa={hasRom ? () => setMapaOpen(true) : undefined}
       />
 
       <main className="app__main">
        <div className="juego" ref={marcoDeJuego}>
+        {/* Dentro del marco que va a pantalla completa: fuera de el no se veria
+            jugando a pantalla completa, que es justo cuando salta. */}
+        {avisoRegla && (
+          <div
+            className={`aviso-regla aviso-regla--${avisoRegla.tipo}`}
+            role={avisoRegla.tipo === 'error' ? 'alert' : 'status'}
+          >
+            <span className="aviso-regla__marca" aria-hidden="true">
+              {avisoRegla.tipo === 'error' ? '!' : 'i'}
+            </span>
+            <span>{avisoRegla.texto}</span>
+            <button type="button" onClick={() => setAvisoRegla(null)}>
+              Entendido
+            </button>
+          </div>
+        )}
+
         {/* Con una sola columna de equipo -pantalla completa, o estrecha- la mesa
             es la de jugar solo: si no, se quedaba reservada la columna del
             companero, vacia, y la partida perdia 230 pixeles de ancho por un
@@ -572,6 +768,7 @@ export const App = () => {
              deslizar a su partida tiene que verse tambien su equipo. */
           mirandoLoSuyo={verSuPantalla}
           onCambiarPantalla={cambiarDePantalla}
+          onAbrirMapa={() => setMapaOpen(true)}
           canvasRef={emulator.canvasRef}
           companeroSinVideo={session.state.peerSinVideo}
           remoteStream={session.state.remoteStream}
@@ -821,6 +1018,12 @@ export const App = () => {
           montado debajo. Desmontarlo para ensenar una tabla seria apagarle el
           juego a alguien por mirar quien va ganando, y volver costaria cargar
           el nucleo otra vez. */}
+      <SoulLinkModal
+        open={preguntarSoullink}
+        nombreDelCompanero={nombreDelCompanero}
+        onElegir={elegirSoullink}
+      />
+
       <MapaModal
         open={mapaOpen}
         onClose={() => setMapaOpen(false)}
@@ -832,18 +1035,6 @@ export const App = () => {
         gastadasSuyas={conCompanero ? (session.state.mapaCompanero?.gastadas ?? []) : null}
         nombreSuyo={nombreDelCompanero}
       />
-
-      {avisoRegla && (
-        <div className="aviso-regla" role="alert">
-          <span className="aviso-regla__marca" aria-hidden="true">
-            !
-          </span>
-          <span>{avisoRegla}</span>
-          <button type="button" onClick={() => setAvisoRegla(null)}>
-            Entendido
-          </button>
-        </div>
-      )}
 
       {rankingOpen && (
         <Ranking

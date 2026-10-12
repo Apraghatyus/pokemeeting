@@ -77,6 +77,17 @@ export type PartidaGuardada = {
    */
   soullink: boolean | null;
   /**
+   * Si se dijo que NO a hacerla Soul Link. Se pregunta al jugar con alguien al
+   * principio de la partida, y la respuesta se recuerda para no preguntar mas.
+   */
+  soullinkDescartado?: boolean;
+  /**
+   * Con quien se empezo la Soul Link: su cuenta, comprobada por el servidor de
+   * salas. Null si el otro no tenia cuenta. Es con quien hay que seguirla, y
+   * solo si se termina con esa misma persona cuenta en el ranking.
+   */
+  companeroSoullink?: string | null;
+  /**
    * Con que reglas se juega: Normal, Nuzlocke o Nivelada. Se elige al crearla y
    * no cambia, igual que el modo: cambiarla a mitad seria otra partida.
    *
@@ -116,11 +127,62 @@ export const semillaDePartida = (partida: PartidaGuardada): Semilla | null =>
       }
     : null;
 
-/** Marca una partida como de Soul Link. Solo se enciende, nunca se apaga. */
-export const marcarSoullink = (fichero: string): void => {
+/**
+ * Marca una partida como de Soul Link, con quien se empieza.
+ *
+ * El companero solo se apunta si no lo habia: la Soul Link es con quien se
+ * empezo y eso no cambia despues.
+ */
+export const marcarSoullink = (fichero: string, companero: string | null = null): void => {
   escribirTodas(
-    leerTodas().map((p) => (p.fichero === fichero ? { ...p, soullink: true } : p)),
+    leerTodas().map((p) =>
+      p.fichero === fichero
+        ? {
+            ...p,
+            soullink: true,
+            soullinkDescartado: false,
+            companeroSoullink: p.companeroSoullink ?? companero,
+          }
+        : p,
+    ),
   );
+};
+
+/** Con quien se empezo la Soul Link de esa partida, si se sabe. */
+export const companeroDeSoullink = (fichero: string | null): string | null =>
+  (fichero ? leerTodas().find((p) => p.fichero === fichero)?.companeroSoullink : null) ?? null;
+
+/**
+ * Apunta que esta partida NO es una Soul Link.
+ *
+ * Solo se ofrece al principio de la partida: ahi todavia no hay parejas que
+ * romper. Despues el modo ya no cambia.
+ */
+export const descartarSoullink = (fichero: string): void => {
+  escribirTodas(
+    leerTodas().map((p) =>
+      p.fichero === fichero ? { ...p, soullink: false, soullinkDescartado: true } : p,
+    ),
+  );
+};
+
+/**
+ * Si esa partida se juega como Soul Link.
+ *
+ * - `si`: se eligio, o nacio de una invitacion.
+ * - `no`: se dijo que no.
+ * - `sin-decidir`: nadie lo ha preguntado todavia.
+ *
+ * Las de antes de que esto existiera (null) cuentan como `si`: abrir una sala
+ * las marcaba solas, y asi se jugaban.
+ */
+export type ModoSoullink = 'si' | 'no' | 'sin-decidir';
+
+export const modoSoullink = (fichero: string | null): ModoSoullink => {
+  const partida = fichero ? leerTodas().find((p) => p.fichero === fichero) : undefined;
+  if (!partida) return 'sin-decidir';
+  if (partida.soullink === true || partida.soullink === null) return 'si';
+  return partida.soullinkDescartado ? 'no' : 'sin-decidir';
 };
 
 /** Si esa partida es de Soul Link, mirando por su fichero. */
