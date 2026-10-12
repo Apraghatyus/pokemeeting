@@ -1666,7 +1666,7 @@ Excepción a "se avisa, no se impide", pedida a propósito. Con el reto vivo:
 | No se sale del Centro con un muerto, también si está en pie por haberlo sacado del PC | Nuzlocke, Nivelada | Se vuelve a justo antes de salir |
 | No se sale del Centro con un Pokémon de tipo primario repetido entre los equipos (su ficha sale apagada) | Nivelada | Se vuelve a justo antes de salir |
 | No se pelea contra el siguiente líder con alguien por encima de su tope | Nivelada | Se vuelve a antes del combate |
-| Solo el primer encuentro de cada zona: si no se captura, se pierde. Si es de una familia que ya llevas en el equipo, no cuenta y vale el siguiente | Nuzlocke, Nivelada | Capturar otro se deshace volviendo a antes de ese combate |
+| Solo el primer encuentro de cada zona: si no se captura, se pierde. Si es de una familia que ya llevas en el equipo, no cuenta y vale el siguiente | Nuzlocke, Nivelada | Al empezar el combate se avisa; lanzar una Poké Ball (o capturar) se deshace volviendo a antes de ese combate |
 
 **Cómo se impide.** El equipo se mira cada tres segundos guardando un estado, y
 se conservan los del último minuto. Al romperse una regla se carga uno de esos,
@@ -1688,6 +1688,11 @@ también a pantalla completa. No se escribe nada en la partida.
 - **Primer encuentro**: empieza a contar con la primera captura (antes no hay Poké
   Balls). Por zona se apunta el primer salvaje en
   `emupoke.encuentros.<partida>`.
+
+- **Lanzar una Poké Ball**: el bolsillo de Poké Balls de la mochila cambia en
+  mitad de un combate salvaje (`mochila.ts`). El bloque de guardado se encuentra
+  por forma: el mapa actual en su cabecera y el bolsillo a la distancia de cada
+  juego. Necesita la bandera de combate, así que hoy solo en Rojo Fuego español.
 
 `apps/web/src/core/reglasEnVivo.ts`, `test:reglas:vivo`.
 

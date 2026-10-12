@@ -12,6 +12,7 @@ import {
   juzgarCaptura,
   juzgarCentro,
   juzgarLider,
+  juzgarPokeball,
   leerDisposicionDelCentro,
   leerEncuentros,
   revividoConObjeto,
@@ -556,6 +557,8 @@ export const App = () => {
     const memoria = encuentrosRef.current?.partida === partida
       ? encuentrosRef.current.memoria
       : leerEncuentros(partida);
+    const lanzada = juzgarPokeball(antes, ahora, memoria, contexto, nombreDeZona);
+    if (lanzada) return lanzada;
     const captura = juzgarCaptura(antes, ahora, memoria, contexto, nombreDeZona);
     if (captura) return captura;
     const apuntado = apuntarEncuentro(memoria, ahora, contexto, especies.nombre);

@@ -49,6 +49,11 @@ export type Lectura = {
   mapa: MapaInfo | null;
   /** El Pokemon que se tiene delante en un combate, o null. */
   rival: Rival | null;
+  /**
+   * Los bytes del bolsillo de Poke Balls, o null si no se sabe leer. Si cambian
+   * en mitad de un combate salvaje, se ha lanzado una. Ver `mochila.ts`.
+   */
+  balls?: string | null;
 };
 
 /**
@@ -275,7 +280,11 @@ export const apuntarEncuentro = (
   }
   const zona = String(zonaCanonica(ahora.mapa.zona));
   if (siguiente.zonas[zona] || contexto.rutas[zona] !== undefined) {
-    return { memoria: siguiente, aviso: null };
+    // Se avisa al empezar: lo que no se puede es lanzarle una Poke Ball.
+    return {
+      memoria: siguiente,
+      aviso: `Esta zona ya tuvo su encuentro: no le lances Poké Balls a ${nombreDe(rival.especie)}.`,
+    };
   }
 
   // Repetido: ya llevas uno de su familia. No gasta la zona.
@@ -293,6 +302,51 @@ export const apuntarEncuentro = (
       zonas: { ...siguiente.zonas, [zona]: { especie: rival.especie, personalidad: rival.personalidad } },
     },
     aviso: `Primer encuentro de la zona: ${nombreDe(rival.especie)}. Si no lo capturas, la zona queda gastada.`,
+  };
+};
+
+/** Si en esta zona ya no se puede capturar a ese rival. */
+const zonaCerradaPara = (
+  zona: number,
+  rival: Rival,
+  memoria: MemoriaDeEncuentros,
+  contexto: ContextoDeCaptura,
+): boolean => {
+  const clave = String(zona);
+  const oportunidad = memoria.zonas[clave];
+  if (oportunidad) return oportunidad.personalidad !== rival.personalidad;
+  return contexto.rutas[clave] !== undefined;
+};
+
+/**
+ * Lanzar una Poke Ball en una zona que ya tuvo su encuentro.
+ *
+ * Se ve en que el bolsillo de Poke Balls cambia en mitad de un combate salvaje.
+ * Se vuelve a antes de ese combate, igual que con una captura, pero sin
+ * esperar a ver si entra: lanzarla ya es intentarlo.
+ *
+ * Solo con la bandera de combate (`equipo.enCombate`): fuera de un combate el
+ * bolsillo cambia por comprar o por recoger del suelo, y eso no es lanzar.
+ */
+export const juzgarPokeball = (
+  antes: Lectura | null,
+  ahora: Lectura,
+  memoria: MemoriaDeEncuentros,
+  contexto: ContextoDeCaptura,
+  nombreDeZona: (zona: number) => string,
+): Veredicto | null => {
+  const rival = ahora.rival;
+  if (!antes || !rival || !ahora.mapa || contexto.propio === null) return null;
+  if (rival.entrenador !== contexto.propio || ahora.equipo?.enCombate !== true) return null;
+  if (antes.equipo?.enCombate !== true || antes.rival?.personalidad !== rival.personalidad) return null;
+  if (!antes.balls || !ahora.balls || antes.balls === ahora.balls) return null;
+
+  const zona = zonaCanonica(ahora.mapa.zona);
+  if (!zonaCerradaPara(zona, rival, memoria, contexto)) return null;
+  return {
+    motivo: `En ${nombreDeZona(zona)} ya tuviste tu encuentro: no puedes lanzar Poké Balls ahí.`,
+    atras: 0,
+    antesDe: rival.personalidad,
   };
 };
 
