@@ -24,3 +24,25 @@ export const desdeBase64 = (texto: string): Uint8Array => {
   }
   return salida;
 };
+
+const LETRAS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+/** Bytes a base64, para devolverle al emulador un estado o guardar un fichero. */
+export const aBase64 = (bytes: Uint8Array): string => {
+  const trozos: string[] = [];
+  // De tres en tres bytes, en trozos para no hacer una cadena gigante a sumas.
+  for (let inicio = 0; inicio < bytes.length; inicio += 0x3000) {
+    const fin = Math.min(inicio + 0x3000, bytes.length);
+    let trozo = '';
+    for (let i = inicio; i < fin; i += 3) {
+      const a = bytes[i]!;
+      const b = i + 1 < fin ? bytes[i + 1]! : 0;
+      const c = i + 2 < fin ? bytes[i + 2]! : 0;
+      trozo += LETRAS[a >> 2]! + LETRAS[((a & 3) << 4) | (b >> 4)]!;
+      trozo += i + 1 < fin ? LETRAS[((b & 15) << 2) | (c >> 6)]! : '=';
+      trozo += i + 2 < fin ? LETRAS[c & 63]! : '=';
+    }
+    trozos.push(trozo);
+  }
+  return trozos.join('');
+};

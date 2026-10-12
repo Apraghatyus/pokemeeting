@@ -17,8 +17,11 @@ const config = {
       '@emupoke/protocol': path.join(raiz, 'packages/protocol'),
     },
     // Los paquetes compartidos no tienen node_modules propios: lo que importen
-    // se busca en los de la app.
+    // se busca en los de la app, y SOLO ahi. Sin cortar la busqueda hacia
+    // arriba, el codigo de apps/web encontraria el React de la web en la raiz
+    // y la app llevaria dos Reacts: los hooks fallan en cuanto se mezclan.
     nodeModulesPaths: [path.join(__dirname, 'node_modules')],
+    disableHierarchicalLookup: true,
   },
 };
 

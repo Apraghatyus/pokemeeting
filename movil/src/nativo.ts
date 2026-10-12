@@ -25,6 +25,41 @@ type MgbaNativo = {
   restaurarMando(): void;
   /** Se ha vuelto a enseñar el mando tactil: la proxima vez que se use el fisico, avisa. */
   mandoTactilVisible(): void;
+  /** La pantalla del emulador como pista de WebRTC: lo que devuelve getDisplayMedia. */
+  pistaDePantalla(): Promise<{streamId: string; track: unknown}>;
+  /** El fichero de guardado de la partida que corre, en base64. */
+  guardado(): Promise<string | null>;
+  /** Las cuatro letras del codigo de juego de una ROM, de su cabecera. */
+  codigoDeJuego(ruta: string): Promise<string>;
+  /** CRC32 de un fichero, en ocho cifras hex como la web. */
+  crc32(ruta: string): Promise<string>;
+  /** Pone el guardado de una ROM antes de abrirla. */
+  escribirGuardado(nombreRom: string, base64: string): Promise<boolean>;
+  /** Ranuras de estado de una ROM: guardar, cargar y cuales tienen algo (fecha en ms). */
+  guardarRanura(nombreRom: string, ranura: number): Promise<boolean>;
+  cargarRanura(nombreRom: string, ranura: number): Promise<boolean>;
+  ranuras(nombreRom: string): Promise<Record<string, number>>;
+  /** Abre un fichero cualquiera con el selector del sistema. */
+  abrirFichero(): Promise<{nombre: string; base64: string} | null>;
+  /** Guarda bytes donde elija el jugador. */
+  guardarFichero(nombreSugerido: string, base64: string): Promise<boolean>;
+  /**
+   * Aleatoriza con el servicio de la web y guarda la copia en la carpeta de
+   * ROMs. Ajustes y resumen llegan en base64, como en las cabeceras.
+   */
+  aleatorizar(
+    rutaBase: string,
+    peticion: string,
+    nombreNuevo: string,
+    origen: string,
+  ): Promise<{
+    ruta: string;
+    nombre: string;
+    seed: string | null;
+    ajustes: string | null;
+    resumen: string | null;
+    reproducible: boolean;
+  }>;
 };
 
 export const Mgba = NativeModules.Mgba as MgbaNativo;

@@ -213,4 +213,19 @@ JNIEXPORT void JNICALL Java_com_aguaquim_emupoke_mgba_Nativo_superficie(JNIEnv* 
   }
 }
 
+JNIEXPORT jint JNICALL Java_com_aguaquim_emupoke_mgba_Nativo_copiarPantalla(JNIEnv* env, jobject,
+                                                                          jobject destino) {
+  auto* bytes = static_cast<uint8_t*>(env->GetDirectBufferAddress(destino));
+  const jlong capacidad = env->GetDirectBufferCapacity(destino);
+  if (!bytes) return 0;
+  std::lock_guard<std::mutex> l(cerrojo);
+  if (!nucleo.cargado()) return 0;
+  const unsigned ancho = nucleo.ancho();
+  const unsigned alto = nucleo.alto();
+  const size_t tamano = static_cast<size_t>(ancho) * alto * sizeof(uint32_t);
+  if (capacidad < 0 || static_cast<size_t>(capacidad) < tamano) return 0;
+  std::memcpy(bytes, nucleo.pixeles(), tamano);
+  return static_cast<jint>((ancho << 16) | alto);
+}
+
 }  // extern "C"

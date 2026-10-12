@@ -7,6 +7,12 @@
       ],
       "@emupoke/protocol": [
         "../packages/protocol/src/index.ts"
+      ],
+      "react": [
+        "./node_modules/@types/react"
+      ],
+      "react/*": [
+        "./node_modules/@types/react/*"
       ]
     },
     "types": [
