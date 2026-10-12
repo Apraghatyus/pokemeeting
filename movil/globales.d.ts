@@ -18,3 +18,19 @@ declare var EMUPOKE_ORIGEN: string | undefined;
 /** Hermes los trae desde React Native 0.74; los tipos de React Native, no. */
 declare function atob(datos: string): string;
 declare function btoa(datos: string): string;
+
+/**
+ * Del navegador. En la app NO existen: el codigo compartido que los usa
+ * (core/invitacion.ts) solo lo hace en funciones que la app no llama.
+ */
+declare var location: {origin: string; pathname: string; hash: string; hostname: string; search: string};
+declare var history: {replaceState(datos: unknown, titulo: string, url?: string): void};
+
+/** Los pone src/texto.ts si Hermes no los trae. Solo UTF-8. */
+declare class TextDecoder {
+  constructor(etiqueta?: string);
+  decode(datos?: ArrayBufferView | ArrayBuffer): string;
+}
+declare class TextEncoder {
+  encode(texto?: string): Uint8Array;
+}

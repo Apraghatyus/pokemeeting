@@ -9,9 +9,10 @@
 // poder abrirla y de ahi no se mueve: por la sala viaja su huella -titulo,
 // codigo y CRC-, igual que en la web.
 
-import {useEffect, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {
   AppState,
+  Linking,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -26,7 +27,31 @@ import type {Dificultad, PokemonResumen} from '@emupoke/protocol';
 import {parseGameCode} from '@emupoke/pokemon';
 import {readRomHeader} from '../apps/web/src/core/romHeader';
 import {DIFICULTADES} from '../apps/web/src/core/dificultad';
-import {registrar, todasLasPartidas} from '../apps/web/src/core/partidas';
+import {apodoGuardado} from '../apps/web/src/core/apodo';
+import {leerPaquete, type Partida as PartidaTraida} from '../apps/web/src/core/paquete';
+import {
+  codificarSemilla,
+} from '../apps/web/src/core/semilla';
+import {
+  cuando,
+  juegoDePartida,
+  nombreDePartida,
+  registrar,
+  reglasDe,
+  semillaDePartida,
+  tocar,
+  todasLasPartidas,
+  type PartidaGuardada,
+} from '../apps/web/src/core/partidas';
+import {subirLoDeAqui} from '../apps/web/src/core/cuenta';
+import type {Invitacion} from '../apps/web/src/core/invitacion';
+import {useCuenta, type EstadoDeCuenta} from '../apps/web/src/core/useCuenta';
+import {Aleatorizar} from './src/Aleatorizar';
+import {traerPartida, type PuestoEnCola} from './src/aleatorizar';
+import {Invitado} from './src/Invitado';
+import {invitacionDeEnlace} from './src/invitacion';
+import {PanelDeCuenta} from './src/PanelDeCuenta';
+import {PanelDeEstados} from './src/PanelDeEstados';
 import {Aviso} from './src/Aviso';
 import {desdeBase64} from './src/base64';
 import {Boton} from './src/Boton';
@@ -40,14 +65,42 @@ import {PanelDeSala} from './src/PanelDeSala';
 import {usePartidaViva, type DatosDePartida} from './src/partidaViva';
 import {CambiarMote, FinDePartida, IntercambioVentana, PreguntaSoulLink} from './src/Ventanas';
 
+type Pantalla =
+  | {tipo: 'inicio'}
+  | {tipo: 'aleatorizar'}
+  | {tipo: 'invitado'; invitacion: Invitacion}
+  | {tipo: 'traer'; traida: PartidaTraida}
+  | {tipo: 'reglas'; datos: DatosDePartida; unirseA: Invitacion | null}
+  | {tipo: 'jugando'; datos: DatosDePartida; unirseA: Invitacion | null};
+
 const App = () => {
-  const [partida, setPartida] = useState<DatosDePartida | null>(null);
+  const [pantalla, setPantalla] = useState<Pantalla>({tipo: 'inicio'});
   const [problema, setProblema] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
-  /** Una ROM abierta que todavia no tiene reglas elegidas. */
-  const [eligiendo, setEligiendo] = useState<DatosDePartida | null>(null);
+  const [roms, setRoms] = useState<Rom[]>([]);
+  const cuenta = useCuenta();
+  /** Una invitacion que llega jugando: se atiende al salir. */
+  const [invitacionPendiente, setInvitacionPendiente] = useState<Invitacion | null>(null);
 
-  const abrir = async (rom: Rom) => {
+  const releerRoms = useCallback(() => void Mgba.romsGuardadas().then(setRoms), []);
+  useEffect(releerRoms, [releerRoms]);
+
+  // El enlace de invitacion de la web abre la app: al arrancar o con ella abierta.
+  const pantallaRef = useRef(pantalla);
+  pantallaRef.current = pantalla;
+  useEffect(() => {
+    const recibir = (url: string | null) => {
+      const invitacion = invitacionDeEnlace(url);
+      if (!invitacion) return;
+      if (pantallaRef.current.tipo === 'jugando') setInvitacionPendiente(invitacion);
+      else setPantalla({tipo: 'invitado', invitacion});
+    };
+    void Linking.getInitialURL().then(recibir);
+    const sub = Linking.addEventListener('url', ({url}) => recibir(url));
+    return () => sub.remove();
+  }, []);
+
+  const abrir = async (rom: Rom, unirseA: Invitacion | null = null) => {
     setCargando(true);
     setProblema(null);
     try {
@@ -69,16 +122,21 @@ const App = () => {
       };
       if (!(await Mgba.cargar(rom.ruta))) throw new Error('El emulador no reconoce ese fichero como un juego.');
       // Una partida sin apuntar: se pregunta con que reglas se juega, una vez.
-      if (todasLasPartidas().some(p => p.fichero === rom.nombre)) setPartida(datos);
-      else setEligiendo(datos);
+      const registrada = todasLasPartidas().find(p => p.fichero === rom.nombre);
+      if (registrada) {
+        tocar(registrada.id);
+        setPantalla({tipo: 'jugando', datos, unirseA});
+      } else setPantalla({tipo: 'reglas', datos, unirseA});
     } catch (error) {
       setProblema(error instanceof Error ? error.message : String(error));
+      setPantalla({tipo: 'inicio'});
     } finally {
       setCargando(false);
+      releerRoms();
     }
   };
 
-  const apuntar = (datos: DatosDePartida, dificultad: Dificultad) => {
+  const apuntar = (datos: DatosDePartida, dificultad: Dificultad, unirseA: Invitacion | null) => {
     const juego = parseGameCode(datos.huella.gameCode).game;
     registrar({
       soullink: false,
@@ -94,25 +152,82 @@ const App = () => {
       juego: juego?.label ?? null,
       generacion: juego?.generacion ?? null,
     });
-    setEligiendo(null);
-    setPartida(datos);
+    setPantalla({tipo: 'jugando', datos, unirseA});
+  };
+
+  const anadirRom = async () => {
+    const rom = await Mgba.elegirRom();
+    releerRoms();
+    return rom;
+  };
+
+  const traer = async () => {
+    setProblema(null);
+    const fichero = await Mgba.abrirFichero().catch(() => null);
+    if (!fichero) return;
+    const traida = leerPaquete(desdeBase64(fichero.base64));
+    if (!traida) {
+      setProblema('Ese fichero no es una partida de Pokemeeting. Tiene que ser el .emupoke que exportaste.');
+      return;
+    }
+    setPantalla({tipo: 'traer', traida});
+  };
+
+  const volverAlInicio = () => {
+    if (invitacionPendiente) {
+      setPantalla({tipo: 'invitado', invitacion: invitacionPendiente});
+      setInvitacionPendiente(null);
+    } else setPantalla({tipo: 'inicio'});
   };
 
   return (
     <SafeAreaView style={estilos.raiz}>
       <StatusBar barStyle="light-content" backgroundColor="#0b0f14" />
-      {partida ? (
+      {pantalla.tipo === 'jugando' ? (
         <Juego
-          partida={partida}
+          partida={pantalla.datos}
+          unirseA={pantalla.unirseA}
+          hayCuenta={cuenta.cuenta !== null}
+          invitacionPendiente={invitacionPendiente !== null}
           onSalir={() => {
             Mgba.cerrar();
-            setPartida(null);
+            volverAlInicio();
           }}
         />
-      ) : eligiendo ? (
-        <ElegirDificultad onElegir={d => apuntar(eligiendo, d)} />
+      ) : pantalla.tipo === 'reglas' ? (
+        <ElegirDificultad onElegir={d => apuntar(pantalla.datos, d, pantalla.unirseA)} />
+      ) : pantalla.tipo === 'aleatorizar' ? (
+        <Aleatorizar roms={roms} onListo={rom => void abrir(rom)} onVolver={() => setPantalla({tipo: 'inicio'})} />
+      ) : pantalla.tipo === 'invitado' ? (
+        <Invitado
+          invitacion={pantalla.invitacion}
+          roms={roms}
+          onAnadirRom={() => void anadirRom()}
+          onListo={rom => void abrir(rom, pantalla.invitacion)}
+          onVolver={() => setPantalla({tipo: 'inicio'})}
+        />
+      ) : pantalla.tipo === 'traer' ? (
+        <Traer
+          traida={pantalla.traida}
+          roms={roms}
+          onAnadirRom={() => void anadirRom()}
+          onListo={rom => void abrir(rom)}
+          onVolver={() => setPantalla({tipo: 'inicio'})}
+        />
       ) : (
-        <Inicio onAbrir={rom => void abrir(rom)} cargando={cargando} problema={problema} />
+        <Inicio
+          roms={roms}
+          cuenta={cuenta}
+          onAbrir={rom => void abrir(rom)}
+          onAnadir={async () => {
+            const rom = await anadirRom();
+            if (rom) void abrir(rom);
+          }}
+          onAleatorizar={() => setPantalla({tipo: 'aleatorizar'})}
+          onTraer={() => void traer()}
+          cargando={cargando}
+          problema={problema}
+        />
       )}
     </SafeAreaView>
   );
@@ -139,48 +254,176 @@ const ElegirDificultad = ({onElegir}: {onElegir: (d: Dificultad) => void}) => (
   </ScrollView>
 );
 
+/** Que es cada ROM de la lista: su partida apuntada, si la tiene. */
+const etiquetaDe = (rom: Rom, partidas: PartidaGuardada[]) => {
+  const p = partidas.find(x => x.fichero === rom.nombre);
+  if (!p) return {titulo: rom.nombre, detalle: null};
+  const reglas = DIFICULTADES.find(d => d.id === reglasDe(p))?.nombre ?? '';
+  const aleatoria = p.semilla !== null;
+  return {
+    titulo: aleatoria ? `${juegoDePartida(p)} · ${nombreDePartida(p)}` : juegoDePartida(p),
+    detalle: [aleatoria ? 'Aleatoria' : 'Tal cual', reglas, p.soullink ? 'Soul Link' : null, cuando(p.jugada)]
+      .filter(Boolean)
+      .join(' · '),
+  };
+};
+
 const Inicio = ({
+  roms,
+  cuenta,
   onAbrir,
+  onAnadir,
+  onAleatorizar,
+  onTraer,
   cargando,
   problema,
 }: {
+  roms: Rom[];
+  cuenta: EstadoDeCuenta;
   onAbrir: (rom: Rom) => void;
+  onAnadir: () => void;
+  onAleatorizar: () => void;
+  onTraer: () => void;
   cargando: boolean;
   problema: string | null;
 }) => {
-  const [roms, setRoms] = useState<Rom[]>([]);
-  useEffect(() => {
-    void Mgba.romsGuardadas().then(setRoms);
-  }, []);
+  const partidas = todasLasPartidas();
+  // Lo jugado hace poco, arriba; lo que no tiene partida, detras.
+  const orden = (r: Rom) => partidas.find(p => p.fichero === r.nombre)?.jugada ?? 0;
+  const lista = [...roms].sort((a, b) => orden(b) - orden(a));
 
   return (
     <ScrollView contentContainerStyle={estilos.inicio}>
       <Text style={estilos.marca}>Pokemeeting</Text>
       <Text style={estilos.nota}>
-        Elige tu ROM. Se queda en este telefono: no se sube a ningun sitio ni se le manda a nadie.
+        Tus ROMs se quedan en este teléfono: no se suben a ningún sitio ni se le mandan a nadie.
       </Text>
-      <Boton
-        texto={cargando ? 'Abriendo…' : 'Elegir una ROM'}
-        principal
-        onPress={async () => {
-          const rom = await Mgba.elegirRom();
-          if (rom) onAbrir(rom);
-        }}
-      />
+      <Boton texto={cargando ? 'Abriendo…' : 'Añadir una ROM'} principal onPress={onAnadir} />
+      <View style={estilos.fila}>
+        <View style={estilos.mitad}>
+          <Boton texto="Aleatorizar" onPress={onAleatorizar} />
+        </View>
+        <View style={estilos.mitad}>
+          <Boton texto="Traer partida" onPress={onTraer} />
+        </View>
+      </View>
       {problema && <Text style={estilos.error}>{problema}</Text>}
-      {roms.length > 0 && <Text style={estilos.seccion}>Tus juegos</Text>}
-      {roms.map(rom => (
-        <Boton key={rom.ruta} texto={rom.nombre} onPress={() => onAbrir(rom)} />
-      ))}
+      {lista.length > 0 && <Text style={estilos.seccion}>Tus juegos</Text>}
+      {lista.map(rom => {
+        const {titulo, detalle} = etiquetaDe(rom, partidas);
+        return (
+          <Pressable
+            key={rom.ruta}
+            onPress={() => onAbrir(rom)}
+            style={({pressed}) => [estilos.tarjeta, pressed && {opacity: 0.7}]}>
+            <Text style={estilos.tarjetaTitulo} numberOfLines={1}>
+              {titulo}
+            </Text>
+            {detalle && <Text style={estilos.nota}>{detalle}</Text>}
+          </Pressable>
+        );
+      })}
+      <Text style={estilos.seccion}>Tu cuenta</Text>
+      <PanelDeCuenta cuenta={cuenta} />
     </ScrollView>
   );
 };
 
-const Juego = ({partida, onSalir}: {partida: DatosDePartida; onSalir: () => void}) => {
-  const viva = usePartidaViva(partida, false);
+/** Elegir la ROM original para seguir una partida traida en un .emupoke. */
+const Traer = ({
+  traida,
+  roms,
+  onAnadirRom,
+  onListo,
+  onVolver,
+}: {
+  traida: PartidaTraida;
+  roms: Rom[];
+  onAnadirRom: () => void;
+  onListo: (rom: Rom) => void;
+  onVolver: () => void;
+}) => {
+  const [trabajando, setTrabajando] = useState(false);
+  const [puesto, setPuesto] = useState<PuestoEnCola | null>(null);
+  const [problema, setProblema] = useState<string | null>(null);
+  const bases = roms.filter(r => !/-aleatoria-/.test(r.nombre));
+
+  const usar = async (base: Rom) => {
+    setTrabajando(true);
+    setProblema(null);
+    try {
+      onListo(await traerPartida(base, traida, setPuesto));
+    } catch (error) {
+      setProblema(error instanceof Error ? error.message : String(error));
+    } finally {
+      setTrabajando(false);
+    }
+  };
+
+  return (
+    <ScrollView contentContainerStyle={estilos.inicio}>
+      <Text style={estilos.marca}>Traer «{traida.nombre}»</Text>
+      {trabajando ? (
+        <Text style={estilos.nota}>
+          {puesto && puesto.delante > 0
+            ? `Rehaciendo tu mundo… hay ${puesto.delante} delante.`
+            : 'Rehaciendo tu mundo desde la semilla…'}
+        </Text>
+      ) : (
+        <>
+          <Text style={estilos.nota}>
+            Elige la ROM original con la que se creó: de ella y la semilla sale la misma copia, y ahí se mete tu
+            guardado.
+          </Text>
+          {bases.map(r => (
+            <Boton key={r.ruta} texto={r.nombre} onPress={() => void usar(r)} />
+          ))}
+          <Boton texto="Añadir una ROM" principal={bases.length === 0} onPress={onAnadirRom} />
+          {problema && <Text style={estilos.error}>{problema}</Text>}
+          <Boton texto="Volver" onPress={onVolver} />
+        </>
+      )}
+    </ScrollView>
+  );
+};
+
+const Juego = ({
+  partida,
+  unirseA,
+  hayCuenta,
+  invitacionPendiente,
+  onSalir,
+}: {
+  partida: DatosDePartida;
+  /** Si se llega por un enlace de invitacion: se entra en esa sala sola. */
+  unirseA: Invitacion | null;
+  hayCuenta: boolean;
+  invitacionPendiente: boolean;
+  onSalir: () => void;
+}) => {
+  const viva = usePartidaViva(partida, hayCuenta);
   const {sala, lectura, intercambio} = viva;
   const {equipo} = lectura;
-  const [verSala, setVerSala] = useState(false);
+  const [verSala, setVerSala] = useState(unirseA !== null);
+  const [verEstados, setVerEstados] = useState(false);
+
+  // Por el enlace se entra en la sala sin teclear nada.
+  const unido = useRef(false);
+  useEffect(() => {
+    if (!unirseA || unido.current) return;
+    unido.current = true;
+    sala.unirse(unirseA.sala, unirseA.clave, apodoGuardado());
+  }, [unirseA, sala]);
+
+  // Al terminar con sesion, el final se sube solo para el ranking.
+  useEffect(() => {
+    if (viva.fin.acabada && hayCuenta) void subirLoDeAqui().catch(() => undefined);
+  }, [viva.fin.acabada, hayCuenta]);
+
+  // La semilla de esta partida, para que quien entre rehaga el mismo mundo.
+  const registro = todasLasPartidas().find(p => p.fichero === partida.fichero);
+  const semillaRegistro = registro ? semillaDePartida(registro) : null;
+  const semilla = semillaRegistro ? codificarSemilla(semillaRegistro) : null;
   const [verLoSuyo, setVerLoSuyo] = useState(false);
   const [menu, setMenu] = useState(false);
   const [verMando, setVerMando] = useState(false);
@@ -285,8 +528,9 @@ const Juego = ({partida, onSalir}: {partida: DatosDePartida; onSalir: () => void
           }}
         />
       )}
+      <Boton texto="Estados y exportar" onPress={() => setVerEstados(true)} />
       <Boton texto="Mando físico" onPress={() => setVerMando(true)} />
-      <Boton texto="Salir del juego" onPress={onSalir} />
+      <Boton texto={invitacionPendiente ? 'Salir (tienes una invitación)' : 'Salir del juego'} onPress={onSalir} />
     </>
   );
 
@@ -321,9 +565,18 @@ const Juego = ({partida, onSalir}: {partida: DatosDePartida; onSalir: () => void
           <Text style={estilos.botonMenuTexto}>☰</Text>
         </Pressable>
 
-        {(menu || verSala || verMando) && (
+        {(menu || verSala || verMando || verEstados) && (
           <View style={estilos.velo}>
-            {verMando ? (
+            {verEstados ? (
+              <PanelDeEstados
+                fichero={partida.fichero}
+                titulo={partida.huella.title}
+                onCerrar={() => {
+                  setVerEstados(false);
+                  setMenu(false);
+                }}
+              />
+            ) : verMando ? (
               <PanelDelMando
                 onCerrar={() => {
                   setVerMando(false);
@@ -333,6 +586,8 @@ const Juego = ({partida, onSalir}: {partida: DatosDePartida; onSalir: () => void
             ) : verSala ? (
               <PanelDeSala
                 sala={sala}
+                semilla={semilla}
+                juego={registro?.juego ?? partida.huella.title}
                 onCerrar={() => {
                   setVerSala(false);
                   setMenu(false);
@@ -382,15 +637,22 @@ const Juego = ({partida, onSalir}: {partida: DatosDePartida; onSalir: () => void
         )}
       </View>
 
-      {menu ? (
+      {menu && !verEstados ? (
         <ScrollView contentContainerStyle={estilos.panel}>
           {opcionesDelMenu(() => setMenu(false))}
           <Boton texto="Volver al juego" principal onPress={() => setMenu(false)} />
         </ScrollView>
+      ) : verEstados ? (
+        <PanelDeEstados fichero={partida.fichero} titulo={partida.huella.title} onCerrar={() => setVerEstados(false)} />
       ) : verMando ? (
         <PanelDelMando onCerrar={() => setVerMando(false)} />
       ) : verSala ? (
-        <PanelDeSala sala={sala} onCerrar={() => setVerSala(false)} />
+        <PanelDeSala
+          sala={sala}
+          semilla={semilla}
+          juego={registro?.juego ?? partida.huella.title}
+          onCerrar={() => setVerSala(false)}
+        />
       ) : (
         <>
           <Medallas medallas={lectura.medallas} topes={viva.topes} siguiente={viva.tope} />
@@ -428,6 +690,8 @@ const estilos = StyleSheet.create({
   error: {color: '#ee1515', fontSize: 14},
   tarjeta: {padding: 14, gap: 6, borderRadius: 14, borderWidth: 1, borderColor: '#26313d', backgroundColor: '#131a22'},
   tarjetaTitulo: {color: '#e8eef5', fontSize: 16, fontWeight: '700'},
+  fila: {flexDirection: 'row', gap: 8},
+  mitad: {flex: 1},
   juego: {flex: 1},
   barra: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, height: 44},
   barraDerecha: {flexDirection: 'row', alignItems: 'center', gap: 16},

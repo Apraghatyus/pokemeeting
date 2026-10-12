@@ -125,7 +125,8 @@ export const App = () => {
   const [tratoOpen, setTratoOpen] = useState(false);
   const [randomizerOpen, setRandomizerOpen] = useState(false);
   const [cuentaOpen, setCuentaOpen] = useState(false);
-  const [rankingOpen, setRankingOpen] = useState(false);
+  // La app de Android manda aqui con #ranking para ver la clasificacion.
+  const [rankingOpen, setRankingOpen] = useState(() => globalThis.location?.hash === '#ranking');
   const [mapaOpen, setMapaOpen] = useState(false);
 
   // Quien eres, si es que has entrado. No hace falta para jugar: si el

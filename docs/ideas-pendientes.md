@@ -110,7 +110,11 @@ ejecútala en vez de fiarte de esta lista.
   contra el mismo servidor de salas viendo la pantalla del compañero, y el
   equipo de los dos con sprites. En horizontal, como la web.
 - **Mandos físicos**, con la misma tabla que la web y reasignables desde su
-  panel. Ver la sección de la aplicación más abajo para lo que le falta.
+  panel.
+- **A la par con la web**: mandar pantalla y voz, reconexión, medallas, reglas
+  de cada dificultad, Soul Link, intercambios, motes, aleatorizar, enlace de
+  invitación, cuentas y ranking, estados y `.emupoke`. Ver la sección de la
+  aplicación más abajo para lo que le falta (probarla y firmarla).
 
 **Montarlo**
 
@@ -594,7 +598,7 @@ mGBA**. Otro núcleo significa rehacer todo eso.
 
 ---
 
-## Una aplicación propia para el móvil (APK) — PRIMERA VERSIÓN HECHA
+## Una aplicación propia para el móvil (APK) — HECHA, FALTA PROBARLA Y FIRMARLA
 
 **Dónde está.** En `movil/`: React Native con mGBA nativo. Se hizo saltándose el
 orden sensato de abajo (el Worker primero), por decisión explícita. Lo que hay:
@@ -607,22 +611,39 @@ orden sensato de abajo (el Worker primero), por decisión explícita. Lo que hay
   físicos reasignables.
 - La APK la compila GitHub Actions y va firmada con la clave de depuración.
 
-**Lo que le falta a la aplicación**, frente a la web:
+**Hecho en la app** (casi a la par con la web, compila y empaqueta, sin probar
+en un teléfono):
 
-1. **Probarla en un teléfono de verdad.** Compila, pero nadie la ha abierto
-   todavía en un móvil: ni el sonido, ni la velocidad en un aparato flojo, ni el
-   vídeo del compañero encima de la partida, ni un mando Bluetooth.
-2. **Mandar lo propio.** Hoy solo recibe: el compañero no ve tu pantalla ni oye
-   tu voz.
-3. **Reconexión** cuando se cae la sala.
-4. **Medallas, tope de nivel y cartel de fin de partida.**
-5. **Dificultades**: avisos de TIPO, RUTA y REVIVIDO.
-6. **Intercambios.**
-7. **Aleatorizar desde la app** y entrar por un enlace de invitación.
-8. **Cuentas**: entrar y subir los finales al ranking.
-9. **Guardar y cargar estados**, y llevarse la partida entre la web y la app.
-10. **Clave de firma propia y forma de repartirla**, que fuera de la tienda
-    sigue siendo instalar un APK a mano.
+- Manda su pantalla (pista de WebRTC propia a 30 fps) y su voz, con micro,
+  silenciar al compañero y dejar de mandar vídeo. Reconexión sola como la web.
+- Medallas, tope de nivel, cartel de fin de partida, dificultades con las
+  reglas que se hacen cumplir (centro, revivir, líder, Poké Ball, primera
+  captura, tipo repetido), pregunta de Soul Link ligada a la cuenta del
+  compañero, intercambios y cambio de mote. Es el mismo código de
+  `apps/web/src/core`, con `localStorage` puesto sobre SharedPreferences.
+- Aleatorizar desde la app (mismo servicio y cola), lista de partidas con su
+  juego, reglas y modo.
+- El enlace de invitación de la web abre la app: pregunta a la sala, rehace el
+  mismo mundo con tu ROM y entra sola. Desde la sala se comparte el enlace.
+- Cuentas: entrar, crear, subir partidas y finales (también al terminar) y ver
+  el ranking (abre la web en `#ranking`).
+- Estados en tres ranuras y exportar/importar `.emupoke`, el mismo fichero que
+  la web: la partida pasa de la web a la app y al revés.
+
+**Lo que le falta a la aplicación:**
+
+1. **Probarla en un teléfono de verdad.** Nadie la ha abierto todavía en un
+   móvil: sonido, velocidad en un aparato flojo, vídeo y voz en los dos
+   sentidos, mando Bluetooth, enlace de invitación, aleatorizar, importar.
+2. **Clave de firma propia y forma de repartirla.** Sigue firmada con la clave
+   de depuración. Falta: que el workflow firme con una clave guardada en los
+   secretos del repositorio, publicar la APK como Release al etiquetar, y un
+   enlace "Descargar la app" en la web. Para que el enlace de invitación abra
+   la app sin preguntar hace falta además `/.well-known/assetlinks.json` en el
+   servidor con la huella de esa clave (hoy Android pregunta con qué abrirlo).
+3. **Detalles menores**: al entrar por enlace, el botón "Compartir invitación"
+   no aparece (la contraseña no se guarda en el panel); los estados se pueden
+   cargar en Nuzlocke igual que en la web, sin restricción.
 
 Lo de abajo es el razonamiento con el que se planteó, y sigue valiendo.
 

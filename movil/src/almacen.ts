@@ -46,3 +46,6 @@ const almacen: Storage = {
 if (!(globalThis as {localStorage?: Storage}).localStorage) {
   (globalThis as {localStorage?: Storage}).localStorage = almacen;
 }
+
+// Y donde estan los servicios: la app no tiene pagina de la que sacarlo.
+(globalThis as {EMUPOKE_ORIGEN?: string}).EMUPOKE_ORIGEN = 'https://emupoke.aguaquim.com';

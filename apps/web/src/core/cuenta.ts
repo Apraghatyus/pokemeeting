@@ -26,9 +26,10 @@ export type { Cuenta };
  *
  * Siempre en el mismo origen desde el que se sirvio la pagina, igual que las
  * salas. Asi la galleta es de este sitio y no hace falta permiso de origen
- * cruzado para nada.
+ * cruzado para nada. La app de Android no tiene pagina: pone el origen en
+ * `EMUPOKE_ORIGEN` y la galleta la guarda su cliente HTTP.
  */
-const RAIZ = '/cuentas';
+const RAIZ = `${(globalThis as { EMUPOKE_ORIGEN?: string }).EMUPOKE_ORIGEN ?? ''}/cuentas`;
 
 /** Lo que devuelve el servidor cuando algo sale mal. */
 export class FalloDeCuenta extends Error {}

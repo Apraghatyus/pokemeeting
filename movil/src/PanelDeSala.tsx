@@ -2,14 +2,27 @@
 // la reconexion. Igual que "Jugar con un amigo" en la web.
 
 import {useState} from 'react';
-import {ScrollView, StyleSheet, Text, TextInput} from 'react-native';
+import {ScrollView, Share, StyleSheet, Text, TextInput} from 'react-native';
+import {apodoGuardado, guardarApodo} from '../../apps/web/src/core/apodo';
+import {enlaceDeInvitacion} from './config';
 import {Boton} from './Boton';
 import {MAX_REINTENTOS, type useSala} from './sala';
 
-export const PanelDeSala = ({sala, onCerrar}: {sala: ReturnType<typeof useSala>; onCerrar: () => void}) => {
+export const PanelDeSala = ({
+  sala,
+  semilla,
+  juego,
+  onCerrar,
+}: {
+  sala: ReturnType<typeof useSala>;
+  /** La semilla de la partida: con ella quien entre rehace el mismo mundo. */
+  semilla: string | null;
+  juego: string | null;
+  onCerrar: () => void;
+}) => {
   const [codigo, setCodigo] = useState('');
   const [clave, setClave] = useState('');
-  const [apodo, setApodo] = useState('');
+  const [apodo, setApodo] = useState(() => apodoGuardado() ?? '');
   const {estado} = sala;
 
   if (estado.fase !== 'sin-sala') {
@@ -35,6 +48,22 @@ export const PanelDeSala = ({sala, onCerrar}: {sala: ReturnType<typeof useSala>;
           </>
         )}
         {estado.codigo && <Text style={estilos.codigo}>{estado.codigo}</Text>}
+        {estado.codigo && clave !== '' && (
+          <Boton
+            texto="Compartir invitación"
+            principal={estado.fase !== 'conectada'}
+            onPress={() =>
+              void Share.share({
+                message: [
+                  `Juega conmigo: ${enlaceDeInvitacion(estado.codigo!, clave)}`,
+                  `Sala: ${estado.codigo}`,
+                  `Contraseña: ${clave}`,
+                  `Necesitas tu propia copia de ${juego ?? 'el juego'}: el enlace no la lleva.`,
+                ].join('\n'),
+              })
+            }
+          />
+        )}
         <Text style={estilos.nota}>
           Tu compañero entra con este codigo y la contraseña, desde otro telefono o desde
           emupoke.aguaquim.com.
@@ -81,10 +110,18 @@ export const PanelDeSala = ({sala, onCerrar}: {sala: ReturnType<typeof useSala>;
     <ScrollView contentContainerStyle={estilos.panel}>
       <TextInput style={estilos.campo} placeholder="Tu apodo" placeholderTextColor="#8b9aab" value={apodo} onChangeText={setApodo} maxLength={17} />
       <TextInput style={estilos.campo} placeholder="Contraseña de la sala" placeholderTextColor="#8b9aab" value={clave} onChangeText={setClave} secureTextEntry />
-      <Boton texto="Crear sala" principal onPress={() => clave && sala.crear(clave, apodo || null)} />
+      <Boton texto="Crear sala" principal onPress={() => {
+          if (!clave) return;
+          if (apodo) guardarApodo(apodo);
+          sala.crear(clave, apodo || null, semilla);
+        }} />
       <Text style={estilos.seccion}>O entra en una</Text>
       <TextInput style={estilos.campo} placeholder="Codigo (6 letras)" placeholderTextColor="#8b9aab" value={codigo} onChangeText={setCodigo} autoCapitalize="characters" maxLength={6} />
-      <Boton texto="Entrar" onPress={() => codigo && clave && sala.unirse(codigo, clave, apodo || null)} />
+      <Boton texto="Entrar" onPress={() => {
+          if (!codigo || !clave) return;
+          if (apodo) guardarApodo(apodo);
+          sala.unirse(codigo, clave, apodo || null);
+        }} />
       {estado.error && <Text style={estilos.error}>{estado.error}</Text>}
       <Boton texto="Volver al juego" onPress={onCerrar} />
     </ScrollView>
