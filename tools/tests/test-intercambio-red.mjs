@@ -84,5 +84,10 @@ check('un "listo" sin trato no pasa', leer({ type: 'trato-listo' }) === null);
 check('un tipo que no existe no pasa', leer({ type: 'otra-cosa', trato: 'a' }) === null);
 check('y basura tampoco', parsePeerMessage('{{{') === null);
 
+// --- el aviso de pantalla apagada, que viaja por el mismo canal ---
+check('el aviso de pantalla se entiende', leer({ type: 'video', enviando: false })?.enviando === false);
+check('sin el dato no se inventa', leer({ type: 'video' }) === null);
+check('y un dato que no es si o no se descarta', leer({ type: 'video', enviando: 'no' }) === null);
+
 console.log(fallos === 0 ? '\nLO QUE SE ESCRIBE EN UNA PARTIDA SE MIRA ANTES' : `\n${fallos} COMPROBACIONES FALLIDAS`);
 process.exit(fallos === 0 ? 0 : 1);

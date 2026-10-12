@@ -44,6 +44,8 @@ type Props = {
   };
   teclas: Teclas;
   mando: MandoTactil;
+  /** Si este aparato manda su pantalla al companero. */
+  video: { enviando: boolean; cambiar: (enviar: boolean) => void };
   hasRom: boolean;
   conCompanero: boolean;
   /**
@@ -88,6 +90,7 @@ export const AjustesModal = ({
   emulator,
   teclas,
   mando,
+  video,
   hasRom,
   conCompanero,
   onAleatorizar,
@@ -213,6 +216,37 @@ export const AjustesModal = ({
               </div>
             </div>
           </div>
+
+          {/* En un movil que no da abasto, mandar la partida a 60 por segundo
+              es lo que mas cuesta despues de emularla. Sin ella siguen el
+              equipo, la voz y todo lo demas. */}
+          <div className="teclas">
+            <div className="teclas__fila teclas__fila--ancha">
+              <span className="teclas__que">Enviar mi pantalla</span>
+              <div className="modos">
+                {[
+                  { valor: true, etiqueta: 'Si' },
+                  { valor: false, etiqueta: 'No' },
+                ].map(({ valor, etiqueta }) => (
+                  <button
+                    key={etiqueta}
+                    type="button"
+                    className={video.enviando === valor ? 'is-active' : undefined}
+                    aria-pressed={video.enviando === valor}
+                    onClick={() => video.cambiar(valor)}
+                  >
+                    {etiqueta}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          {!video.enviando && (
+            <p className="hint">
+              Tu compañero no ve tu partida, pero sí tu equipo y tu voz. Útil si el móvil va
+              lento.
+            </p>
+          )}
 
           {teclas.problema && <p className="warn">{teclas.problema}</p>}
         </section>

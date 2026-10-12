@@ -461,6 +461,21 @@ body {
   pointer-events: none;
 }
 
+/* El companero no manda su pantalla: se dice encima del ultimo fotograma. */
+.pantalla__sin-video {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  background: rgba(11, 15, 20, 0.82);
+  color: var(--muted);
+  font-family: var(--tipo-texto);
+  font-size: 13px;
+  text-align: center;
+}
+
 .pantalla--pequena .pantalla__etiqueta {
   top: 6px;
   left: 6px;

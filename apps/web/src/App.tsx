@@ -488,6 +488,7 @@ export const App = () => {
           mirandoLoSuyo={verSuPantalla}
           onCambiarPantalla={cambiarDePantalla}
           canvasRef={emulator.canvasRef}
+          companeroSinVideo={session.state.peerSinVideo}
           remoteStream={session.state.remoteStream}
           /* Su apodo, si lo dijo al entrar en la sala. El nombre del fichero
              de su ROM no sale nunca: no le dice nada a nadie y ademas delata
@@ -640,6 +641,7 @@ export const App = () => {
           emulator={emulator}
           teclas={teclas}
           mando={mando}
+          video={{ enviando: session.enviandoVideo, cambiar: session.cambiarEnvioDeVideo }}
           hasRom={hasRom}
           conCompanero={conCompanero}
           onAleatorizar={() => {

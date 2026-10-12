@@ -71,6 +71,9 @@ export class PeerLink {
   #channel: RTCDataChannel | null = null;
   /** Temporizador del parpadeo, si hay uno en marcha. */
   #gracia: ReturnType<typeof setTimeout> | null = null;
+  /** Por donde sale la pantalla, y que pista es, para poder apagarla y volver. */
+  #videoEmisor: RTCRtpSender | null = null;
+  #videoPista: MediaStreamTrack | null = null;
 
   constructor(handlers: PeerHandlers, localStream: MediaStream | null) {
     this.#handlers = handlers;
@@ -81,7 +84,11 @@ export class PeerLink {
     if (localStream) {
       for (const track of localStream.getTracks()) {
         const emisor = this.#pc.addTrack(track, localStream);
-        if (track.kind === 'video') void this.#ajustarVideo(emisor);
+        if (track.kind === 'video') {
+          this.#videoEmisor = emisor;
+          this.#videoPista = track;
+          void this.#ajustarVideo(emisor);
+        }
       }
     }
 
@@ -176,6 +183,18 @@ export class PeerLink {
    */
   async setVoiceTrack(track: MediaStreamTrack | null): Promise<void> {
     await this.#voiceTransceiver()?.sender.replaceTrack(track);
+  }
+
+  /**
+   * Manda o deja de mandar la pantalla.
+   *
+   * Con replaceTrack sobre el hueco ya negociado, igual que el microfono: sin
+   * pista el navegador deja de codificar, que es justo lo que le sobra a un
+   * movil flojo, y volver a encenderla no pide renegociar nada.
+   */
+  async setVideoEnviado(enviar: boolean): Promise<void> {
+    if (!this.#videoEmisor) return;
+    await this.#videoEmisor.replaceTrack(enviar ? this.#videoPista : null);
   }
 
   /**
