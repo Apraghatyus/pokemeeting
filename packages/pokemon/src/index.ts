@@ -8,6 +8,7 @@ export * from './compatibility';
 export * from './savestate';
 export * from './gen3';
 export * from './evoluciones';
+export * from './dex';
 export * from './texto';
 export * from './rom';
 export * from './equipo';

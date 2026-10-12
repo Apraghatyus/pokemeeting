@@ -12,6 +12,7 @@
 
 import { useEffect, useMemo, useRef } from 'react';
 import {
+  nacionalDeGen3,
   encontrarTablaDex,
   encontrarTablaEstadisticas,
   encontrarTablaMovimientos,
@@ -91,10 +92,14 @@ export const useEspecies = (
         asegurar();
         return nombresRef.current?.(especie) ?? `#${especie}`;
       },
-      // Sin tabla, 0: quien pinta el sprite sabe que entonces no hay sprite.
+      // Sin ROM, la tabla fija de tercera generacion. No es inventarse nada:
+      // esa numeracion es parte del juego y no la toca el aleatorizador, asi
+      // que es la misma que se leeria del fichero. Hace falta porque el ranking
+      // enseña equipos de partidas de otra gente y se mira tanto jugando como
+      // sin jugar: sin esto, ahi no habia sprites.
       nacional: (especie: number) => {
         asegurar();
-        return dexRef.current?.(especie) ?? 0;
+        return dexRef.current?.(especie) ?? nacionalDeGen3(especie);
       },
       tipos: (especie: number) => {
         asegurar();
