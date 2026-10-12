@@ -108,8 +108,12 @@ export const seCuroElEquipo = (antes: Lectura | null, ahora: Lectura): boolean =
 /** Quien no puede salir del Centro contigo, y por que. */
 const quienNoPuedeSalir = (lectura: Lectura, reglas: ReglasDelCentro): string | null => {
   for (const p of vivos(lectura.equipo)) {
-    if (reglas.muertoEsMuerto && p.estado === 'debilitado' && reglas.muertos.includes(p.personalidad)) {
-      return `No puedes salir del Centro con ${nombre(p)} debilitado. Déjalo en el PC o libéralo.`;
+    // Muerto aunque ahora este en pie: dejarlo en el PC y sacarlo le devuelve
+    // la vida en el juego, pero para el reto sigue muerto.
+    if (reglas.muertoEsMuerto && reglas.muertos.includes(p.personalidad)) {
+      return p.estado === 'debilitado'
+        ? `No puedes salir del Centro con ${nombre(p)} debilitado. Déjalo en el PC o libéralo.`
+        : `No puedes salir del Centro con ${nombre(p)}: está muerto aunque lo hayas sacado del PC. Déjalo en el PC o libéralo.`;
     }
     if (reglas.tiposRepetidos && p.tipos && reglas.tiposRepetidos.has(p.tipos[0])) {
       return `No puedes salir del Centro con ${nombre(p)}: su tipo primario ya lo lleva otro Pokémon de los equipos. Déjalo en el PC.`;
@@ -146,6 +150,19 @@ export const juzgarCentro = (
             : `${nombre(revivido)} está muerto: no se puede revivir. Déjalo en el PC o libéralo.`,
         atras: ATRAS_CURA,
       };
+    }
+
+    // Un muerto en el equipo aunque este en pie: el PC le devuelve la vida al
+    // sacarlo, y asi no se veria nunca el paso de debilitado a en pie. La
+    // enfermera no atiende igual.
+    if (seCuroElEquipo(antes, ahora)) {
+      const muerto = vivos(ahora.equipo).find((p) => reglas.muertos.includes(p.personalidad));
+      if (muerto) {
+        return {
+          motivo: `La enfermera no atiende con ${nombre(muerto)} en el equipo: está muerto aunque lo hayas sacado del PC. Déjalo en el PC o libéralo antes de curar.`,
+          atras: ATRAS_CURA,
+        };
+      }
     }
   }
 

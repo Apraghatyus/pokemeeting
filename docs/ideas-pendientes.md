@@ -1662,8 +1662,8 @@ Excepción a "se avisa, no se impide", pedida a propósito. Con el reto vivo:
 
 | Regla | Dificultad | Qué pasa si se rompe |
 |---|---|---|
-| La enfermera no cura con un muerto en el equipo (ni vale revivirlo con un objeto) | Nuzlocke, Nivelada | Se vuelve a antes de hablar con ella |
-| No se sale del Centro con un muerto | Nuzlocke, Nivelada | Se vuelve a justo antes de salir |
+| La enfermera no cura con un muerto en el equipo, aunque esté en pie porque se sacó del PC (ni vale revivirlo con un objeto) | Nuzlocke, Nivelada | Se vuelve a antes de hablar con ella |
+| No se sale del Centro con un muerto, también si está en pie por haberlo sacado del PC | Nuzlocke, Nivelada | Se vuelve a justo antes de salir |
 | No se sale del Centro con un Pokémon de tipo primario repetido entre los equipos (su ficha sale apagada) | Nivelada | Se vuelve a justo antes de salir |
 | No se pelea contra el siguiente líder con alguien por encima de su tope | Nivelada | Se vuelve a antes del combate |
 | Solo el primer encuentro de cada zona: si no se captura, se pierde. Si es de una familia que ya llevas en el equipo, no cuenta y vale el siguiente | Nuzlocke, Nivelada | Capturar otro se deshace volviendo a antes de ese combate |

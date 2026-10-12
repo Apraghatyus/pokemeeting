@@ -91,6 +91,21 @@ check(
   juzgarCentro(conMuerto, curados, { ...centroReglas, muertoEsMuerto: false }) === null,
 );
 
+// --- un muerto sacado del PC: en pie, pero muerto ---
+const sacadoDelPC = lectura(centro, [pk(1, 'BULBA', { ps: 10 }), pk(2, 'PIDGEY')]);
+const curaConSacado = juzgarCentro(sacadoDelPC, lectura(centro, [pk(1, 'BULBA'), pk(2, 'PIDGEY')]), centroReglas);
+check(
+  'la enfermera tampoco cura con un muerto sacado del PC',
+  curaConSacado?.motivo.includes('PIDGEY') === true && curaConSacado?.atras >= 8,
+  curaConSacado?.motivo,
+);
+const salirConSacado = juzgarCentro(
+  lectura(centro, [pk(1, 'BULBA'), pk(2, 'PIDGEY')]),
+  lectura(calle, [pk(1, 'BULBA'), pk(2, 'PIDGEY')]),
+  centroReglas,
+);
+check('ni se sale del Centro con el', salirConSacado?.motivo.includes('PIDGEY') === true, salirConSacado?.motivo);
+
 // --- salir del Centro ---
 const dentroConMuerto = lectura(centro, [pk(1, 'BULBA'), pk(2, 'PIDGEY', { ps: 0 })]);
 const fueraConMuerto = lectura(calle, [pk(1, 'BULBA'), pk(2, 'PIDGEY', { ps: 0 })]);
