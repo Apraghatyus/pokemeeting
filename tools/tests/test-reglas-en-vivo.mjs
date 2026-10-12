@@ -15,7 +15,15 @@
 import { pathToFileURL } from 'node:url';
 
 const desde = (ruta) => import(pathToFileURL(`${process.cwd()}/${ruta}`).href);
-const { juzgarCentro, juzgarLider, juzgarCaptura, apuntarEncuentro, seCuroElEquipo, ENCUENTROS_VACIOS } =
+const {
+  juzgarCentro,
+  juzgarLider,
+  juzgarCaptura,
+  apuntarEncuentro,
+  seCuroElEquipo,
+  revividoConObjeto,
+  ENCUENTROS_VACIOS,
+} =
   await desde('apps/web/src/core/reglasEnVivo.ts');
 const { rivalEnCombate, familiasEvolutivas, TAMANO_ESTADO, REGIONES } = await desde(
   'packages/pokemon/src/index.ts',
@@ -68,13 +76,17 @@ check('la cura se reconoce', seCuroElEquipo(conMuerto, curados));
 const cura = juzgarCentro(conMuerto, curados, centroReglas);
 check('la enfermera no cura con un muerto', cura?.motivo.includes('enfermera') === true, cura?.motivo);
 check('y se vuelve a antes de hablar con ella', cura?.atras >= 8);
+// Con un Revivir si: es la unica forma de volver.
+const conRevivir = [
+  lectura(ruta, [pk(1, 'BULBA', { ps: 10 }), pk(2, 'PIDGEY', { ps: 0 })]),
+  lectura(ruta, [pk(1, 'BULBA', { ps: 10 }), pk(2, 'PIDGEY', { ps: 15 })]),
+];
+check('revivir con un objeto no se deshace', juzgarCentro(...conRevivir, centroReglas) === null);
+check('y deja de estar muerto', revividoConObjeto(...conRevivir, centroReglas) === 2);
+check('la cura de la enfermera no cuenta como Revivir', revividoConObjeto(conMuerto, curados, centroReglas) === null);
 check(
-  'revivir con un objeto tampoco',
-  juzgarCentro(
-    lectura(ruta, [pk(2, 'PIDGEY', { ps: 0 })]),
-    lectura(ruta, [pk(2, 'PIDGEY', { ps: 15 })]),
-    centroReglas,
-  )?.motivo.includes('no se puede revivir') === true,
+  'un Revivir en Normal no hace nada',
+  revividoConObjeto(...conRevivir, { ...centroReglas, muertoEsMuerto: false }) === null,
 );
 check(
   'curar sin muertos, adelante',

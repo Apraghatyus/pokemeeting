@@ -122,6 +122,30 @@ const quienNoPuedeSalir = (lectura: Lectura, reglas: ReglasDelCentro): string | 
   return null;
 };
 
+/**
+ * Un muerto que se levanta con un Revivir: la unica forma de volver.
+ *
+ * Se reconoce porque se levanta EL y no el equipo entero, que es lo que hace
+ * la enfermera. Devuelve su personalidad, para quitarlo de los muertos.
+ */
+export const revividoConObjeto = (
+  antes: Lectura | null,
+  ahora: Lectura,
+  reglas: ReglasDelCentro,
+): number | null => {
+  if (!antes || !reglas.muertoEsMuerto || seCuroElEquipo(antes, ahora)) return null;
+  const previos = new Map(vivos(antes.equipo).map((p) => [p.personalidad, p]));
+  const revivido = vivos(ahora.equipo).find((p) => {
+    const previo = previos.get(p.personalidad);
+    return (
+      p.estado !== 'debilitado' &&
+      previo?.estado === 'debilitado' &&
+      reglas.muertos.includes(p.personalidad)
+    );
+  });
+  return revivido?.personalidad ?? null;
+};
+
 /** Las dos reglas del Centro: curar y salir. */
 export const juzgarCentro = (
   antes: Lectura | null,
@@ -130,8 +154,10 @@ export const juzgarCentro = (
 ): Veredicto | null => {
   if (!antes) return null;
 
-  // --- un muerto que vuelve a estar en pie ---
-  if (reglas.muertoEsMuerto) {
+  // --- un muerto que vuelve a estar en pie, por la enfermera ---
+  // Con un Revivir si se puede: eso lo resuelve `revividoConObjeto`, que se
+  // mira antes. Lo que llega aqui es la cura del equipo entero.
+  if (reglas.muertoEsMuerto && seCuroElEquipo(antes, ahora)) {
     const previos = new Map(vivos(antes.equipo).map((p) => [p.personalidad, p]));
     const revivido = vivos(ahora.equipo).find((p) => {
       const previo = previos.get(p.personalidad);
@@ -142,12 +168,8 @@ export const juzgarCentro = (
       );
     });
     if (revivido) {
-      const enElCentro = ahora.mapa !== null && esCentro(ahora.mapa, reglas.disposicionDelCentro);
       return {
-        motivo:
-          enElCentro || seCuroElEquipo(antes, ahora)
-            ? `La enfermera no atiende con ${nombre(revivido)} debilitado en el equipo. Déjalo en el PC o libéralo antes de curar.`
-            : `${nombre(revivido)} está muerto: no se puede revivir. Déjalo en el PC o libéralo.`,
+        motivo: `La enfermera no atiende con ${nombre(revivido)} debilitado en el equipo. Usa un Revivir, o déjalo en el PC o libéralo antes de curar.`,
         atras: ATRAS_CURA,
       };
     }
@@ -159,7 +181,7 @@ export const juzgarCentro = (
       const muerto = vivos(ahora.equipo).find((p) => reglas.muertos.includes(p.personalidad));
       if (muerto) {
         return {
-          motivo: `La enfermera no atiende con ${nombre(muerto)} en el equipo: está muerto aunque lo hayas sacado del PC. Déjalo en el PC o libéralo antes de curar.`,
+          motivo: `La enfermera no atiende con ${nombre(muerto)} en el equipo: está muerto aunque lo hayas sacado del PC. Solo vuelve con un Revivir; si no, déjalo en el PC o libéralo antes de curar.`,
           atras: ATRAS_CURA,
         };
       }

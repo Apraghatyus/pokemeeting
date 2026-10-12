@@ -14,6 +14,7 @@ import {
   juzgarLider,
   leerDisposicionDelCentro,
   leerEncuentros,
+  revividoConObjeto,
   seCuroElEquipo,
   type MemoriaDeEncuentros,
 } from './core/reglasEnVivo';
@@ -509,12 +510,24 @@ export const App = () => {
     const propio = infracciones.memoria.propio;
 
     // --- Centro: curar y salir ---
-    const delCentro = juzgarCentro(antes, ahora, {
+    const reglasDelCentro = {
       muertoEsMuerto: reglas.muertoEsMuerto,
       muertos: infracciones.memoria.muertos,
       tiposRepetidos: reglas.tipoPrimarioUnico ? (tiposRepetidos ?? null) : null,
       disposicionDelCentro: codigoJuego ? leerDisposicionDelCentro(codigoJuego) : null,
-    });
+    };
+    // Un Revivir es la unica forma de volver: ese deja de estar muerto.
+    const resucitado = revividoConObjeto(antes, ahora, reglasDelCentro);
+    if (resucitado !== null) {
+      infracciones.resucitar(resucitado);
+      reglasDelCentro.muertos = reglasDelCentro.muertos.filter((p) => p !== resucitado);
+      const quien = ahora.equipo?.ranuras.find((p) => p.personalidad === resucitado);
+      setAvisoRegla({
+        texto: `${quien?.mote.trim() || 'Tu Pokémon'} ha vuelto con un Revivir: ya no cuenta como muerto.`,
+        tipo: 'info',
+      });
+    }
+    const delCentro = juzgarCentro(antes, ahora, reglasDelCentro);
     if (delCentro) return delCentro;
 
     // --- Nivelada: el lider, con todos dentro del tope ---
