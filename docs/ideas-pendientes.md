@@ -792,6 +792,65 @@ ordenador, asi que habria que mandarle a cada uno lo que su propia copia dice.
 
 ---
 
+## Cambiarle el mote a un Pokémon desde la página
+
+Pulsar un Pokémon de tu equipo, escribirle otro nombre, y que ese nombre quede
+**dentro de la partida**: no una etiqueta nuestra encima del juego, sino el mote
+de verdad, el que se ve al abrir el equipo en el emulador.
+
+### La mitad difícil ya está hecha
+
+Esto no parte de cero, y conviene saberlo antes de calcular lo que cuesta. La
+evolución al intercambiar dejó resuelto justamente este camino:
+
+- **Escribir el mote en el bloque** ya existe: `escribirMote`, en `gen3.ts`. El
+  mote NO va cifrado, así que esta parte ni siquiera toca el checksum.
+- **Meter un bloque cambiado en la partida y devolvérsela al emulador** es lo
+  que hace el intercambio en cada trato, y está probado contra partidas reales.
+- **Esperar a que no haya combate** también: el intercambio ya se niega en
+  mitad de uno, porque cargar un estado editado ahí es como se corrompe una
+  partida. La misma guarda vale aquí.
+
+### Lo que falta, y no es la escritura
+
+**1. Pasar el texto al juego de caracteres.** Hoy sabemos leerlo -`leerTexto`-
+pero no escribirlo: para la evolución se copiaron los bytes de la tabla de
+nombres de la ROM, que ya venían en el formato bueno. Con alguien escribiendo
+hay que hacer el camino de vuelta, y ahí aparecen las preguntas de siempre: qué
+pasa con una letra que no existe en esa tabla, y que el hueco son **10 bytes**,
+no diez caracteres de los nuestros.
+
+**2. EL MOTE ES LA LLAVE DEL SOUL LINK.** Esta es la de verdad, y por sí sola
+decide cómo se hace lo demás. Dos Pokémon están emparejados porque se llaman
+igual: así se sabe que, al caer el de ella, el de él también está muerto. Si uno
+de los dos renombra el suyo y el otro no, **la pareja se rompe en silencio** y
+el reto deja de funcionar sin que nadie se entere.
+
+O sea que no vale con escribir en tu partida. Hay tres salidas y conviene
+elegirla a propósito:
+
+- **Renombrar a los dos a la vez**, mandándoselo al compañero. Es lo que
+  mantiene el reto en pie, y encaja con que ya hay un canal abierto entre las
+  dos partidas.
+- **Dejarlo solo para fuera de una sala**, que es simple y no rompe nada.
+- **Avisar y dejar pasar**, que es lo peor de los dos mundos: el aviso se lee
+  una vez y el reto se queda roto para siempre.
+
+**3. Decir qué es esto.** En el juego los motes los cambia el Tasador de Motes,
+y solo a los Pokémon que capturaste tú: a uno intercambiado no se le puede. Si
+nuestra pantalla deja renombrar cualquiera, está haciendo algo que el juego no
+deja, igual que la evolución forzada. Se puede hacer, pero se dice: es una
+intervención del emulador, no una mecánica del juego.
+
+### Para qué sirve de verdad
+
+En una Soul Link, ponerse de acuerdo en los motes es el primer paso de cada
+captura, y hoy se hace con el Tasador: hay que llegar a su casa, en una ciudad
+concreta, cada vez. Poder hacerlo desde la página quita ese viaje, que no aporta
+nada al reto.
+
+---
+
 ## Segunda generación por dentro
 
 Oro, Plata y Cristal se juegan y se aleatorizan, pero no se les lee el equipo:
