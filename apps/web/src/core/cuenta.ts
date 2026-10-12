@@ -127,19 +127,23 @@ export const subirLoDeAqui = async (): Promise<ResultadoDeSubida> => {
     dificultad: p.dificultad ?? null,
   }));
 
-  const finales: FinalParaSubir[] = historial().map((f) => ({
-    id: f.id,
-    partida: f.partida,
-    cuando: f.cuando,
-    resultado: f.resultado,
-    porElEnlace: f.porElEnlace,
-    medallas: f.medallas,
-    juego: f.juego,
-    modo: f.modo,
-    companero: f.companero,
-    dificultad: f.dificultad ?? null,
-    equipo: f.equipo,
-  }));
+  // Lo que no cuenta para el ranking se queda aqui: una Soul Link terminada
+  // con otra persona que con la que se empezo.
+  const finales: FinalParaSubir[] = historial()
+    .filter((f) => !f.fueraDelRanking)
+    .map((f) => ({
+      id: f.id,
+      partida: f.partida,
+      cuando: f.cuando,
+      resultado: f.resultado,
+      porElEnlace: f.porElEnlace,
+      medallas: f.medallas,
+      juego: f.juego,
+      modo: f.modo,
+      companero: f.companero,
+      dificultad: f.dificultad ?? null,
+      equipo: f.equipo,
+    }));
 
   return pedir<ResultadoDeSubida>('/subir', {
     method: 'POST',

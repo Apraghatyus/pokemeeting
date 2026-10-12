@@ -1246,6 +1246,29 @@ comprueba-, así que el ranking de parejas de verdad necesita las cuentas; pero
 apuntar el apodo ahora es gratis y es lo único que habrá de las partidas de
 antes.
 
+### Cuándo una partida es Soul Link, y con quién — HECHO
+
+- **Se pregunta, no se deduce.** Abrir una sala ya no convierte la partida en
+  Soul Link. Cuando entra el compañero y la partida está empezando (sin medallas
+  y como mucho con el inicial) sale la pregunta: "Sí, Soul Link" o "No, solo
+  jugar juntos". Lo elegido se manda al otro (mensaje `soullink`) y vale para
+  las dos partidas. Más tarde ya no se ofrece. Sin Soul Link se juega junto pero
+  sin parejas: lo que caiga en su partida no toca la tuya.
+- **La Soul Link es con quien se empezó.** El servidor de salas comprueba la
+  cuenta de cada uno con su sesión (pregunta a `/yo` del servicio de cuentas con
+  la galleta del socket) y se la pasa al otro como `peerUsuario`. El apodo no
+  vale para esto: lo escribe cada uno. La partida guarda `companeroSoullink`.
+- **Con otra persona** se puede jugar junto, pero sin parejas y con un aviso.
+- **Para el ranking**, una Soul Link de alguien con cuenta solo cuenta si se
+  termina con la misma cuenta con la que se empezó. Si no, el final se apunta en
+  el historial con el motivo (`fueraDelRanking`) y no se sube. Sin cuenta no se
+  valida nada: tampoco se sube.
+- **Decidido así y fácil de cambiar:** si la Soul Link se empezó con alguien
+  sin cuenta, no hay a quién comprobar y cuenta igual.
+
+**Falta comprobar** en el servidor real que la galleta llega al socket por el
+túnel (Caddy la pasa tal cual; debería).
+
 ### El modal de perfil de usuario
 
 Pulsar a alguien en el ranking y ver quien es: su apodo, desde cuando juega,

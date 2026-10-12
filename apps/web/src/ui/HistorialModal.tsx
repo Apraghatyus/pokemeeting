@@ -126,6 +126,11 @@ const Fila = ({ partida, especies }: { partida: PartidaTerminada; especies: Espe
         <p className="historial__enlace">Se acabó por el enlace: cayó la pareja de tu compañero.</p>
       )}
 
+      {/* Apuntada, pero sin subir: una Soul Link terminada con otra persona. */}
+      {partida.fueraDelRanking && (
+        <p className="historial__enlace">No cuenta para el ranking: {partida.fueraDelRanking}.</p>
+      )}
+
       {abierta && (
         <ul className="historial__equipo">
           {partida.equipo.length > 0 ? (

@@ -25,6 +25,8 @@ export type Participant<Socket> = {
   rom: RomFingerprint;
   /** Como se llama, o null si no lo dijo. */
   nombre: string | null;
+  /** Su cuenta, comprobada con su sesion, o null si entro sin cuenta. */
+  usuario?: string | null;
 };
 
 export type Room<Socket> = {

@@ -131,8 +131,20 @@ export type ServerMessage =
       peerRom: RomFingerprint;
       /** Como se llama el otro, si lo dijo. */
       peerNombre?: string | null;
+      /**
+       * La cuenta del otro, COMPROBADA por el servidor con su sesion, o null si
+       * entro sin cuenta. Es lo que ata una Soul Link a una persona: el apodo lo
+       * pone cada uno y no vale para eso.
+       */
+      peerUsuario?: string | null;
     }
-  | { type: 'peer-joined'; peerRom: RomFingerprint; peerNombre?: string | null }
+  | {
+      type: 'peer-joined';
+      peerRom: RomFingerprint;
+      peerNombre?: string | null;
+      /** Ver `room-joined`. */
+      peerUsuario?: string | null;
+    }
   | { type: 'peer-left' }
   | { type: 'room-info'; datos: DatosDeSala }
   | { type: 'signal'; data: unknown }
@@ -329,7 +341,12 @@ export type PeerMessage =
    */
   | { type: 'video'; enviando: boolean }
   /** Donde anda y que zonas ha gastado ya. Ver `MapaCompartido`. */
-  | { type: 'mapa'; mapa: MapaCompartido };
+  | { type: 'mapa'; mapa: MapaCompartido }
+  /**
+   * Si la partida que se empieza juntos es una Soul Link. Lo elige uno de los
+   * dos al principio y el otro lo aplica a la suya: tienen que ir iguales.
+   */
+  | { type: 'soullink'; activo: boolean };
 
 /**
  * Lo que se cuenta del mapa al companero.
@@ -434,6 +451,10 @@ export const parsePeerMessage = (crudo: string): PeerMessage | null => {
     if (zona !== null && !esZona(zona)) return null;
     if (!Array.isArray(mapa.gastadas) || mapa.gastadas.length > MAX_ZONAS) return null;
     return { type: 'mapa', mapa: { zona, gastadas: mapa.gastadas.filter(esZona) } };
+  }
+  if (mensaje.type === 'soullink') {
+    const activo = (datos as { activo?: unknown }).activo;
+    return typeof activo === 'boolean' ? { type: 'soullink', activo } : null;
   }
   if (mensaje.type === 'video') {
     const enviando = (datos as { enviando?: unknown }).enviando;

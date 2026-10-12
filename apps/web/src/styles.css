@@ -6441,3 +6441,33 @@ details.partidas[open] > summary::before {
   background: var(--accent);
   color: var(--accent-ink);
 }
+
+/* ------------------------------------------- pregunta de Soul Link --- */
+
+.soullink-pregunta {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.soullink-pregunta p {
+  margin: 0;
+}
+
+.soullink-pregunta ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+}
+
+.soullink-pregunta__acciones {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}

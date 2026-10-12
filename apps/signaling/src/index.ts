@@ -44,6 +44,42 @@ const LATIDO_MS = 25_000;
 
 const rooms = new RoomRegistry<WebSocket>();
 
+/**
+ * Donde contesta el servicio de cuentas, que va en el mismo contenedor.
+ *
+ * Sin el -se despliega sin base de datos- nadie tiene cuenta y todo sigue
+ * funcionando igual.
+ */
+const CUENTAS_URL = process.env.CUENTAS_URL ?? 'http://127.0.0.1:8789';
+
+/**
+ * De quien es esta conexion: su cuenta, preguntada al servicio de cuentas con
+ * la galleta de sesion que el navegador manda al abrir el socket.
+ *
+ * Asi la cuenta del otro la COMPRUEBA el servidor y no la dice cada uno: es lo
+ * que deja atar una Soul Link a una persona. Ante cualquier fallo, null, que es
+ * lo mismo que entrar sin cuenta.
+ */
+const cuentaDe = async (galletas: string | undefined): Promise<string | null> => {
+  if (!galletas) return null;
+  try {
+    const respuesta = await fetch(`${CUENTAS_URL}/yo`, {
+      headers: { cookie: galletas },
+      signal: AbortSignal.timeout(2500),
+    });
+    if (!respuesta.ok) return null;
+    const datos = (await respuesta.json()) as { cuenta?: { usuario?: unknown } | null };
+    return typeof datos.cuenta?.usuario === 'string' ? datos.cuenta.usuario : null;
+  } catch {
+    return null;
+  }
+};
+
+/** La cuenta de cada conexion, que se pregunta al abrirse. */
+const cuentas = new WeakMap<WebSocket, Promise<string | null>>();
+const cuentaDelSocket = (socket: WebSocket): Promise<string | null> =>
+  cuentas.get(socket) ?? Promise.resolve(null);
+
 const send = (socket: WebSocket, message: ServerMessage): void => {
   if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(message));
 };
@@ -80,7 +116,12 @@ const handleCreate = async (socket: WebSocket, message: Extract<ClientMessage, {
 
   const room = await rooms.create(
     message.password,
-    { socket, rom: message.rom, nombre: limpiarApodo(message.nombre) },
+    {
+      socket,
+      rom: message.rom,
+      nombre: limpiarApodo(message.nombre),
+      usuario: await cuentaDelSocket(socket),
+    },
     semilla,
   );
   console.log(`[sala ${room.code}] creada  (${rooms.size} activas)`);
@@ -131,7 +172,12 @@ const handleJoin = async (socket: WebSocket, message: Extract<ClientMessage, { t
   // El intento correcto limpia el contador: quien acierta no debe arrastrar los
   // fallos de tecleo anteriores.
   room.joinAttempts = 0;
-  const participant = { socket, rom: message.rom, nombre: limpiarApodo(message.nombre) };
+  const participant = {
+    socket,
+    rom: message.rom,
+    nombre: limpiarApodo(message.nombre),
+    usuario: await cuentaDelSocket(socket),
+  };
   if (room.host) room.guest = participant;
   else room.host = participant;
   room.emptySince = null;
@@ -143,11 +189,13 @@ const handleJoin = async (socket: WebSocket, message: Extract<ClientMessage, { t
       roomCode: code,
       peerRom: other.rom,
       peerNombre: other.nombre,
+      peerUsuario: other.usuario ?? null,
     });
     send(other.socket, {
       type: 'peer-joined',
       peerRom: message.rom,
       peerNombre: participant.nombre,
+      peerUsuario: participant.usuario,
     });
   }
 };
@@ -211,8 +259,9 @@ const wss = new WebSocketServer({ server });
  */
 const vivos = new WeakSet<WebSocket>();
 
-wss.on('connection', (socket) => {
+wss.on('connection', (socket, peticion) => {
   vivos.add(socket);
+  cuentas.set(socket, cuentaDe(peticion.headers.cookie));
   socket.on('pong', () => vivos.add(socket));
 
   socket.on('message', (raw) => {

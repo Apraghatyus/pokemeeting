@@ -57,6 +57,11 @@ export type SessionState = {
    */
   peerNombre: string | null;
   /**
+   * La cuenta del companero, comprobada por el servidor, o null si entro sin
+   * cuenta. Es lo que ata una Soul Link a una persona.
+   */
+  peerUsuario: string | null;
+  /**
    * Si al companero su juego le ha cantado una derrota.
    *
    * Se queda en true una vez dicho, para el resto de la sala: el mensaje del
@@ -96,6 +101,8 @@ export type SessionState = {
   peerSinVideo: boolean;
   /** Donde anda el companero y que zonas ha gastado. Null hasta que lo diga. */
   mapaCompanero: MapaCompartido | null;
+  /** Lo ultimo que dijo el companero sobre hacer la partida Soul Link. */
+  soullinkCompanero: { activo: boolean; momento: number } | null;
 };
 
 /** Donde se recuerda si este aparato manda su pantalla. Es del aparato, no de la cuenta. */
@@ -115,6 +122,7 @@ const initialState: SessionState = {
   isHost: false,
   peerRom: null,
   peerNombre: null,
+  peerUsuario: null,
   peerPerdio: false,
   compatibility: null,
   error: null,
@@ -132,6 +140,7 @@ const initialState: SessionState = {
   canalListo: null,
   peerSinVideo: false,
   mapaCompanero: null,
+  soullinkCompanero: null,
 };
 
 /**
@@ -272,6 +281,10 @@ export const useSession = (
               patch({ mapaCompanero: mensaje.mapa });
               return;
             }
+            if (mensaje.type === 'soullink') {
+              patch({ soullinkCompanero: { activo: mensaje.activo, momento: Date.now() } });
+              return;
+            }
             if (mensaje.type !== 'equipo') {
               for (const oyente of oyentesDelTrato.current) oyente(mensaje);
               return;
@@ -317,7 +330,7 @@ export const useSession = (
         if (password) credentialsRef.current = { roomCode, password };
         patch({ roomCode, isHost: true, phase: 'esperando-companero' });
       },
-      onRoomJoined: (roomCode, peerRom, peerNombre) => {
+      onRoomJoined: (roomCode, peerRom, peerNombre, peerUsuario) => {
         const password = pendingPasswordRef.current;
         if (password) credentialsRef.current = { roomCode, password };
         // Volver a entrar bien significa que la reconexion termino.
@@ -329,14 +342,20 @@ export const useSession = (
           isHost: false,
           peerRom,
           peerNombre,
+          peerUsuario,
           compatibility: mine ? compareRoms(mine, peerRom) : null,
         });
         // Quien entra espera la oferta del anfitrion.
         startPeer(false);
       },
-      onPeerJoined: (peerRom, peerNombre) => {
+      onPeerJoined: (peerRom, peerNombre, peerUsuario) => {
         const mine = romRef.current;
-        patch({ peerRom, peerNombre, compatibility: mine ? compareRoms(mine, peerRom) : null });
+        patch({
+          peerRom,
+          peerNombre,
+          peerUsuario,
+          compatibility: mine ? compareRoms(mine, peerRom) : null,
+        });
         // El anfitrion es quien inicia la negociacion.
         startPeer(true);
       },
@@ -347,6 +366,7 @@ export const useSession = (
           phase: 'esperando-companero',
           peerRom: null,
           peerNombre: null,
+          peerUsuario: null,
           remoteStream: null,
           compatibility: null,
         });
@@ -608,6 +628,15 @@ export const useSession = (
     }
   }, []);
 
+  /** Le dice al companero si la partida es Soul Link. */
+  const enviarSoullink = useCallback((activo: boolean) => {
+    try {
+      peerRef.current?.send(JSON.stringify({ type: 'soullink', activo }));
+    } catch {
+      // Con el canal cerrado no hay companero a quien decirselo.
+    }
+  }, []);
+
   /**
    * Manda un mensaje del intercambio.
    *
@@ -667,6 +696,7 @@ export const useSession = (
     cambiarEnvioDeVideo,
     enviarEquipo,
     enviarMapa,
+    enviarSoullink,
     enviarDelTrato,
     escucharTrato,
     createRoom,
