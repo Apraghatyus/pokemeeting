@@ -4,11 +4,15 @@
   "private": true,
   "scripts": {
     "android": "react-native run-android",
-    "start": "react-native start",
+    "start": "expo start --dev-client",
     "typecheck": "tsc --noEmit",
-    "bundle": "react-native bundle --platform android --dev false --entry-file index.js --bundle-output /tmp/emupoke.bundle"
+    "bundle": "react-native bundle --platform android --dev false --entry-file index.js --bundle-output /tmp/emupoke.bundle",
+    "start:tunel": "expo start --dev-client --tunnel"
   },
   "dependencies": {
+    "expo": "~52.0.49",
+    "expo-asset": "~11.0.5",
+    "expo-dev-client": "~5.0.20",
     "react": "18.3.1",
     "react-native": "0.76.9",
     "react-native-webrtc": "124.0.8"

@@ -1,4 +1,5 @@
 package com.aguaquim.emupoke
+import expo.modules.ReactActivityDelegateWrapper
 
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -21,7 +22,7 @@ class MainActivity : ReactActivity() {
    * which allows you to enable New Architecture with a single boolean flags [fabricEnabled]
    */
   override fun createReactActivityDelegate(): ReactActivityDelegate =
-      DefaultReactActivityDelegate(this, mainComponentName, fabricEnabled)
+      ReactActivityDelegateWrapper(this, BuildConfig.IS_NEW_ARCHITECTURE_ENABLED, DefaultReactActivityDelegate(this, mainComponentName, fabricEnabled))
 
   /**
    * Los botones de un mando fisico van al juego antes que a nadie. Si no, el B

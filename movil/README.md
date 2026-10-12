@@ -19,8 +19,9 @@ pinta la interfaz, ni se lleva 300 MB de wasm, ni compite con el navegador.
   (`apps/web/src/core/mandoFisico.ts`): el boton de la derecha es A y el de
   abajo B, como en la consola. Se suman al mando tactil.
 
-Todavia no: mandar tu pantalla y tu voz, intercambios, aleatorizar, cuentas y
-dificultades.
+Y ya a la par con la web: mandar tu pantalla y tu voz, reconexion,
+dificultades y sus reglas, Soul Link, intercambios, motes, aleatorizar, enlace
+de invitacion, cuentas y estados (ver `docs/ideas-pendientes.md`).
 
 ## Como esta montado
 
@@ -57,3 +58,32 @@ cd android && ./gradlew assembleRelease
 ```
 
 Necesita Android 8 o superior (por AAudio).
+
+## Probar en el telefono con Expo (dev client)
+
+Expo Go, la app de la tienda, NO sirve: no trae el emulador ni la pantalla por
+WebRTC, que son codigo nativo de esta app. Lo que se usa es un *dev client*:
+esta misma app compilada en modo desarrollo, que en vez de llevar el
+JavaScript dentro lo pide al ordenador. Cada cambio en `App.tsx` o `src/` se
+ve en el telefono al guardar, sin volver a compilar.
+
+1. **Instalar la APK de desarrollo, una vez.** En GitHub, pestaña Actions →
+   *APK Android* → la ultima ejecucion en verde → artefacto
+   `pokemeeting-dev-client-apk`. Se instala como **Pokemeeting Dev**, al lado
+   de la normal. Solo hay que reinstalarla si cambia algo nativo (Kotlin, C++,
+   una dependencia nativa).
+2. **Arrancar el servidor en el ordenador:**
+
+   ```bash
+   cd movil
+   npm install
+   npm start          # telefono y ordenador en la misma wifi
+   npm run start:tunel  # si no estan en la misma red
+   ```
+
+3. **Abrirlo en el telefono:** escanear el QR que sale en la terminal con la
+   camara, o abrir Pokemeeting Dev: lista los servidores que encuentra en la
+   red, y tambien deja escribir la direccion (`http://IP-del-ordenador:8081`).
+
+Con el servidor abierto, sacudir el telefono saca el menu de desarrollo
+(recargar, ver errores, rendimiento). La APK normal no lleva nada de esto.
