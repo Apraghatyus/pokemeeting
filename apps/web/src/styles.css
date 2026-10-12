@@ -6067,3 +6067,355 @@ details.partidas[open] > summary::before {
 .hecha .interruptores {
   grid-template-columns: 1fr;
 }
+
+/* ---------------------------------------------------------------- mapa --- */
+
+/* El mapa pide anchura: en la columna estrecha de los modales se quedaba en un
+   sello. Alto acotado y solo el cuerpo se desplaza, como en ajustes. */
+.modal[open]:has(.mapa) {
+  width: min(900px, calc(100vw - 32px));
+  max-height: min(94vh, 900px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal[open]:has(.mapa) .modal__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.mapa__aparte summary {
+  cursor: pointer;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.mapa__aparte[open] summary {
+  margin-bottom: 8px;
+}
+
+.mapa {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* Azul claro para el companero: el --azul de la marca no se lee sobre el
+     fondo oscuro. */
+  --mapa-suya: #6f8cff;
+}
+
+.mapa__aqui {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-raised);
+  font-size: 12px;
+}
+
+.mapa__aqui strong {
+  font-size: 13px;
+}
+
+.mapa__estado--libre {
+  color: var(--ok);
+}
+
+.mapa__estado--mia,
+.mapa__estado--ambas {
+  color: var(--accent);
+}
+
+.mapa__estado--suya {
+  color: var(--mapa-suya);
+}
+
+.mapa__volver {
+  margin-left: auto;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.mapa__lienzo {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.mapa__lienzo svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 62vh;
+}
+
+.mapa__camino {
+  stroke: var(--border);
+  stroke-width: 3;
+}
+
+.mapa__punto {
+  cursor: pointer;
+}
+
+.mapa__punto rect,
+.mapa__punto circle {
+  fill: var(--bg-raised);
+  stroke: var(--muted);
+  stroke-width: 1.5;
+  transition: fill 0.15s, stroke 0.15s;
+}
+
+.mapa__punto:hover rect,
+.mapa__punto:hover circle {
+  stroke: var(--text);
+}
+
+.mapa__punto--ciudad rect {
+  stroke-width: 2;
+}
+
+.mapa__punto--libre rect,
+.mapa__punto--libre circle {
+  stroke: var(--ok);
+}
+
+.mapa__punto--mia rect,
+.mapa__punto--mia circle {
+  fill: var(--accent);
+  stroke: var(--accent);
+}
+
+.mapa__punto--suya rect,
+.mapa__punto--suya circle {
+  fill: var(--mapa-suya);
+  stroke: var(--mapa-suya);
+}
+
+.mapa__punto--ambas rect,
+.mapa__punto--ambas circle {
+  fill: var(--accent);
+  stroke: var(--mapa-suya);
+  stroke-width: 4;
+}
+
+.mapa__punto.is-enfocada rect,
+.mapa__punto.is-enfocada circle {
+  stroke: var(--text);
+  stroke-width: 3;
+}
+
+.mapa__numero {
+  fill: var(--text);
+  font-size: 10px;
+  font-weight: 700;
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+.mapa__punto--mia .mapa__numero,
+.mapa__punto--ambas .mapa__numero {
+  fill: var(--accent-ink);
+}
+
+.mapa__nombre {
+  fill: var(--muted);
+  font-size: 10px;
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+.mapa__jugador {
+  pointer-events: none;
+}
+
+.mapa__jugador circle {
+  fill: none;
+  stroke-width: 3;
+  animation: mapa-latido 1.6s ease-in-out infinite;
+}
+
+.mapa__jugador text {
+  font-size: 11px;
+  font-weight: 700;
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: var(--bg);
+  stroke-width: 3px;
+}
+
+.mapa__jugador--mia circle {
+  stroke: var(--accent);
+}
+
+.mapa__jugador--mia text {
+  fill: var(--accent);
+}
+
+.mapa__jugador--suya circle {
+  stroke: var(--mapa-suya);
+}
+
+.mapa__jugador--suya text {
+  fill: var(--mapa-suya);
+}
+
+@keyframes mapa-latido {
+  50% {
+    stroke-opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mapa__jugador circle {
+    animation: none;
+  }
+}
+
+.mapa__leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.mapa__leyenda li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mapa__muestra {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--ok);
+  background: var(--bg-raised);
+}
+
+.mapa__muestra--mia {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.mapa__muestra--suya {
+  border-color: var(--mapa-suya);
+  background: var(--mapa-suya);
+}
+
+.mapa__muestra--ambas {
+  border-color: var(--mapa-suya);
+  background: var(--accent);
+}
+
+.mapa__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mapa__chip {
+  padding: 5px 10px;
+  border: 1px solid var(--ok);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.mapa__chip--mia,
+.mapa__chip--ambas {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.mapa__chip--suya {
+  border-color: var(--mapa-suya);
+  background: var(--mapa-suya);
+  color: var(--bg);
+}
+
+.mapa__chip.is-aqui {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+}
+
+.mapa__chip.is-alli {
+  outline: 2px dashed var(--mapa-suya);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------- aviso de una regla --- */
+
+/* Sale encima de la partida cuando se deshace algo por romper una regla del
+   Centro Pokemon: el jugador acaba de aparecer donde estaba hace un momento y
+   tiene que saber por que. */
+.aviso-regla {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 60;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 12px 16px;
+  border: 1px solid var(--danger);
+  border-radius: 12px;
+  background: var(--bg-raised);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 45%);
+  font-size: 13px;
+  line-height: 1.4;
+  animation: aviso-regla-entra 0.2s ease-out;
+}
+
+.aviso-regla__marca {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--danger);
+  color: #fff;
+  font-weight: 700;
+}
+
+.aviso-regla button {
+  flex: none;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+@keyframes aviso-regla-entra {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+}

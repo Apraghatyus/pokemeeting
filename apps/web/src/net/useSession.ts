@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import {
   parsePeerMessage,
   type EquipoResumen,
+  type MapaCompartido,
   type PeerMessage,
   type RomFingerprint,
 } from '@emupoke/protocol';
@@ -93,6 +94,8 @@ export type SessionState = {
    * quedaria con el ultimo fotograma congelado, que parece un fallo.
    */
   peerSinVideo: boolean;
+  /** Donde anda el companero y que zonas ha gastado. Null hasta que lo diga. */
+  mapaCompanero: MapaCompartido | null;
 };
 
 /** Donde se recuerda si este aparato manda su pantalla. Es del aparato, no de la cuenta. */
@@ -128,6 +131,7 @@ const initialState: SessionState = {
   equipoCompanero: null,
   canalListo: null,
   peerSinVideo: false,
+  mapaCompanero: null,
 };
 
 /**
@@ -262,6 +266,10 @@ export const useSession = (
             // en el mismo instante se pisarian y el trato se quedaria colgado.
             if (mensaje.type === 'video') {
               patch({ peerSinVideo: !mensaje.enviando });
+              return;
+            }
+            if (mensaje.type === 'mapa') {
+              patch({ mapaCompanero: mensaje.mapa });
               return;
             }
             if (mensaje.type !== 'equipo') {
@@ -591,6 +599,15 @@ export const useSession = (
     peerRef.current?.send(JSON.stringify({ type: 'equipo', equipo, perdio }));
   }, []);
 
+  /** Cuenta donde anda y que zonas ha gastado. Igual que el equipo: perder uno no importa. */
+  const enviarMapa = useCallback((mapa: MapaCompartido) => {
+    try {
+      peerRef.current?.send(JSON.stringify({ type: 'mapa', mapa }));
+    } catch {
+      // Con el canal cerrado, el siguiente cambio lo repite.
+    }
+  }, []);
+
   /**
    * Manda un mensaje del intercambio.
    *
@@ -649,6 +666,7 @@ export const useSession = (
     enviandoVideo,
     cambiarEnvioDeVideo,
     enviarEquipo,
+    enviarMapa,
     enviarDelTrato,
     escucharTrato,
     createRoom,

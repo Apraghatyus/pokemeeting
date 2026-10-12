@@ -4,7 +4,14 @@ import { useTeclas } from './core/useTeclas';
 import { useEmulator } from './core/useEmulator';
 import { useKeyboardOwnership } from './core/useKeyboardOwnership';
 import { useSession } from './net/useSession';
-import { useEquipo } from './core/useEquipo';
+import { useEquipo, type Vigilante } from './core/useEquipo';
+import {
+  guardarDisposicionDelCentro,
+  juzgar,
+  leerDisposicionDelCentro,
+  seCuroElEquipo,
+} from './core/centroPokemon';
+import { zonaCanonica } from './core/zonas';
 import { useTopeDeNivel } from './core/useTopeDeNivel';
 import { reglasActivas, tiposPrimariosRepetidos } from './core/dificultad';
 import { useReglasNuzlocke } from './core/reglasNuzlocke';
@@ -27,7 +34,7 @@ import {
   sePuedeRehacer,
   todasLasPartidas,
 } from './core/partidas';
-import { motesDebilitados, parseGameCode } from '@emupoke/pokemon';
+import { aprenderCentro, motesDebilitados, parseGameCode } from '@emupoke/pokemon';
 import { EquipoPanel } from './ui/EquipoPanel';
 import { AjustesModal } from './ui/AjustesModal';
 import { CuentaModal } from './ui/CuentaModal';
@@ -47,6 +54,7 @@ import { RoomModal } from './ui/RoomModal';
 import { Stage } from './ui/Stage';
 import { TouchControls } from './ui/TouchControls';
 import { TopBar } from './ui/TopBar';
+import { MapaModal } from './ui/MapaModal';
 import { VoiceBar } from './ui/VoiceBar';
 
 export const App = () => {
@@ -71,7 +79,6 @@ export const App = () => {
     if (invitacion) olvidarInvitacion();
     // Solo al arrancar: si se pusiera `invitacion` como dependencia, cerrar el
     // cartel volveria a ejecutarlo para nada.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Y tambien si llega una invitacion con la pagina YA abierta.
@@ -97,6 +104,7 @@ export const App = () => {
   const [randomizerOpen, setRandomizerOpen] = useState(false);
   const [cuentaOpen, setCuentaOpen] = useState(false);
   const [rankingOpen, setRankingOpen] = useState(false);
+  const [mapaOpen, setMapaOpen] = useState(false);
 
   // Quien eres, si es que has entrado. No hace falta para jugar: si el
   // servicio de cuentas no esta, esto se queda en null y no se nota.
@@ -254,11 +262,17 @@ export const App = () => {
 
   // Tu equipo se lee de la partida cada pocos segundos y, cuando cambia, se le
   // manda al companero. Si no hay sala, enviarEquipo no hace nada.
+  // Las reglas del Centro Pokemon se hacen cumplir desde la misma lectura del
+  // equipo. Quien decide se define mas abajo, cuando ya se saben la dificultad
+  // y el tope; aqui solo se le hace sitio.
+  const vigilanteRef = useRef<Vigilante | null>(null);
   const miEquipo = useEquipo(
     emulator.coreRef,
     state.status === 'running',
     state.romName,
     especies,
+    emulator.romBytesRef,
+    vigilanteRef,
   );
 
   // El panel no sigue el orden de la memoria: el juego sube al que sale a pelear
@@ -348,6 +362,69 @@ export const App = () => {
     miEquipo.equipo,
     reglas.primeraCaptura || reglas.muertoEsMuerto,
   );
+  // Las reglas del Centro Pokemon: no curar ni salir con un muerto, ni en
+  // Nivelada con alguien por encima del tope. Ver `centroPokemon.ts`.
+  const codigoJuego = state.header?.gameCode ?? '';
+  vigilanteRef.current = (antes, ahora, tabla) => {
+    // Donde cura la enfermera es un Centro: asi se aprende cual es.
+    if (tabla && ahora.mapa && codigoJuego && seCuroElEquipo(antes, ahora)) {
+      const aprendida = aprenderCentro(ahora.mapa, tabla);
+      if (aprendida !== null) guardarDisposicionDelCentro(codigoJuego, aprendida);
+    }
+    if (!reglas.muertoEsMuerto && !reglas.topeDeNivel) return null;
+    return juzgar(antes, ahora, {
+      muertoEsMuerto: reglas.muertoEsMuerto,
+      muertos: infracciones.memoria.muertos,
+      tope: reglas.topeDeNivel ? (topes.siguiente?.nivel ?? null) : null,
+      disposicionDelCentro: codigoJuego ? leerDisposicionDelCentro(codigoJuego) : null,
+    });
+  };
+
+  // Lo que se ve en el mapa: las zonas donde ya se capturo -las apuntadas y
+  // las de quien va en el equipo- y donde se esta.
+  const zonasGastadas = useMemo(() => {
+    const zonas = new Set(Object.keys(infracciones.memoria.rutas).map(Number));
+    for (const p of miEquipo.equipo?.ranuras ?? []) {
+      if (p.huevo || p.lugar === null || p.lugar === undefined) continue;
+      if (infracciones.memoria.propio !== null && p.entrenador !== infracciones.memoria.propio) {
+        continue;
+      }
+      zonas.add(zonaCanonica(p.lugar));
+    }
+    return [...zonas].sort((a, b) => a - b);
+  }, [infracciones.memoria, miEquipo.equipo]);
+  const zonaActual = miEquipo.mapa ? zonaCanonica(miEquipo.mapa.zona) : null;
+  // Quien salio de cada zona, para decirlo en el mapa. Solo los que van en el
+  // equipo: de los demas solo se sabe que la zona esta gastada.
+  const capturasMias = useMemo(() => {
+    const quien = new Map<number, string>();
+    for (const p of miEquipo.equipo?.ranuras ?? []) {
+      if (!p.huevo && p.lugar !== null && p.lugar !== undefined) {
+        quien.set(zonaCanonica(p.lugar), p.mote);
+      }
+    }
+    return quien;
+  }, [miEquipo.equipo]);
+
+  // El aviso de una regla que se acaba de hacer cumplir. Se va solo.
+  const [avisoRegla, setAvisoRegla] = useState<string | null>(null);
+  const deshecho = miEquipo.deshecho;
+  useEffect(() => {
+    if (!deshecho) return;
+    setAvisoRegla(deshecho.motivo);
+    const quitar = setTimeout(() => setAvisoRegla(null), 9000);
+    return () => clearTimeout(quitar);
+  }, [deshecho]);
+
+  // Y se le cuenta al companero, igual que el equipo.
+  const { enviarMapa } = session;
+  const clavesMapa = `${zonaActual}|${zonasGastadas.join(',')}`;
+  useEffect(() => {
+    if (state.status !== 'running') return;
+    enviarMapa({ zona: zonaActual, gastadas: zonasGastadas });
+    // `clavesMapa` resume las dos cosas: solo se manda cuando cambian.
+  }, [clavesMapa, session.state.canalListo, enviarMapa, state.status]);
+
   const tiposRepetidos = useMemo(
     () =>
       reglas.tipoPrimarioUnico
@@ -433,6 +510,7 @@ export const App = () => {
         onOpenCuenta={() => setCuentaOpen(true)}
         cuentaOpen={cuentaOpen}
         onOpenRanking={() => setRankingOpen(true)}
+        onOpenMapa={hasRom ? () => setMapaOpen(true) : undefined}
       />
 
       <main className="app__main">
@@ -743,6 +821,30 @@ export const App = () => {
           montado debajo. Desmontarlo para ensenar una tabla seria apagarle el
           juego a alguien por mirar quien va ganando, y volver costaria cargar
           el nucleo otra vez. */}
+      <MapaModal
+        open={mapaOpen}
+        onClose={() => setMapaOpen(false)}
+        codigoJuego={state.header?.gameCode ?? null}
+        zonaMia={zonaActual}
+        gastadasMias={zonasGastadas}
+        capturasMias={capturasMias}
+        zonaSuya={conCompanero ? (session.state.mapaCompanero?.zona ?? null) : null}
+        gastadasSuyas={conCompanero ? (session.state.mapaCompanero?.gastadas ?? []) : null}
+        nombreSuyo={nombreDelCompanero}
+      />
+
+      {avisoRegla && (
+        <div className="aviso-regla" role="alert">
+          <span className="aviso-regla__marca" aria-hidden="true">
+            !
+          </span>
+          <span>{avisoRegla}</span>
+          <button type="button" onClick={() => setAvisoRegla(null)}>
+            Entendido
+          </button>
+        </div>
+      )}
+
       {rankingOpen && (
         <Ranking
           onVolver={() => setRankingOpen(false)}

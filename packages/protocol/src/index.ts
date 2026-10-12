@@ -241,6 +241,12 @@ export type PokemonResumen = {
    * del otro.
    */
   entrenador?: number;
+  /**
+   * Puntos de salud, ahora y como mucho. Con ellos se sabe cuando la enfermera
+   * ha curado al equipo: todos llenos de golpe.
+   */
+  ps?: number;
+  psMax?: number;
 };
 
 /** El equipo entero en un momento dado. */
@@ -321,7 +327,29 @@ export type PeerMessage =
    * apagar y quedarse con el equipo y la voz; al otro lado se dice en vez de
    * dejar el ultimo fotograma congelado, que parece un fallo.
    */
-  | { type: 'video'; enviando: boolean };
+  | { type: 'video'; enviando: boolean }
+  /** Donde anda y que zonas ha gastado ya. Ver `MapaCompartido`. */
+  | { type: 'mapa'; mapa: MapaCompartido };
+
+/**
+ * Lo que se cuenta del mapa al companero.
+ *
+ * Las zonas son el numero de "seccion de mapa" del juego, el mismo que cada
+ * Pokemon lleva como sitio de captura. Iguales en los cinco juegos de tercera
+ * generacion, asi que sirven entre copias aleatorizadas distintas.
+ */
+export type MapaCompartido = {
+  /** La zona donde esta ahora, o null si no se sabe. */
+  zona: number | null;
+  /** Las zonas donde ya capturo. */
+  gastadas: number[];
+};
+
+/** Mas zonas que esto no tiene ningun juego. */
+const MAX_ZONAS = 256;
+
+const esZona = (valor: unknown): valor is number =>
+  typeof valor === 'number' && Number.isInteger(valor) && valor >= 0 && valor < MAX_ZONAS;
 
 /** Cuanto ocupa un Pokemon de tercera generacion, y por tanto su bloque. */
 const BYTES_DE_UN_POKEMON = 100;
@@ -398,6 +426,14 @@ export const parsePeerMessage = (crudo: string): PeerMessage | null => {
   // Los del intercambio se miran aqui arriba porque no llevan equipo dentro.
   if (mensaje.type === 'oferta') {
     return esOferta(mensaje.oferta) ? { type: 'oferta', oferta: mensaje.oferta } : null;
+  }
+  if (mensaje.type === 'mapa') {
+    const mapa = (datos as { mapa?: unknown }).mapa as Partial<MapaCompartido> | undefined;
+    if (!mapa || typeof mapa !== 'object') return null;
+    const zona = mapa.zona === null || mapa.zona === undefined ? null : mapa.zona;
+    if (zona !== null && !esZona(zona)) return null;
+    if (!Array.isArray(mapa.gastadas) || mapa.gastadas.length > MAX_ZONAS) return null;
+    return { type: 'mapa', mapa: { zona, gastadas: mapa.gastadas.filter(esZona) } };
   }
   if (mensaje.type === 'video') {
     const enviando = (datos as { enviando?: unknown }).enviando;

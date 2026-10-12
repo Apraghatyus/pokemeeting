@@ -927,7 +927,31 @@ canal que ya existe.
 
 ---
 
-## Mapa de dónde has capturado
+## Mapa de dónde has capturado — HECHO
+
+**Lo que hay.** Botón de mapa en la barra de arriba. Un esquema de Kanto (con las
+Islas Sete en lista) o de Hoenn, según el juego, con cada zona libre o gastada
+-por ti, por tu compañero o por los dos- y dónde está cada uno ahora mismo. Arriba
+dice en qué zona estás y si ahí todavía se puede capturar.
+
+- **Dónde estás** se lee de la memoria sin direcciones encontradas a mano
+  (`packages/pokemon/src/mapas.ts`): se busca en la ROM la tabla de mapas por su
+  forma, y en la memoria la copia de la cabecera del mapa actual, que el juego
+  hace al entrar en cada mapa. Vale para los cinco juegos. `test:mapas`, con ROM
+  y estado fabricados.
+- **Lo gastado** es lo que ya apuntaba la regla de RUTA, más la zona de captura
+  de quien va en el equipo.
+- **Al compañero** se le manda la zona y lo gastado por el canal de datos
+  (mensaje `mapa`).
+- Los nombres son los de la versión en español hasta donde se sabe
+  (`apps/web/src/core/zonas.ts`); algún sitio pequeño puede no coincidir letra a
+  letra.
+
+**Falta comprobarlo con una ROM y una partida reales**: que se encuentre la
+tabla, que la zona leída sea la buena y que el esquema cuadre con el juego.
+
+Lo de abajo es como se planteó.
+
 
 En un Soul Link solo se captura una vez por zona, y hoy eso se lleva de memoria
 o en un papel aparte. La idea es marcarlo en un mapa: dónde cayó cada Pokémon y
@@ -1609,6 +1633,26 @@ Dos cosas que conviene recordar de cómo se hizo:
 
 `apps/randomizer/src/tiendas.ts`, `test:tiendas`.
 
+### Las reglas del Centro Pokémon, que sí se hacen cumplir
+
+Excepción a "se avisa, no se impide", pedida a propósito:
+
+- **La enfermera no cura con un muerto en el equipo.** Si se cura al equipo con
+  un debilitado dentro -o se revive con un objeto-, se vuelve a cargar el estado
+  de unos segundos antes y sale un aviso: hay que dejarlo en el PC o liberarlo.
+- **No se sale del Centro** con un muerto, ni en Nivelada con alguien por encima
+  del tope del siguiente líder. Subir a la planta de arriba sí se puede.
+
+Cómo se sabe que es un Centro: todos comparten la misma disposición por dentro,
+y se aprende la primera vez que la enfermera cura al equipo (la casa del jugador
+también cura, pero es única y no cuenta). Hasta esa primera cura, la regla de
+salir no puede vigilarse. Lo que se carga es el estado que el propio programa
+guardó al mirar el equipo: no se escribe nada en la partida.
+`apps/web/src/core/centroPokemon.ts`, `test:centro`.
+
+**Falta comprobarlo jugando**: que la cura de la enfermera se detecte, y que
+volver unos segundos atrás no deje al jugador en un bucle incómodo.
+
 ### En un Soul Link, la dificultad viene en la invitación
 
 **Si invitas a alguien, la dificultad va fijada desde el enlace.** No es un
@@ -1722,7 +1766,7 @@ Los MMO de Pokémon que existen (PokeMMO, Pokémon Revolution) no son emuladores
 con red añadida: son **clientes propios** que reimplementan el juego, hechos por
 equipos durante años.
 
-**Lo que sí está al alcance**, y da buena parte de la sensación, es un **mapa
+**Lo que sí está al alcance — HECHO a nivel de zona**, y da buena parte de la sensación, es un **mapa
 compartido fuera del juego**: leer las coordenadas de los dos, dibujar un mini
 mapa en la interfaz y ver el punto de cada uno moverse en tiempo real. "Estoy en
 Ciudad Celeste, ven" sin escribirlo. No toca la ROM.

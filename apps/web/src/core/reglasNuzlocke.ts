@@ -32,6 +32,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { EquipoResumen } from '@emupoke/protocol';
+import { zonaCanonica } from './zonas';
 
 export type MemoriaDeReglas = {
   /** Tu numero de entrenador, el del primer equipo que se vio. */
@@ -98,7 +99,9 @@ export const aplicarReglas = (
     if (p.lugar === null || p.lugar === undefined) continue;
     // Lo que te llego por intercambio no lo capturaste tu.
     if (propio !== null && p.entrenador !== undefined && p.entrenador !== propio) continue;
-    const zona = String(p.lugar);
+    // Las zonas que el juego parte en dos -la segunda planta de una cueva- son
+    // la misma para esto.
+    const zona = String(zonaCanonica(p.lugar));
     const duenio = rutas[zona];
     if (duenio === undefined) rutas[zona] = p.personalidad;
     else if (duenio !== p.personalidad) rutaRepetida.add(p.personalidad);
@@ -169,7 +172,7 @@ export const useReglasNuzlocke = (
   partida: string | null,
   equipo: EquipoResumen | null,
   activo: boolean,
-): Infracciones => {
+): Infracciones & { memoria: MemoriaDeReglas } => {
   // La memoria va atada a SU partida. Al cambiar de partida hay un render en
   // el que todavia se tiene la de la anterior; sin esta marca se aplicaria a la
   // nueva y se guardaria con su nombre, mezclando las rutas de las dos.
@@ -199,5 +202,10 @@ export const useReglasNuzlocke = (
     setGuardada({ partida, memoria: nueva });
   }, [partida, lista, nueva, memoria]);
 
-  return resultado?.infracciones ?? SIN_INFRACCIONES;
+  return {
+    ...(resultado?.infracciones ?? SIN_INFRACCIONES),
+    // Lo apuntado: que zonas se gastaron y quien ha caido. Lo usan el mapa y
+    // las reglas del Centro Pokemon.
+    memoria: resultado?.memoria ?? memoria,
+  };
 };
