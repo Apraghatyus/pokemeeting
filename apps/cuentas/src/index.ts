@@ -31,12 +31,35 @@ import {
   deQuienEs,
   galletaDeLaPeticion,
   galletaDeSesion,
+  resumenDeLaSesion,
   galletaVacia,
 } from './sesiones.ts';
 import { subir } from './subir.ts';
 import { juegosConPartidas, ranking, type Filtros } from './ranking.ts';
+import {
+  amigosDe,
+  avatarDe,
+  guardarAvatar,
+  guardarPerfil,
+  latir,
+  NoSePuede,
+  perfilDe,
+  quitarAmigo,
+  responder as responderSolicitud,
+  solicitar,
+  tagLibre,
+} from './ficha.ts';
 
 const PORT = Number(process.env['PORT'] ?? 8789);
+
+/**
+ * Lo mas grande que puede pesar una foto de perfil.
+ *
+ * Doscientos kilos sobran: el navegador la recorta a 256 px antes de
+ * mandarla, y eso son unos 30 KB. El tope esta para que una peticion
+ * inventada no pueda meter un fichero enorme en la base.
+ */
+const MAX_AVATAR = 200 * 1024;
 const HOST = process.env['HOST'] ?? '127.0.0.1';
 
 /**
@@ -83,6 +106,7 @@ type Fila = {
   id: string;
   usuario: string;
   apodo: string;
+  tag: string;
   creada: Date;
 };
 
@@ -90,12 +114,13 @@ const comoSeCuenta = (fila: Fila): Cuenta => ({
   id: fila.id,
   usuario: fila.usuario,
   apodo: fila.apodo,
+  tag: fila.tag,
   creada: fila.creada.toISOString(),
 });
 
 const buscarPorId = async (id: string): Promise<Fila | null> => {
   const { rows } = await pool.query<Fila>(
-    'select id, usuario, apodo, creada from usuarios where id = $1',
+    'select id, usuario, apodo, tag, creada from usuarios where id = $1',
     [id],
   );
   return rows[0] ?? null;
@@ -143,12 +168,14 @@ const registro = async (req: IncomingMessage, res: ServerResponse): Promise<void
   // ranking, y por eso vale el nombre de usuario como respaldo.
   const apodo = limpiarApodo(texto(cuerpo['apodo'])) || usuario;
 
+  // El tag se reparte al crear la cuenta: es lo que distingue a dos personas
+  // que se pongan el mismo apodo, y el apodo no tiene por que ser unico.
   const { rows } = await pool.query<Fila>(
-    `insert into usuarios (usuario, normalizado, clave, apodo)
-     values ($1, $2, $3, $4)
+    `insert into usuarios (usuario, normalizado, clave, apodo, tag)
+     values ($1, $2, $3, $4, $5)
      on conflict (normalizado) do nothing
-     returning id, usuario, apodo, creada`,
-    [usuario, normalizarUsuario(usuario), await resumirClave(clave), apodo],
+     returning id, usuario, apodo, tag, creada`,
+    [usuario, normalizarUsuario(usuario), await resumirClave(clave), apodo, await tagLibre(apodo)],
   );
 
   const fila = rows[0];
@@ -184,7 +211,7 @@ const entrar = async (req: IncomingMessage, res: ServerResponse): Promise<void> 
   }
 
   const { rows } = await pool.query<Fila & { clave: string }>(
-    'select id, usuario, apodo, creada, clave from usuarios where normalizado = $1',
+    'select id, usuario, apodo, tag, creada, clave from usuarios where normalizado = $1',
     [cuenta],
   );
   const fila = rows[0];
@@ -231,7 +258,7 @@ const subirTodo = async (
 };
 
 const atender = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
-  const ruta = (req.url ?? '/').split('?')[0];
+  const ruta = (req.url ?? '/').split('?')[0] ?? '/';
 
   if (ruta === '/health') {
     // Comprueba la base de verdad: un servicio de cuentas que responde pero no
@@ -256,6 +283,46 @@ const atender = async (req: IncomingMessage, res: ServerResponse): Promise<void>
       jugadores: await ranking(filtros),
       juegos: await juegosConPartidas(),
     });
+    return;
+  }
+
+  // La foto de alguien. Publica, como el ranking: es la cara que enseña en la
+  // tabla, no un dato suyo.
+  if (req.method === 'GET' && ruta.startsWith('/avatar/')) {
+    const [apodo, tag] = decodeURIComponent(ruta.slice('/avatar/'.length)).split('#');
+    const foto = apodo && tag ? await avatarDe(apodo, tag) : null;
+    if (!foto) {
+      fallar(res, 404, 'Esa persona no tiene foto.');
+      return;
+    }
+    res.writeHead(200, {
+      'Content-Type': foto.tipo,
+      'Content-Length': foto.bytes.length,
+      // Una hora: la foto cambia poco y asi no se pide en cada pintada. Al
+      // cambiarla, la direccion lleva un numero distinto y se salta la cache.
+      'Cache-Control': 'public, max-age=3600',
+    });
+    res.end(foto.bytes);
+    return;
+  }
+
+  if (req.method === 'GET' && ruta === '/perfil') {
+    const quien = await quienEs(req);
+    if (!quien) {
+      fallar(res, 401, 'Hay que iniciar sesion.');
+      return;
+    }
+    responder(res, 200, { perfil: await perfilDe(quien.id) });
+    return;
+  }
+
+  if (req.method === 'GET' && ruta === '/amigos') {
+    const quien = await quienEs(req);
+    if (!quien) {
+      fallar(res, 401, 'Hay que iniciar sesion.');
+      return;
+    }
+    responder(res, 200, await amigosDe(quien.id));
     return;
   }
 
@@ -286,6 +353,163 @@ const atender = async (req: IncomingMessage, res: ServerResponse): Promise<void>
       await cerrarSesion(galletaDeLaPeticion(req.headers.cookie));
       responder(res, 200, { ok: true }, galletaVacia());
       return;
+    case '/perfil': {
+      const quien = await quienEs(req);
+      if (!quien) {
+        fallar(res, 401, 'Hay que iniciar sesion.');
+        return;
+      }
+      const cuerpo = (await leerJson(req)) as Record<string, unknown>;
+      const cambios: { apodo?: string; lema?: string | null; favorito?: number | null } = {};
+
+      if ('apodo' in cuerpo) {
+        const apodo = limpiarApodo(texto(cuerpo['apodo']));
+        if (!apodo) {
+          fallar(res, 400, 'Ese nombre no vale.');
+          return;
+        }
+        cambios.apodo = apodo;
+      }
+      if ('lema' in cuerpo) {
+        // Una linea, no un parrafo: debajo del nombre no cabe mas, y lo que no
+        // cabe se corta en la pantalla de quien lo mire.
+        cambios.lema = (texto(cuerpo['lema']) ?? '').slice(0, 80) || null;
+      }
+      if ('favorito' in cuerpo) {
+        const n = cuerpo['favorito'];
+        cambios.favorito =
+          typeof n === 'number' && Number.isInteger(n) && n > 0 && n < 412 ? n : null;
+      }
+
+      await guardarPerfil(quien.id, cambios);
+      responder(res, 200, { perfil: await perfilDe(quien.id) });
+      return;
+    }
+
+    case '/clave': {
+      const quien = await quienEs(req);
+      if (!quien) {
+        fallar(res, 401, 'Hay que iniciar sesion.');
+        return;
+      }
+      const cuerpo = (await leerJson(req)) as Record<string, unknown>;
+      const actual = typeof cuerpo['actual'] === 'string' ? cuerpo['actual'] : '';
+      const nueva = typeof cuerpo['nueva'] === 'string' ? cuerpo['nueva'] : '';
+
+      const mal = problemaDeLaClave(nueva);
+      if (mal) {
+        fallar(res, 400, mal);
+        return;
+      }
+
+      // Se pide la de ahora aunque ya haya sesion abierta. Una pestaña
+      // olvidada en un ordenador ajeno no puede servir para quedarse con la
+      // cuenta: con esto, quien la encuentre no puede cambiar la contraseña
+      // sin saber la vieja.
+      const { rows } = await pool.query<{ clave: string }>(
+        'select clave from usuarios where id = $1',
+        [quien.id],
+      );
+      if (!rows[0] || !(await claveCorrecta(actual, rows[0].clave))) {
+        fallar(res, 401, 'La contrasena de ahora no es esa.');
+        return;
+      }
+
+      await pool.query('update usuarios set clave = $1 where id = $2', [
+        await resumirClave(nueva),
+        quien.id,
+      ]);
+      // Las demas sesiones se cierran: cambiar la contraseña es lo que hace
+      // alguien que cree que se la han visto, y dejar las otras abiertas seria
+      // no servir para nada. La de aqui se queda.
+      await pool.query('delete from sesiones where usuario_id = $1 and resumen <> $2', [
+        quien.id,
+        resumenDeLaSesion(req.headers.cookie),
+      ]);
+      responder(res, 200, { ok: true });
+      return;
+    }
+
+    case '/avatar': {
+      const quien = await quienEs(req);
+      if (!quien) {
+        fallar(res, 401, 'Hay que iniciar sesion.');
+        return;
+      }
+      const cuerpo = (await leerJson(req)) as Record<string, unknown>;
+      const datos = typeof cuerpo['imagen'] === 'string' ? cuerpo['imagen'] : '';
+      // Llega como data URL, que es lo que da un canvas. De ahi salen el tipo
+      // y los bytes sin tener que fiarse de lo que diga el cliente aparte.
+      const m = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(datos);
+      if (!m) {
+        fallar(res, 400, 'Eso no es una imagen que sepa guardar.');
+        return;
+      }
+      const bytes = Buffer.from(m[2]!, 'base64');
+      if (bytes.length > MAX_AVATAR) {
+        fallar(res, 413, 'La foto es demasiado grande.');
+        return;
+      }
+      await guardarAvatar(quien.id, bytes, m[1]!);
+      responder(res, 200, { ok: true });
+      return;
+    }
+
+    case '/presencia': {
+      const quien = await quienEs(req);
+      // Sin sesion no se apunta nada, y no es un error: se juega igual.
+      if (!quien) {
+        responder(res, 200, { ok: true });
+        return;
+      }
+      const cuerpo = (await leerJson(req)) as Record<string, unknown>;
+      await latir(
+        quien.id,
+        texto(cuerpo['juego'])?.slice(0, 80) ?? null,
+        cuerpo['enSala'] === true,
+      );
+      responder(res, 200, { ok: true });
+      return;
+    }
+
+    case '/amigos/solicitar':
+    case '/amigos/responder':
+    case '/amigos/quitar': {
+      const quien = await quienEs(req);
+      if (!quien) {
+        fallar(res, 401, 'Hay que iniciar sesion.');
+        return;
+      }
+      const cuerpo = (await leerJson(req)) as Record<string, unknown>;
+      try {
+        if (ruta === '/amigos/solicitar') {
+          const apodo = texto(cuerpo['apodo']) ?? '';
+          const tag = texto(cuerpo['tag']) ?? '';
+          if (!apodo || !/^\d{4}$/.test(tag)) {
+            fallar(res, 400, 'Escribe el nombre y sus cuatro cifras, asi: Juan#0482.');
+            return;
+          }
+          await solicitar(quien.id, apodo, tag);
+        } else if (ruta === '/amigos/responder') {
+          await responderSolicitud(
+            quien.id,
+            String(cuerpo['id'] ?? ''),
+            cuerpo['aceptar'] === true,
+          );
+        } else {
+          await quitarAmigo(quien.id, texto(cuerpo['apodo']) ?? '', texto(cuerpo['tag']) ?? '');
+        }
+      } catch (error) {
+        if (error instanceof NoSePuede) {
+          fallar(res, 409, error.message);
+          return;
+        }
+        throw error;
+      }
+      responder(res, 200, await amigosDe(quien.id));
+      return;
+    }
+
     case '/subir': {
       const quien = await quienEs(req);
       if (!quien) {

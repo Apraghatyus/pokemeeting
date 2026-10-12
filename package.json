@@ -99,7 +99,8 @@
     "test:cuentas:ui": "node tools/tests/test-cuentas-ui.mjs",
     "test:evoluciones": "npx tsx tools/tests/test-evoluciones.mjs",
     "test:ranking": "node tools/tests/test-ranking.mjs",
-    "test:dex": "npx tsx tools/tests/test-dex.mjs"
+    "test:dex": "npx tsx tools/tests/test-dex.mjs",
+    "test:ficha": "node tools/tests/test-ficha.mjs"
   },
   "engines": {
     "node": ">=20"

@@ -81,6 +81,14 @@ export type Cuenta = {
   usuario: string;
   /** El nombre con el que sale en la sala y en el ranking. */
   apodo: string;
+  /**
+   * Cuatro cifras que distinguen a dos personas con el mismo apodo.
+   *
+   * Se escribe "Juan#0482" para añadir a alguien. Existe para que el apodo NO
+   * tenga que ser unico: obligar a que lo fuera convertiria el nombre que te
+   * ponen tus amigos en un recurso que se agota.
+   */
+  tag: string;
   /** Cuando se creo la cuenta. */
   creada: string;
 };

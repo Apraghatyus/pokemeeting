@@ -60,6 +60,18 @@ export const deQuienEs = async (testigo: string | null): Promise<string | null> 
   return rows[0]?.usuario_id ?? null;
 };
 
+/**
+ * El resumen del testigo que trae esta peticion.
+ *
+ * Lo usa el cambio de contraseña: al cambiarla se cierran TODAS las sesiones
+ * menos la de quien la esta cambiando, y para eso hay que saber cual es la
+ * suya sin exponer el testigo.
+ */
+export const resumenDeLaSesion = (cabecera: string | undefined): string => {
+  const testigo = galletaDeLaPeticion(cabecera);
+  return testigo ? resumir(testigo) : '';
+};
+
 /** Cierra esta sesion. Las de los otros aparatos siguen abiertas. */
 export const cerrarSesion = async (testigo: string | null): Promise<void> => {
   if (!testigo) return;

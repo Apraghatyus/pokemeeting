@@ -20,8 +20,10 @@ import { motesDebilitados, parseGameCode } from '@emupoke/pokemon';
 import { EquipoPanel } from './ui/EquipoPanel';
 import { AjustesModal } from './ui/AjustesModal';
 import { CuentaModal } from './ui/CuentaModal';
+import { FichaModal } from './ui/FichaModal';
 import { Ranking } from './ui/Ranking';
 import { useCuenta } from './core/useCuenta';
+import { latir } from './core/ficha';
 import { IntercambioModal } from './ui/IntercambioModal';
 import { useIntercambio } from './core/useIntercambio';
 import { FinModal } from './ui/FinModal';
@@ -178,6 +180,24 @@ export const App = () => {
   };
 
   const session = useSession(emulator.canvasRef, romRef);
+
+  // El latido: avisa de que sigues aqui y de a que juegas, para que tus amigos
+  // te vean conectado. Cada treinta segundos, que es la mitad de lo que el
+  // servidor espera antes de darte por ido: asi un latido perdido no te hace
+  // parpadear a "desconectado" y volver.
+  //
+  // Sin cuenta no se manda nada. No es solo que no sirva: es que no hay motivo
+  // para que el servidor sepa que alguien sin cuenta esta jugando.
+  const hayCuenta = cuenta.cuenta !== null;
+  const juegoEnCurso = state.platform ? parseGameCode(state.header?.gameCode ?? '').game?.label ?? null : null;
+  const enSala = session.state.phase !== 'sin-sala';
+  useEffect(() => {
+    if (!hayCuenta) return;
+    const mandar = () => void latir(juegoEnCurso, enSala);
+    mandar();
+    const reloj = setInterval(mandar, 30_000);
+    return () => clearInterval(reloj);
+  }, [hayCuenta, juegoEnCurso, enSala]);
 
   // Abrir una sala con una partida puesta la convierte en una Soul Link, y eso
   // se marca EN LA PARTIDA y no se deduce al final.
@@ -555,7 +575,19 @@ export const App = () => {
           generacion={generacionDelEquipo(equipoMio.equipo)}
         />
 
-        <CuentaModal open={cuentaOpen} onClose={() => setCuentaOpen(false)} cuenta={cuenta} />
+        {/* Con sesion, el boton de la cuenta abre tu ficha; sin ella, la
+            pantalla de entrar. Son dos cosas distintas y no tiene sentido
+            meterlas en el mismo cartel. */}
+        {cuenta.cuenta ? (
+          <FichaModal
+            open={cuentaOpen}
+            onClose={() => setCuentaOpen(false)}
+            cuenta={cuenta}
+            especies={especies}
+          />
+        ) : (
+          <CuentaModal open={cuentaOpen} onClose={() => setCuentaOpen(false)} cuenta={cuenta} />
+        )}
 
         <AjustesModal
           open={menuOpen}
