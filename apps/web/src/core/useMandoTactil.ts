@@ -39,6 +39,11 @@ export type MandoTactil = {
   modo: ModoMando;
   /** Lo enciende o lo apaga a mano, y deja de decidirse solo. */
   fijar: (visible: boolean) => void;
+  /**
+   * Se esta jugando con un mando fisico: el tactil sobra. Igual que al usar el
+   * teclado, solo si se decide solo; elegido a mano, se respeta.
+   */
+  apartar: () => void;
   cambiarModo: (modo: ModoMando) => void;
 };
 
@@ -116,6 +121,10 @@ export const useMandoTactil = (): MandoTactil => {
     };
   }, []);
 
+  const apartar = useCallback(() => {
+    if (automatico.current) setVisible(false);
+  }, []);
+
   const cambiarModo = useCallback((siguiente: ModoMando) => {
     setModo(siguiente);
     automatico.current = siguiente === 'auto';
@@ -135,5 +144,6 @@ export const useMandoTactil = (): MandoTactil => {
     modo,
     cambiarModo,
     fijar: (quiere: boolean) => cambiarModo(quiere ? 'siempre' : 'nunca'),
+    apartar,
   };
 };

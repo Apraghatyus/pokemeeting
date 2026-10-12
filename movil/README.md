@@ -13,6 +13,11 @@ pinta la interfaz, ni se lleva 300 MB de wasm, ni compite con el navegador.
 - Entrar en una sala de `emupoke.aguaquim.com`, ver el equipo del otro y las
   parejas caidas del Soul Link. Se puede jugar con alguien que este en la web.
 - Ver la pantalla del companero si la manda.
+- Jugar tumbado: la partida a todo el alto y el mando flotando en las esquinas,
+  como en la web.
+- Mandos Bluetooth o USB, con la misma tabla que la web
+  (`apps/web/src/core/mandoFisico.ts`): el boton de la derecha es A y el de
+  abajo B, como en la consola. Se suman al mando tactil.
 
 Todavia no: mandar tu pantalla y tu voz, intercambios, aleatorizar, cuentas y
 dificultades.

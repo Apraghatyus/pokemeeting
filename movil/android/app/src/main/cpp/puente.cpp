@@ -40,7 +40,8 @@ ANativeWindow* ventana = nullptr;
 std::thread hilo;
 std::atomic<bool> corriendo{false};
 std::atomic<bool> pausado{false};
-std::atomic<uint32_t> botones{0};
+std::atomic<uint32_t> botones{0};  // los de la pantalla
+std::atomic<uint32_t> fisicos{0};  // los de un mando Bluetooth o USB
 AAudioStream* altavoz = nullptr;
 
 void abrirAltavoz() {
@@ -96,7 +97,8 @@ void bucle() {
     int pares = 0;
     {
       std::lock_guard<std::mutex> l(cerrojo);
-      nucleo.teclas(botones.load());
+      // Se suman: se puede jugar con el mando y tocar la pantalla a la vez.
+      nucleo.teclas(botones.load() | fisicos.load());
       nucleo.fotograma();
       pares = nucleo.sonido(sonido, 2048);
       pintar();
@@ -165,6 +167,10 @@ JNIEXPORT void JNICALL Java_com_aguaquim_emupoke_mgba_Nativo_pausar(JNIEnv*, job
 
 JNIEXPORT void JNICALL Java_com_aguaquim_emupoke_mgba_Nativo_teclas(JNIEnv*, jobject, jint bits) {
   botones = static_cast<uint32_t>(bits);
+}
+
+JNIEXPORT void JNICALL Java_com_aguaquim_emupoke_mgba_Nativo_teclasFisicas(JNIEnv*, jobject, jint bits) {
+  fisicos = static_cast<uint32_t>(bits);
 }
 
 JNIEXPORT jbyteArray JNICALL Java_com_aguaquim_emupoke_mgba_Nativo_estado(JNIEnv* env, jobject) {

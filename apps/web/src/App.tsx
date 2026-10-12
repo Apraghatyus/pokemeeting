@@ -14,6 +14,7 @@ import { useEsEstrecha } from './core/useEsEstrecha';
 import { usePantallaCompleta } from './core/usePantallaCompleta';
 import { useEspecies } from './core/useEspecies';
 import { useMandoTactil } from './core/useMandoTactil';
+import { useMandoFisico } from './core/useMandoFisico';
 import { apodoGuardado, comoSeLlama } from './core/apodo';
 import { codificarSemilla, type Semilla } from './core/semilla';
 import { leerInvitacion, olvidarInvitacion, type Invitacion } from './core/invitacion';
@@ -104,6 +105,12 @@ export const App = () => {
   // El mando en pantalla aparece solo cuando hace falta: lo decide con que se
   // esta jugando, no que aparato es. Desde el menu se fuerza a mano.
   const mando = useMandoTactil();
+  // Un mando fisico, si hay alguno. Al jugar con el, el tactil se aparta.
+  const mandoFisico = useMandoFisico(
+    emulator.coreRef,
+    state.status === 'running',
+    mando.apartar,
+  );
 
   // Con el modal o el menu abiertos el teclado es de la interfaz aunque el foco
   // este en un boton: si no, las flechas moverian al personaje por detras.
@@ -641,6 +648,7 @@ export const App = () => {
           emulator={emulator}
           teclas={teclas}
           mando={mando}
+          mandoFisico={mandoFisico.conectado}
           video={{ enviando: session.enviandoVideo, cambiar: session.cambiarEnvioDeVideo }}
           hasRom={hasRom}
           conCompanero={conCompanero}

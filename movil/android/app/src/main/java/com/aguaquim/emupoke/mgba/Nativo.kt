@@ -23,6 +23,12 @@ object Nativo {
   /** Botones pulsados como bits: A, B, Select, Start, derecha, izquierda, arriba, abajo, R, L. */
   external fun teclas(bits: Int)
 
+  /** Lo que pulsa un mando fisico. Se suma a lo de la pantalla. Ver Mando.kt. */
+  external fun teclasFisicas(bits: Int)
+
+  /** Si hay una partida corriendo. Sin ella, el mando sirve para moverse por la app. */
+  @Volatile var jugando = false
+
   /** El estado entero de la maquina: los 0x61000 bytes que lee packages/pokemon. */
   external fun estado(): ByteArray?
 

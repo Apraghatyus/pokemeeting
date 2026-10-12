@@ -62,6 +62,7 @@
     "test:equipo": "npx tsx tools/tests/test-equipo-companero.mjs",
     "test:soullink": "npx tsx tools/tests/test-soullink.mjs",
     "test:dificultad": "npx tsx tools/tests/test-dificultad.mjs",
+    "test:mando:fisico": "npx tsx tools/tests/test-mando-fisico.mjs",
     "test:paneles": "npx tsx tools/tests/test-paneles.mjs",
     "test:resumen": "npx tsx tools/tests/test-resumen.mjs",
     "test:texto": "npx tsx tools/tests/test-texto.mjs",

@@ -130,11 +130,18 @@ class MgbaModule(private val contexto: ReactApplicationContext) :
     trabajo.execute {
       val base = File(ruta).nameWithoutExtension
       val guardado = File(carpetaGuardados, "$base.sav").absolutePath
-      promesa.resolve(Nativo.cargar(ruta, guardado))
+      val ok = Nativo.cargar(ruta, guardado)
+      Nativo.jugando = ok
+      promesa.resolve(ok)
     }
   }
 
-  @ReactMethod fun cerrar() = Nativo.cerrar()
+  @ReactMethod
+  fun cerrar() {
+    Nativo.jugando = false
+    Nativo.teclasFisicas(0)
+    Nativo.cerrar()
+  }
 
   @ReactMethod fun pausar(si: Boolean) = Nativo.pausar(si)
 

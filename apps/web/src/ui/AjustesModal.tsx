@@ -44,6 +44,8 @@ type Props = {
   };
   teclas: Teclas;
   mando: MandoTactil;
+  /** El nombre del mando fisico conectado, o null. */
+  mandoFisico: string | null;
   /** Si este aparato manda su pantalla al companero. */
   video: { enviando: boolean; cambiar: (enviar: boolean) => void };
   hasRom: boolean;
@@ -90,6 +92,7 @@ export const AjustesModal = ({
   emulator,
   teclas,
   mando,
+  mandoFisico,
   video,
   hasRom,
   conCompanero,
@@ -216,6 +219,15 @@ export const AjustesModal = ({
               </div>
             </div>
           </div>
+
+          {/* Un mando por Bluetooth o USB funciona solo, sin configurar nada.
+              Se dice cual se ha reconocido y como van los botones, porque
+              cada fabricante pone otras letras. */}
+          <p className="hint">
+            {mandoFisico
+              ? `Mando conectado: ${mandoFisico.replace(/\s*\(.*$/, '')}. El botón de la derecha es A y el de abajo B, como en la consola.`
+              : 'Puedes conectar un mando por Bluetooth o USB: pulsa cualquier botón para que el navegador lo reconozca.'}
+          </p>
 
           {/* En un movil que no da abasto, mandar la partida a 60 por segundo
               es lo que mas cuesta despues de emularla. Sin ella siguen el
