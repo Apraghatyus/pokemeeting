@@ -254,9 +254,16 @@ const Ficha = ({
               +{sobra}
             </span>
           )}
-          {/* El tipo primario repetido NO lleva etiqueta: ese sitio es de los
-              estados. Se ve en que la ficha sale apagada, y el porque va en el
-              titulo de la ficha. */}
+          {/* Su tipo primario lo lleva otro, aqui o en el equipo del companero.
+              En rojo, como REVIVIDO: para el reto no se puede usar. */}
+          {tipoRepetido && pokemon.tipos && (
+            <span
+              className="estado estado--pasado"
+              title={`Otro Pokemon de los dos equipos tambien es de tipo ${TIPOS_GEN3[pokemon.tipos[0]] ?? '?'} primario: va al PC`}
+            >
+              TIPO REPETIDO
+            </span>
+          )}
           {/* Cayo antes y ahora esta en pie: en una Nuzlocke esta muerto, lo
               haya levantado un Revivir o el Centro Pokemon. */}
           {revivido && (
