@@ -8,8 +8,13 @@
 // Ahora cada copia tiene nombre propio, ninguna pisa a la otra, y las dos
 // quedan en la lista para poder volver a cualquiera.
 //
+//
+// NECESITA ADEMAS EL SERVICIO DE CUENTAS. Las partidas guardadas son de quien
+// inicia sesion -sin cuenta se juega, pero la copia no entra en la lista- asi
+// que esta prueba abre una cuenta nueva antes de empezar.
 // Uso: node tools/tests/test-randomizer-limpio.mjs <rom.gba>
 import { chromium } from 'playwright';
+import { entrarConCuentaNueva } from './con-cuenta.mjs';
 
 const ROM = process.argv[2];
 const URL = process.env.SMOKE_URL ?? 'http://localhost:5173/';
@@ -64,6 +69,12 @@ const guardados = () =>
   });
 
 await page.goto(URL, { waitUntil: 'load' });
+await page.waitForFunction(() => !document.querySelector('.dropzone button')?.disabled, null, {
+  timeout: 30_000,
+});
+
+// Con cuenta: las partidas guardadas son de quien inicia sesion.
+await entrarConCuentaNueva(page, 'limpio');
 await page.waitForFunction(() => !document.querySelector('.dropzone button')?.disabled, null, {
   timeout: 30_000,
 });

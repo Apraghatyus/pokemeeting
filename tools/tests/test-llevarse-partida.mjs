@@ -11,11 +11,16 @@
 //
 // Necesita el servicio de aleatorizacion levantado (npm run dev:all).
 //
+//
+// NECESITA ADEMAS EL SERVICIO DE CUENTAS. Las partidas guardadas son de quien
+// inicia sesion -sin cuenta se juega, pero la copia no entra en la lista- asi
+// que esta prueba abre una cuenta nueva antes de empezar.
 // Uso: node tools/tests/test-llevarse-partida.mjs <rom.gba>
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { chromium } from 'playwright';
+import { entrarConCuentaNueva } from './con-cuenta.mjs';
 
 const ROM = process.argv[2];
 const URL = process.env.SMOKE_URL ?? 'http://localhost:5173/';
@@ -43,6 +48,13 @@ const abrir = async () => {
     if (!/unwind/.test(e.message)) console.log(`[pageerror] ${e.message}`.slice(0, 150));
   });
   await page.goto(URL, { waitUntil: 'load' });
+  await page.waitForFunction(() => !document.querySelector('.dropzone button')?.disabled, null, {
+    timeout: 30_000,
+  });
+
+  // Con cuenta: las partidas guardadas son de quien inicia sesion, y estas
+  // pruebas miran la lista despues de aleatorizar.
+  await entrarConCuentaNueva(page, 'llevar');
   await page.waitForFunction(() => !document.querySelector('.dropzone button')?.disabled, null, {
     timeout: 30_000,
   });

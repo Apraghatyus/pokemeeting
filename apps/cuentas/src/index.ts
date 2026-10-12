@@ -69,8 +69,15 @@ const porDireccion = new Cupo(50, 15 * 60 * 1000);
  * bien configurado, esta cuenta la comparte TODO el mundo, y un numero bajo
  * dejaria sin poder registrarse a un grupo de amigos que se apunta junto. Para
  * frenar a quien lo automatice, veinte por hora sigue sobrando.
+ *
+ * Se puede subir con CUENTAS_MAX_ALTAS, y en desarrollo hace falta: las pruebas
+ * abren una cuenta cada una -las partidas guardadas son de quien inicia sesion-
+ * y todas salen de la misma direccion, asi que el cupo de produccion se agota
+ * en una tanda. Lo que NO se hace es perdonar a las direcciones privadas: con
+ * un proxy mal configurado, todo el mundo llega como una de ellas.
  */
-const altas = new Cupo(20, 60 * 60 * 1000);
+const MAX_ALTAS = Number(process.env['CUENTAS_MAX_ALTAS'] ?? 20);
+const altas = new Cupo(Number.isInteger(MAX_ALTAS) && MAX_ALTAS > 0 ? MAX_ALTAS : 20, 60 * 60 * 1000);
 
 type Fila = {
   id: string;

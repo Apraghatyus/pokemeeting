@@ -62,6 +62,8 @@ type Props = {
   onBorrarPartida: (fichero: string) => void;
   /** Para poder llevarse una partida: lee su guardado. */
   leerGuardado: (fichero: string) => Uint8Array | null;
+  /** Si hay sesion iniciada. Sin cuenta no hay partidas guardadas. */
+  conCuenta: boolean;
   /**
    * La ROM ORIGINAL, no la que se esta jugando.
    *
@@ -94,6 +96,7 @@ export const AjustesModal = ({
   onBorrarPartida,
   leerGuardado,
   baseRom,
+  conCuenta,
 }: Props) => {
   // La lista se relee al abrir el menu: puede haber cambiado desde la vez
   // anterior -se creo una, se borro otra- y una lista vieja aqui dentro
@@ -259,20 +262,33 @@ export const AjustesModal = ({
                 tono="azul"
                 accion={
                   <span className="cuenta">
-                    {partidas.length}/{MAX_PARTIDAS}
+                    {conCuenta ? `${partidas.length}/${MAX_PARTIDAS}` : 'sin cuenta'}
                   </span>
                 }
               >
                 Tus partidas
               </Titulo>
 
+              {/* Sin cuenta no hay partidas guardadas, asi que no hay lista
+                  que enseñar: se dice por que y como tenerlas. */}
+              {!conCuenta && (
+                <p className="hint">
+                  Las partidas guardadas son de quien inicia sesión. Sin cuenta puedes aleatorizar
+                  y jugar, pero al cerrar la pestaña se pierde.
+                </p>
+              )}
+
               <PartidasGuardadas
-                partidas={partidas}
+                partidas={conCuenta ? partidas : []}
                 crcBase={crc}
                 existeGuardada={existeGuardada}
-                libres={MAX_PARTIDAS - partidas.length}
+                libres={conCuenta ? MAX_PARTIDAS - partidas.length : 1}
                 puedeCrear
-                tituloCrear="Abre el menu de aleatorizar para crear una partida nueva"
+                tituloCrear={
+                  conCuenta
+                    ? 'Abre el menu de aleatorizar para crear una partida nueva'
+                    : 'Aleatoriza y juega ahora. Sin cuenta no se guarda.'
+                }
                 onCrear={onAleatorizar}
                 onAbrir={(partida, aqui) => {
                   // Si su copia sigue aqui, se abre y ya. Si no, hay que

@@ -54,6 +54,64 @@ export type RehacerOpciones = {
   cargar: (rom: Uint8Array, fileName: string) => Promise<void>;
   /** Para poder decir cuanta cola hay mientras se espera turno. */
   alEsperar?: (puesto: PuestoEnCola | null) => void;
+  /**
+   * Si la partida se apunta en la lista.
+   *
+   * False sin sesion iniciada: la copia se genera y se juega, pero no se
+   * guarda. Sin cuenta no hay ranuras, y prometer una partida que desaparece
+   * al recargar es peor que decirlo de frente.
+   */
+  guardar?: boolean;
+};
+
+/**
+ * Genera una copia NUEVA con los mismos ajustes que otra, y la apunta.
+ *
+ * Es lo que se le da a quien entra por un enlace. La diferencia con
+ * `rehacerDesdeSemilla` es una sola y es la que importa: de la semilla del
+ * anfitrion se cogen los AJUSTES -que Pokemon se cambian, que objetos, que
+ * entrenadores- pero no el numero, asi que sale otro mundo.
+ *
+ * POR QUE ASI. Jugar los dos el mismo mundo aleatorizado quita la mitad de la
+ * gracia: sabes lo que le va a salir al otro porque ya te salio a ti. Con los
+ * mismos ajustes y distinta semilla, las reglas del reto son identicas -que es
+ * lo que hace que una Soul Link sea justa- y lo que os encontrais, no.
+ *
+ * Quien SI quiera el mismo mundo lo tiene: pegar la semilla del otro en
+ * "Tengo una semilla", que es exactamente lo que hace esa pantalla.
+ */
+export const nuevaConLosMismosAjustes = async ({
+  base,
+  semilla,
+  juego,
+  cargar,
+  alEsperar,
+  guardar = true,
+}: RehacerOpciones): Promise<void> => {
+  if (semilla.baseCrc32 !== base.crc32) throw new SemillaDeOtraRomError();
+
+  // Sin `seed`: el servicio escoge uno y lo devuelve. Eso es lo unico que
+  // separa esta copia de la del anfitrion.
+  const result = await randomizeRom({ settingsString: semilla.ajustes }, base.bytes, alEsperar);
+
+  const generada = crc32(result.rom);
+  const fileName = nombreParaNueva(base.fileName);
+  await cargar(result.rom, fileName);
+  if (!guardar) return;
+  registrar({
+    fichero: fileName,
+    baseNombre: base.fileName,
+    baseCrc32: base.crc32,
+    semilla: result.seed,
+    ajustes: result.ajustes,
+    crc32: generada,
+    cambiado: result.summary.changed,
+    nombre: null,
+    juego: juego.label,
+    generacion: juego.generacion,
+    // Esta partida nace de una invitacion: es de Soul Link por definicion.
+    soullink: true,
+  });
 };
 
 /**
@@ -94,5 +152,8 @@ export const rehacerDesdeSemilla = async ({
     nombre: null,
     juego: juego.label,
     generacion: juego.generacion,
+    // Una semilla pegada a mano puede ser para jugar con alguien o para repetir
+    // un mundo que te gusto. No se sabe, y null dice eso.
+    soullink: null,
   });
 };

@@ -61,7 +61,30 @@ export type PartidaGuardada = {
   juego: string | null;
   /** Segunda o tercera. Acompaña al nombre del juego. */
   generacion: number | null;
+  /**
+   * Si esta partida es de Soul Link.
+   *
+   * Se marca cuando nace con compañero -quien entra por un enlace- y cuando se
+   * invita a alguien a una que ya existia. No se deduce al terminar: el modo
+   * es de la PARTIDA, no de como acabo. Una Soul Link que se juega un rato
+   * sola sigue siendo una Soul Link.
+   *
+   * Es null en las de antes de que esto existiera, y eso dice la verdad: que
+   * no se sabe.
+   */
+  soullink: boolean | null;
 };
+
+/** Marca una partida como de Soul Link. Solo se enciende, nunca se apaga. */
+export const marcarSoullink = (fichero: string): void => {
+  escribirTodas(
+    leerTodas().map((p) => (p.fichero === fichero ? { ...p, soullink: true } : p)),
+  );
+};
+
+/** Si esa partida es de Soul Link, mirando por su fichero. */
+export const esSoullink = (fichero: string | null): boolean =>
+  fichero !== null && leerTodas().some((p) => p.fichero === fichero && p.soullink === true);
 
 /**
  * Si una partida se puede volver a generar desde su semilla.
@@ -83,6 +106,23 @@ const CLAVE = 'emupoke.partidas';
  * ultimo que uno quiere perder.
  */
 export const MAX_PARTIDAS = 3;
+
+/**
+ * Cuantas partidas puede guardar quien NO ha iniciado sesion: ninguna.
+ *
+ * Sin cuenta se puede aleatorizar y jugar -eso no se le quita a nadie- pero la
+ * partida no se queda en la lista: al cerrar la pestaña se pierde. Las tres
+ * ranuras son de quien tiene cuenta.
+ *
+ * ESTO HAY QUE DECIRLO ANTES, no despues. Alguien que juega diez horas y
+ * descubre al recargar que no habia nada guardado no vuelve, y con razon. El
+ * aviso va en la pantalla de crear, antes de generar nada.
+ */
+export const MAX_PARTIDAS_SIN_CUENTA = 0;
+
+/** El cupo que le toca a quien esta mirando. */
+export const cupoDePartidas = (conCuenta: boolean): number =>
+  conCuenta ? MAX_PARTIDAS : MAX_PARTIDAS_SIN_CUENTA;
 
 const leerTodas = (): PartidaGuardada[] => {
   try {

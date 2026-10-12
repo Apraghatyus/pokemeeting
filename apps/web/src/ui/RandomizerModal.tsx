@@ -9,6 +9,7 @@ import {
 } from '../net/randomizer';
 import {
   MAX_PARTIDAS,
+  cupoDePartidas,
   nombreParaNueva,
   renombrar,
   partidasDe,
@@ -49,6 +50,13 @@ type Props = {
   existeGuardada: (fileName: string) => boolean;
   /** El guardado de una partida, para poder llevarsela a otro aparato. */
   leerGuardado: (fileName: string) => Uint8Array | null;
+  /**
+   * Si hay sesion iniciada.
+   *
+   * Sin cuenta se puede aleatorizar y jugar, pero la partida NO se guarda: se
+   * pierde al cerrar la pestaña. Las tres ranuras son de quien tiene cuenta.
+   */
+  conCuenta: boolean;
   /** Mete un guardado traido de fuera. */
   escribirGuardado: (fileName: string, bytes: Uint8Array) => Promise<void>;
 };
@@ -61,7 +69,14 @@ type Progress =
       seed: string | null;
       fileName: string;
       /** Para poder ponerle nombre desde la pantalla de resultado. */
-      partidaId: string;
+      /**
+       * La partida apuntada, o undefined si no se apunto.
+       *
+       * Sin cuenta la copia se genera y se juega pero no entra en la lista, y
+       * entonces no hay nada que renombrar: un nombre para algo que desaparece
+       * al recargar es una promesa que no se cumple.
+       */
+      partidaId?: string;
       nombre: string;
       summary: RandomizeSummary;
       /** Como rehacer esta copia, o null si no se va a poder. */
@@ -144,6 +159,7 @@ export const RandomizerModal = ({
   onBorrar,
   existeGuardada,
   leerGuardado,
+  conCuenta,
   escribirGuardado,
 }: Props) => {
   const [status, setStatus] = useState<RandomizerStatus>({ estado: 'comprobando' });
@@ -202,7 +218,10 @@ export const RandomizerModal = ({
     ? todas.filter((option) => option.generaciones.includes(juego.generacion))
     : todas;
   const guardadas = partidas.length + otras.length;
-  const lleno = guardadas >= MAX_PARTIDAS;
+  // Sin cuenta no hay ranuras, pero si se puede crear: lo que no hay es sitio
+  // donde dejarla. Por eso el cupo no entra en `lleno`.
+  const cupo = cupoDePartidas(conCuenta);
+  const lleno = conCuenta && guardadas >= cupo;
   const canRandomize =
     status.estado === 'listo' &&
     supported &&
@@ -248,23 +267,30 @@ export const RandomizerModal = ({
       // Un nombre de salida que ya distinga una partida de otra de la misma
       // ROM. El jugador lo cambia en la pantalla siguiente si quiere.
       const nombrePorDefecto = `Partida ${partidasDe(base.crc32).length + 1}`;
-      const registrada = registrar({
-        fichero: fileName,
-        baseNombre: base.fileName,
-        baseCrc32: base.crc32,
-        semilla: result.seed,
-        ajustes: result.ajustes,
-        crc32: generada,
-        cambiado: result.summary.changed,
-        nombre: nombrePorDefecto,
-        juego: juego?.label ?? null,
-        generacion: juego?.generacion ?? null,
-      });
+      // SIN CUENTA NO SE APUNTA. La copia existe y ya esta cargada, asi que
+      // se puede jugar; lo que no hace es entrar en la lista, y al cerrar la
+      // pestaña se pierde. Eso se avisa ANTES de llegar aqui, no despues.
+      const registrada = conCuenta
+        ? registrar({
+            // Nace sola. Si luego se invita a alguien, se marca entonces.
+            soullink: false,
+            fichero: fileName,
+            baseNombre: base.fileName,
+            baseCrc32: base.crc32,
+            semilla: result.seed,
+            ajustes: result.ajustes,
+            crc32: generada,
+            cambiado: result.summary.changed,
+            nombre: nombrePorDefecto,
+            juego: juego?.label ?? null,
+            generacion: juego?.generacion ?? null,
+          })
+        : null;
       setProgress({
         fase: 'hecho',
         seed: result.seed,
         fileName,
-        partidaId: registrada.id,
+        partidaId: registrada?.id,
         nombre: nombrePorDefecto,
         summary: result.summary,
         // La semilla solo tiene sentido si de verdad se puede rehacer con ella.
@@ -346,6 +372,9 @@ export const RandomizerModal = ({
       await escribirGuardado(nombre, traida.sav);
       await onRandomized(result.rom, nombre);
       registrar({
+        // Viene de un fichero de partida traido de otro aparato: es la misma
+        // partida que alla, pero aqui no se sabe si era de Soul Link.
+        soullink: null,
         fichero: nombre,
         baseNombre: base.fileName,
         baseCrc32: base.crc32,
@@ -527,6 +556,17 @@ export const RandomizerModal = ({
               </p>
             )}
 
+            {/* ANTES de generar nada, no despues. Alguien que juega diez horas
+                y descubre al recargar que no habia nada guardado no vuelve, y
+                con razon. */}
+            {!conCuenta && (
+              <p className="warn">
+                Sin cuenta puedes aleatorizar y jugar, pero <strong>la partida no se guarda</strong>:
+                al cerrar la pestaña se pierde. Crea una cuenta para tener tus tres partidas y
+                poder volver a ellas.
+              </p>
+            )}
+
             {lleno && (
               <p className="warn">
                 Tienes {guardadas} partidas guardadas, el maximo. Cada una es una ROM entera
@@ -555,7 +595,7 @@ export const RandomizerModal = ({
                     <h2>Tus partidas</h2>
                     <div className="tarjeta__accion">
                       <span className="cuenta">
-                        {guardadas}/{MAX_PARTIDAS}
+                        {conCuenta ? `${guardadas}/${MAX_PARTIDAS}` : 'sin guardar'}
                       </span>
                     </div>
                   </div>
@@ -576,7 +616,9 @@ export const RandomizerModal = ({
                     partidas={[...partidas, ...otras]}
                     crcBase={baseRom.current?.crc32 ?? null}
                     existeGuardada={existeGuardada}
-                    libres={MAX_PARTIDAS - guardadas}
+                    /* Sin cuenta, un solo hueco: no es una ranura que se
+                       quede, es el boton de "aleatoriza y juega ahora". */
+                    libres={conCuenta ? cupo - guardadas : 1}
                     puedeCrear={canRandomize}
                     tituloCrear="Aleatoriza con las opciones marcadas y guarda la partida aqui"
                     onCrear={() => void run()}
@@ -732,7 +774,8 @@ const Resultado = ({
   // para algo que no puede fallar.
   const cambiarNombre = (valor: string) => {
     setNombre(valor);
-    renombrar(progress.partidaId, valor);
+    // Sin partida apuntada no hay nada que renombrar: se jugo sin cuenta.
+    if (progress.partidaId) renombrar(progress.partidaId, valor);
   };
 
   return (

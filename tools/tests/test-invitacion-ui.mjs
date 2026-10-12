@@ -29,8 +29,13 @@
 // Necesita la aplicacion levantada (npm run dev:all), con el servicio de
 // aleatorizacion en marcha.
 //
+//
+// NECESITA ADEMAS EL SERVICIO DE CUENTAS. Las partidas guardadas son de quien
+// inicia sesion -sin cuenta se juega, pero la copia no entra en la lista- asi
+// que esta prueba abre una cuenta nueva antes de empezar.
 // Uso: node tools/tests/test-invitacion-ui.mjs <rom.gba>
 import { chromium } from 'playwright';
+import { entrarConCuentaNueva } from './con-cuenta.mjs';
 
 const ROM = process.argv[2];
 /** Otra ROM cualquiera, para probar que se avisa cuando la copia no es la buena. */
@@ -63,10 +68,22 @@ const esperarElNucleo = (page) =>
     timeout: 30_000,
   });
 
+/**
+ * Deja la pagina lista y con sesion abierta.
+ *
+ * Con cuenta porque las partidas guardadas son de quien inicia sesion, y esta
+ * prueba mira la lista del anfitrion y la de quien entra por el enlace.
+ */
+const prepararPestana = async (page, prefijo) => {
+  await esperarElNucleo(page);
+  await entrarConCuentaNueva(page, prefijo);
+  await esperarElNucleo(page);
+};
+
 // ---------- quien invita: un mundo aleatorizado y una sala ----------
 const anfitrion = await nuevaPestana();
 await anfitrion.goto(URL, { waitUntil: 'load' });
-await esperarElNucleo(anfitrion);
+await prepararPestana(anfitrion, 'anfi');
 await anfitrion.setInputFiles('input[type=file][accept*=".gba"]', ROM);
 
 await anfitrion.getByRole('button', { name: 'Aleatorizar y jugar' }).click({ timeout: 20_000 });
@@ -74,9 +91,12 @@ await anfitrion.locator('.hecha__codigo').waitFor({ timeout: 180_000 });
 const semilla = ((await anfitrion.locator('.hecha__codigo').textContent()) ?? '').trim();
 check('quien invita tiene un mundo con semilla', semilla.startsWith('EMUPOKE1.'), semilla);
 
-// La semilla dice que CRC tiene que tener el mundo. Es el numero con el que se
-// comprueba, al final, que los dos acabaron en el mismo sitio.
+// La semilla lleva cuatro campos: version, CRC de la ROM original, CRC de la
+// copia y los ajustes. Con los dos ultimos se comprueba, al final, lo que de
+// verdad importa: que los dos juegan con las MISMAS REGLAS y en MUNDOS
+// DISTINTOS.
 const crcDelMundo = semilla.split('.')[2];
+const ajustesDelMundo = semilla.split('.').slice(4).join('.');
 
 await anfitrion.getByRole('button', { name: 'Empezar a jugar' }).click();
 await anfitrion.locator('.roomchip').click();
@@ -168,12 +188,18 @@ check('y de una sala que no existe no se inventa nada',
 // la sala al abrirlo.
 const datos = `${sala}:${encodeURIComponent(CLAVE)}`;
 const invitado = await nuevaPestana();
+// La sesion se abre ANTES de pulsar el enlace.  recarga,
+// y la invitacion se lee una sola vez y se borra de la direccion: abriendola
+// primero, la recarga se la llevaria por delante.
+await invitado.goto(URL, { waitUntil: 'load' });
+await prepararPestana(invitado, 'invit');
 await invitado.goto(`${URL}#${datos}`, { waitUntil: 'load' });
 await esperarElNucleo(invitado);
 
 const cartel = invitado.locator('.modal[open]');
 check('al abrir el enlace sale el cartel de la invitacion',
-  (await cartel.locator('.modal__title').textContent()) === 'Te han invitado a jugar');
+  /te ha(n)? invitado a jugar/i.test((await cartel.locator('.modal__title').textContent()) ?? ''),
+  (await cartel.locator('.modal__title').textContent()) ?? '');
 check('y dice a que sala', ((await cartel.locator('.modal__subtitle').textContent()) ?? '').includes(sala));
 
 // Ahi dentro va la contrasena de la sala: no puede quedarse en la barra de
@@ -226,7 +252,8 @@ check('con la copia buena ya no hay aviso', (await cartel.locator('.alert').coun
 check('NO se le pregunta que aleatorizar: el mundo ya esta decidido',
   (await invitado.locator('.modal[open] .aleatorizar').count()) === 0);
 check('sigue siendo el cartel de la invitacion el que esta delante',
-  (await cartel.locator('.modal__title').textContent()) === 'Te han invitado a jugar');
+  /te ha(n)? invitado a jugar/i.test((await cartel.locator('.modal__title').textContent()) ?? ''),
+  (await cartel.locator('.modal__title').textContent()) ?? '');
 
 // ---------- un boton ----------
 //
@@ -248,18 +275,37 @@ check('y quien entro ve la de quien le invito', conectados[1] === true);
 
 // ---------- y el mundo es el mismo ----------
 //
-// El CRC del mundo rehecho tiene que ser el que dice la semilla. Si no lo fuera,
-// rehacer habria dado un error y no se habria cargado nada: esta comprobacion es
-// la que impide que los dos crean estar en el mismo sitio sin estarlo.
+// LO QUE SE COMPARTE SON LAS REGLAS, NO EL MUNDO.
+//
+// Antes se comprobaba lo contrario: que a quien entraba le salia el mundo
+// EXACTO del anfitrion. Se cambio a proposito, porque jugar los dos el mismo
+// mundo aleatorizado quita la mitad de la gracia -sabes lo que le va a salir al
+// otro porque ya te salio a ti-. Ahora se cogen sus ajustes y se genera otro.
+//
+// Asi que aqui se comprueban las dos mitades, y las dos importan: que los
+// ajustes son los suyos -si no, no seria el mismo reto- y que el mundo NO lo
+// es -si lo fuera, no habria cambiado nada-.
 const suMundo = await invitado.evaluate(() => {
   const partidas = JSON.parse(globalThis.localStorage.getItem('emupoke.partidas') ?? '[]');
   const corriendo = (globalThis.mGBAModule?.gameName ?? '').split('/').pop() ?? '';
   const suya = partidas.find((p) => p.fichero === corriendo);
-  return { corriendo, crc32: suya?.crc32 ?? null, cuantas: partidas.length };
+  return {
+    corriendo,
+    crc32: suya?.crc32 ?? null,
+    ajustes: suya?.ajustes ?? null,
+    soullink: suya?.soullink ?? null,
+    cuantas: partidas.length,
+  };
 });
 
-check('el mundo que acaba jugando es el de la semilla, no uno nuevo',
-  suMundo.crc32 === crcDelMundo, `${suMundo.crc32} frente a ${crcDelMundo}`);
+check('el mundo que le sale NO es el del anfitrion',
+  suMundo.crc32 !== null && suMundo.crc32 !== crcDelMundo,
+  `${suMundo.crc32} frente a ${crcDelMundo}`);
+check('pero con sus mismas reglas, que es lo que hace justo el reto',
+  suMundo.ajustes !== null && suMundo.ajustes === ajustesDelMundo,
+  `${String(suMundo.ajustes).slice(0, 24)} frente a ${String(ajustesDelMundo).slice(0, 24)}`);
+// Y nace marcada: una partida que sale de una invitacion es de Soul Link.
+check('y queda marcada como Soul Link', suMundo.soullink === true, String(suMundo.soullink));
 check('y queda apuntado para poder continuarlo manana',
   suMundo.cuantas >= 1 && suMundo.corriendo.endsWith('.gba'), suMundo.corriendo);
 
@@ -280,13 +326,13 @@ await invitado.waitForTimeout(1500);
 check('con la pagina ya abierta, el enlace tambien abre el cartel',
   (await invitado
     .locator('.modal[open]')
-    .filter({ hasText: 'Te han invitado a jugar' })
+    .filter({ hasText: /te ha(n)? invitado a jugar/i })
     .count()) === 1);
 // Se cierra solo el de la invitacion: el de la sala tambien esta abierto por
 // detras, de cuando entro.
 await invitado
   .locator('.modal[open]')
-  .filter({ hasText: 'Te han invitado a jugar' })
+  .filter({ hasText: /te ha(n)? invitado a jugar/i })
   .locator('.modal__close')
   .click();
 
@@ -303,6 +349,8 @@ await invitado.close();
 await anfitrion.waitForTimeout(2500);
 
 const jueves = await mismoNavegador.newPage();
+// Mismo navegador que el invitado, asi que su sesion sigue abierta: aqui solo
+// hay que esperar a que arranque.
 await jueves.goto(`${URL}#${datos}`, { waitUntil: 'load' });
 await esperarElNucleo(jueves);
 // Vuelve a hacer falta su copia del juego: el enlace sigue sin traerla.
@@ -350,7 +398,7 @@ check('y vuelve a estar en la sala',
 await navegador.close();
 console.log(
   fallos === 0
-    ? '\nCON UN ENLACE Y SU ROM, DENTRO Y EN EL MISMO MUNDO'
+    ? '\nCON UN ENLACE Y SU ROM, DENTRO Y CON SUS MISMAS REGLAS'
     : `\n${fallos} COMPROBACIONES FALLIDAS`,
 );
 process.exit(fallos === 0 ? 0 : 1);

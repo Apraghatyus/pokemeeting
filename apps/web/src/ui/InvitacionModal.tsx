@@ -10,24 +10,36 @@
 // edicion se enteraba despues de haberla buscado. Ahora se le pregunta a la sala
 // a que se juega y se le dice el nombre antes de que vaya a por el fichero.
 //
+// LAS REGLAS SE COMPARTEN; EL MUNDO, NO. Del enlace se cogen los AJUSTES de la
+// aleatorizacion del anfitrion -que Pokemon se cambian, que objetos, que
+// entrenadores- y con ellos se genera un mundo NUEVO para quien entra.
+//
+// Antes se generaba el mundo exacto del anfitrion, y eso quitaba la mitad de la
+// gracia: los dos sabian lo que le iba a salir al otro, porque ya les habia
+// salido a ellos. Con las mismas reglas y distinta semilla, el reto es
+// igual de justo para los dos -que es lo que importa en una Soul Link- y lo que
+// os encontrais, no.
+//
+// QUIEN SI QUIERA EL MISMO MUNDO lo tiene: que le pida la semilla al otro y la
+// pegue en "Tengo una semilla", en el menu de aleatorizar. Esa pantalla existe
+// justo para eso y rehace la copia byte a byte.
+//
 // LA SEGUNDA VEZ NO ES COMO LA PRIMERA. El mismo enlace se reenvia dias despues
 // para seguir la partida de siempre: el lunes se quedaron en el segundo gimnasio
-// y el jueves vuelven. Entonces el mundo ya esta aqui, con su guardado dentro, y
-// lo que hace falta es ELEGIR: seguir esa partida o empezar otra en el mismo
-// mundo. Se elige como en el aleatorizador, con la misma lista de siempre,
-// porque es la misma decision.
+// y el jueves vuelven. Entonces la partida ya esta aqui, con su guardado dentro,
+// y lo que hace falta es ELEGIR: seguir esa o empezar otra. Se reconoce por los
+// ajustes, que es lo que comparten las dos partidas; por el mundo no, porque el
+// de cada uno es el suyo.
 //
 // POR QUE "EMPEZAR UNA NUEVA" NO ABRE LAS OPCIONES DEL ALEATORIZADOR. Porque
-// elegir opciones aqui seria generar OTRO mundo, y entonces los dos amigos
-// volverian a estar en sitios distintos: justo lo que el enlace vino a resolver.
-// El mundo de una invitacion lo decide quien invita, y lo que se elige aqui es
-// solo si se empieza de cero en el o se sigue lo que habia.
+// las reglas las eligio quien invita, y cambiarlas aqui seria jugar a otra cosa:
+// la gracia de una Soul Link es que los dos juegan con las mismas.
 
 import { useEffect, useState, type RefObject } from 'react';
 import { describeGame, parseGameCode } from '@emupoke/pokemon';
 import type { Invitacion } from '../core/invitacion';
 import { cuando, nombreDePartida, partidasDe, tocar, type PartidaGuardada } from '../core/partidas';
-import { rehacerDesdeSemilla, type BaseRom } from '../core/rehacer';
+import { nuevaConLosMismosAjustes, type BaseRom } from '../core/rehacer';
 import { descodificarSemilla, type Semilla } from '../core/semilla';
 import { consultarSala } from '../net/signalingClient';
 import type { PuestoEnCola } from '../net/randomizer';
@@ -56,6 +68,8 @@ type Props = {
   onContinuar: (fichero: string) => Promise<void>;
   /** Si la copia de una partida sigue estando. */
   existeGuardada: (fichero: string) => boolean;
+  /** Si hay sesion iniciada. Sin cuenta se juega, pero no se guarda. */
+  conCuenta: boolean;
   /** Entra en la sala. Lo hace quien tiene la sesion, no este modal. */
   onUnirse: (sala: string, clave: string) => Promise<void>;
 };
@@ -87,6 +101,7 @@ export const InvitacionModal = ({
   onRandomized,
   onContinuar,
   existeGuardada,
+  conCuenta,
   onUnirse,
 }: Props) => {
   const [fase, setFase] = useState<Fase>({ nombre: 'esperando' });
@@ -146,14 +161,16 @@ export const InvitacionModal = ({
    * se puede rehacer pero el guardado no: ofrecer "seguir" ahi seria prometer una
    * partida que ya no existe. Ese caso cae solo en empezar otra.
    *
-   * Y solo de ese mundo. Seguir una partida de otro seria volver justo al
-   * problema que el enlace vino a resolver: dos amigos en dos mundos distintos.
+   * Se reconocen por los AJUSTES, no por el mundo. Antes se comparaba el CRC
+   * de la copia, porque quien entraba jugaba el mundo exacto del anfitrion;
+   * ahora cada uno tiene el suyo y lo que comparten son las reglas. Buscar por
+   * mundo no encontraria nunca nada.
    */
   const guardadas: PartidaGuardada[] =
     semilla === null
       ? []
       : partidasDe(semilla.baseCrc32).filter(
-          (p) => p.crc32 === semilla.crc32 && existeGuardada(p.fichero),
+          (p) => p.ajustes === semilla.ajustes && existeGuardada(p.fichero),
         );
 
   const trabajando = fase.nombre === 'preparando' || fase.nombre === 'entrando';
@@ -171,11 +188,12 @@ export const InvitacionModal = ({
         tocar(seguir.id);
       } else if (semilla && base) {
         setFase({ nombre: 'preparando' });
-        await rehacerDesdeSemilla({
+        await nuevaConLosMismosAjustes({
           base,
           semilla,
           juego: { label: juego?.label ?? null, generacion: juego?.generacion ?? null },
           cargar: onRandomized,
+          guardar: conCuenta,
           alEsperar: (cola) =>
             setFase((actual) =>
               actual.nombre === 'preparando' ? { nombre: 'preparando', cola } : actual,
@@ -245,8 +263,8 @@ export const InvitacionModal = ({
             {copiaMala
               ? 'Prueba con otra copia del juego.'
               : juegoPedido
-                ? `Pon tu copia de ${juegoPedido}. Con ella se prepara exactamente el mismo mundo que está jugando quien te invita.`
-                : 'Pon tu propia copia del juego. Con ella se prepara exactamente el mismo mundo que está jugando quien te invita.'}
+                ? `Pon tu copia de ${juegoPedido}. Con ella se te prepara un mundo aleatorizado con las mismas reglas que el de quien te invita.`
+                : 'Pon tu propia copia del juego. Con ella se te prepara un mundo aleatorizado con las mismas reglas que el de quien te invita.'}
           </p>
           <RomDropZone onRom={onRom} disabled={!nucleoListo} hint={hint} />
         </>
@@ -256,7 +274,7 @@ export const InvitacionModal = ({
               decision, asi que no hay motivo para que se vea de otra manera. */}
           <div className="tarjeta__titulo tarjeta__titulo--suelto">
             <span className="tarjeta__marca" />
-            <h3>{guardadas.length > 0 ? 'Ya tienes ese mundo' : 'Su mundo'}</h3>
+            <h3>{guardadas.length > 0 ? 'Ya tienes una con esas reglas' : 'Tu mundo'}</h3>
           </div>
 
           <div className="huecos">
@@ -278,16 +296,17 @@ export const InvitacionModal = ({
               </div>
             ))}
 
-            {/* Y empezar de cero en ESE mundo, no en otro: las opciones las
-                eligio quien invita. Ver la cabecera. */}
+            {/* Empezar de cero con SUS reglas, en TU mundo. Las opciones las
+                eligio quien invita -por eso aqui no hay nada que marcar- pero
+                el mundo que sale es tuyo. Ver la cabecera. */}
             <button
               type="button"
               className="hueco hueco--libre"
               disabled={trabajando}
               title={
                 guardadas.length > 0
-                  ? 'Empieza de cero en el mismo mundo. Lo que ya tienes se queda donde está.'
-                  : 'Prepara el mundo de quien te invita y entra en la sala'
+                  ? 'Empieza de cero con las mismas reglas. Lo que ya tienes se queda donde está.'
+                  : 'Prepara tu mundo con sus reglas y entra en la sala'
               }
               onClick={() => void entrar(null)}
             >
@@ -299,9 +318,16 @@ export const InvitacionModal = ({
             {!semilla
               ? 'Quien te invita juega su ROM tal cual, así que no hay nada que preparar.'
               : guardadas.length > 0
-                ? 'Empezar una nueva no toca lo que ya tienes. El mundo es el mismo: lo eligió quien te invita.'
-                : 'Se va a generar el mismo mundo que juega quien te invita. Tarda un rato y puedes dejar la pestaña abierta.'}
+                ? 'Empezar una nueva no toca lo que ya tienes. Las reglas son las mismas, el mundo será otro.'
+                : 'Se te va a generar TU mundo con las reglas que eligió quien te invita, así que no sabrás lo que le salió a la otra persona. Tarda un rato y puedes dejar la pestaña abierta.'}
           </p>
+
+          {!conCuenta && (
+            <p className="warn">
+              Sin cuenta puedes jugar, pero <strong>la partida no se guarda</strong>: al cerrar la
+              pestaña se pierde. Crea una cuenta para poder volver a ella otro dia.
+            </p>
+          )}
 
           {trabajando && (
             <p className="hint" role="status">

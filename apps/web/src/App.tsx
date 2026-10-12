@@ -15,7 +15,7 @@ import { useMandoTactil } from './core/useMandoTactil';
 import { apodoGuardado, comoSeLlama } from './core/apodo';
 import { codificarSemilla, type Semilla } from './core/semilla';
 import { leerInvitacion, olvidarInvitacion, type Invitacion } from './core/invitacion';
-import { nombreDePartida, sePuedeRehacer, todasLasPartidas } from './core/partidas';
+import { esSoullink, marcarSoullink, nombreDePartida, sePuedeRehacer, todasLasPartidas } from './core/partidas';
 import { motesDebilitados, parseGameCode } from '@emupoke/pokemon';
 import { EquipoPanel } from './ui/EquipoPanel';
 import { AjustesModal } from './ui/AjustesModal';
@@ -179,6 +179,19 @@ export const App = () => {
 
   const session = useSession(emulator.canvasRef, romRef);
 
+  // Abrir una sala con una partida puesta la convierte en una Soul Link, y eso
+  // se marca EN LA PARTIDA y no se deduce al final.
+  //
+  // Se marca al abrir la sala, no al conectar: invitar a alguien ya es jugar
+  // una Soul Link aunque tarde en llegar. Y no se desmarca nunca -`marcarSoullink`
+  // solo enciende-: una Soul Link que un dia se juega un rato sola sigue
+  // siendolo, y el ranking tiene que seguir contandola donde va.
+  const partidaEnCurso = state.romName;
+  const haySala = session.state.phase !== 'sin-sala';
+  useEffect(() => {
+    if (haySala && partidaEnCurso) marcarSoullink(partidaEnCurso);
+  }, [haySala, partidaEnCurso]);
+
   // Con companero la pantalla comparte sitio con su equipo; sin el, se lo
   // queda. Se mira la conexion y no si ha mandado equipo, para que la columna
   // aparezca en cuanto entra y no de un salto cuando llegue su primer aviso.
@@ -269,7 +282,11 @@ export const App = () => {
       // etiqueta de la plataforma es la misma para los cinco, asi que como
       // filtro no separaba nada.
       juego: parseGameCode(state.header?.gameCode ?? '').game?.label ?? null,
-      modo: conCompanero ? 'soullink' : 'sola',
+      // De la PARTIDA, no de si hay alguien conectado ahora mismo. Una Soul
+      // Link se puede acabar un dia que juegas solo, y seguiria siendo una
+      // Soul Link: lo que la define es como se monto, no quien estaba delante
+      // cuando cayo el ultimo Pokemon.
+      modo: esSoullink(state.romName) ? 'soullink' : 'sola',
       companero: conCompanero ? session.state.peerNombre ?? null : null,
     },
   );
@@ -558,6 +575,7 @@ export const App = () => {
           onBorrarPartida={emulator.deleteSavedGame}
           leerGuardado={emulator.leerGuardado}
           baseRom={emulator.baseRomRef}
+          conCuenta={cuenta.cuenta !== null}
         />
       </main>
 
@@ -573,6 +591,9 @@ export const App = () => {
         existeGuardada={emulator.existeGuardada}
         leerGuardado={emulator.leerGuardado}
         escribirGuardado={emulator.escribirGuardado}
+        /* Sin cuenta se puede aleatorizar y jugar, pero la partida no se
+           guarda: las tres ranuras son de quien inicia sesion. */
+        conCuenta={cuenta.cuenta !== null}
       />
 
       {/* Quien llega por un enlace no tiene que escribir nada: el codigo, la
@@ -590,6 +611,7 @@ export const App = () => {
         onRandomized={emulator.openRomBytes}
         onContinuar={emulator.openSavedGame}
         existeGuardada={emulator.existeGuardada}
+        conCuenta={cuenta.cuenta !== null}
         onUnirse={async (sala, clave) => {
           await esperarLaRom();
           await session.joinRoom(sala, clave);

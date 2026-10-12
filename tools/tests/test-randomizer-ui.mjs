@@ -5,8 +5,13 @@
 // es que los botones respondan, sino que despues el juego sigue corriendo con
 // la copia que corresponde.
 //
+//
+// NECESITA ADEMAS EL SERVICIO DE CUENTAS. Las partidas guardadas son de quien
+// inicia sesion -sin cuenta se juega, pero la copia no entra en la lista- asi
+// que esta prueba abre una cuenta nueva antes de empezar.
 // Uso: node tools/tests/test-randomizer-ui.mjs <rom.gba> [carpeta-de-capturas]
 import { chromium } from 'playwright';
+import { entrarConCuentaNueva } from './con-cuenta.mjs';
 
 const ROM = process.argv[2];
 const SHOTS = process.argv[3] ?? '.';
@@ -39,6 +44,13 @@ const abrir = async () => {
     if (!/unwind/.test(e.message)) console.log(`[pageerror] ${e.message}`.slice(0, 180));
   });
   await page.goto(URL, { waitUntil: 'load' });
+  await page.waitForFunction(() => !document.querySelector('.dropzone button')?.disabled, null, {
+    timeout: 30_000,
+  });
+
+  // Con cuenta: las partidas guardadas son de quien inicia sesion, y estas
+  // pruebas miran la lista despues de aleatorizar.
+  await entrarConCuentaNueva(page, 'randui');
   await page.waitForFunction(() => !document.querySelector('.dropzone button')?.disabled, null, {
     timeout: 30_000,
   });
