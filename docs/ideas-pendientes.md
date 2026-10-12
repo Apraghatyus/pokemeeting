@@ -36,6 +36,9 @@ ejecútala en vez de fiarte de esta lista.
 - **Avance rápido** conmutable: espacio en escritorio, botón propio en el mando.
   `test:controles`
 - **Pantalla completa** que incluye partida, mando y equipo. `test:movil:mando`
+- **Mandos físicos** por la Gamepad API, por posición y no por letra: el botón
+  de la derecha es A y el de abajo B, como en la consola. Se reasignan desde
+  Ajustes, y al usarlos el mando táctil se aparta. `test:mando:fisico`
 
 **Jugar con alguien**
 
@@ -44,6 +47,9 @@ ejecútala en vez de fiarte de esta lista.
 - **Vídeo de la partida del otro** a ~55 fotogramas por segundo. `test:fluidez`
 - **Voz en directo**, con silencio propio y volumen del compañero aparte del
   juego. `test:voice`, `test:audio`
+- **Apagar el envío de vídeo** desde Ajustes, para el móvil que no da abasto: se
+  sigue con el equipo y la voz, y al compañero se le dice por qué no ve nada.
+  `test:trato`
 - **Reconexión automática** si se cae el enlace. `test:reconexion`
 - La ventana del compañero se **arrastra a la esquina** que quieras.
   `test:arrastre`
@@ -56,7 +62,7 @@ ejecútala en vez de fiarte de esta lista.
 - **Soul Link**: si cae tu Pokémon, se marca su pareja al otro lado, emparejados
   por el mote. `test:soullink`
 - **Intercambios por dentro**, incluso entre dos copias aleatorizadas distintas,
-  recalculando las estadísticas para la ROM que recibe. Falta la interfaz.
+  recalculando las estadísticas para la ROM que recibe, con su pantalla.
   `test:intercambio`, `test:estadisticas`
 - La tabla de caracteres del juego, los dos abecedarios enteros. `test:texto`
 - **El panel en el mismo orden que el juego**, y **borde amarillo al que está
@@ -88,6 +94,23 @@ ejecútala en vez de fiarte de esta lista.
   `test:llevarse`
 - **Cola con límite** para que varias copias a la vez no tumben el servicio, y
   el jugador ve su puesto. `test:cola`, `test:cola:servicio`, `test:cola:ui`
+
+- **Tres dificultades**, Normal, Nuzlocke y Nivelada, elegidas tras aleatorizar
+  y viajando en la semilla. Se vigilan sus reglas (tope, tipo repetido, segunda
+  captura en una ruta, revivir) y se avisa en el panel. `test:dificultad`
+- **Cuánto ocupa todo**, con aviso antes de quedarse sin sitio, en la lista de
+  partidas guardadas.
+
+**Aplicación de Android** (`movil/`)
+
+- **mGBA nativo** por JNI, con imagen por `ANativeWindow` y sonido por AAudio.
+  El savestate es el mismo que el de la web, así que `packages/pokemon` se usa
+  tal cual. La APK la compila el workflow `APK Android`.
+- **Jugar, sala y equipo**: elegir ROM, mando táctil multitoque, Soul Link
+  contra el mismo servidor de salas viendo la pantalla del compañero, y el
+  equipo de los dos con sprites. En horizontal, como la web.
+- **Mandos físicos**, con la misma tabla que la web y reasignables desde su
+  panel. Ver la sección de la aplicación más abajo para lo que le falta.
 
 **Montarlo**
 
@@ -562,9 +585,8 @@ Caminos, de más a menos prometedor:
    a 30 fps ya se probó y se midió, y se descartó porque no se nota como "ir a la
    mitad" sino como tirones. Si se vuelve a intentar, que sea bajando resolución
    antes que fotogramas, y midiendo.
-3. **Dejar elegir**: en un móvil que no da abasto, poder apagar el envío de vídeo
-   y quedarse solo con el equipo y la voz. Es poco trabajo y devuelve la partida
-   a quien hoy no puede jugar.
+3. **Dejar elegir** — **HECHO**: en Ajustes se puede apagar el envío de vídeo y
+   quedarse con el equipo y la voz. Al compañero se le dice por qué no ve nada.
 
 Cambiar de núcleo es la opción que peor sale: el resto del programa -equipo,
 medallas, combate, fin de partida- está construido sobre leer **savestates de
@@ -572,7 +594,38 @@ mGBA**. Otro núcleo significa rehacer todo eso.
 
 ---
 
-## Una aplicación propia para el móvil (APK)
+## Una aplicación propia para el móvil (APK) — PRIMERA VERSIÓN HECHA
+
+**Dónde está.** En `movil/`: React Native con mGBA nativo. Se hizo saltándose el
+orden sensato de abajo (el Worker primero), por decisión explícita. Lo que hay:
+
+- El núcleo es mGBA 0.10.5 compilado con CMake. **Su savestate mide los mismos
+  `0x61000` bytes que el de la web**, comprobado, así que el aviso de más abajo
+  quedó despejado y `packages/pokemon` se reutiliza sin tocarlo.
+- Jugar, sala (Soul Link contra el mismo servidor, viendo la pantalla del
+  compañero), equipo de los dos, modo horizontal como el de la web y mandos
+  físicos reasignables.
+- La APK la compila GitHub Actions y va firmada con la clave de depuración.
+
+**Lo que le falta a la aplicación**, frente a la web:
+
+1. **Probarla en un teléfono de verdad.** Compila, pero nadie la ha abierto
+   todavía en un móvil: ni el sonido, ni la velocidad en un aparato flojo, ni el
+   vídeo del compañero encima de la partida, ni un mando Bluetooth.
+2. **Mandar lo propio.** Hoy solo recibe: el compañero no ve tu pantalla ni oye
+   tu voz.
+3. **Reconexión** cuando se cae la sala.
+4. **Medallas, tope de nivel y cartel de fin de partida.**
+5. **Dificultades**: avisos de TIPO, RUTA y REVIVIDO.
+6. **Intercambios.**
+7. **Aleatorizar desde la app** y entrar por un enlace de invitación.
+8. **Cuentas**: entrar y subir los finales al ranking.
+9. **Guardar y cargar estados**, y llevarse la partida entre la web y la app.
+10. **Clave de firma propia y forma de repartirla**, que fuera de la tienda
+    sigue siendo instalar un APK a mano.
+
+Lo de abajo es el razonamiento con el que se planteó, y sigue valiendo.
+
 
 La idea: en el móvil se deja de jugar desde el navegador y se juega desde una
 aplicación con **su propio emulador, nativo**, que se conecta a la misma partida
@@ -798,6 +851,9 @@ Pulsar un Pokémon de tu equipo, escribirle otro nombre, y que ese nombre quede
 **dentro de la partida**: no una etiqueta nuestra encima del juego, sino el mote
 de verdad, el que se ve al abrir el equipo en el emulador.
 
+**Decidido: se renombra a los dos a la vez** (ver el punto 2 de abajo). Está sin
+empezar.
+
 ### La mitad difícil ya está hecha
 
 Esto no parte de cero, y conviene saberlo antes de calcular lo que cuesta. La
@@ -871,7 +927,31 @@ canal que ya existe.
 
 ---
 
-## Mapa de dónde has capturado
+## Mapa de dónde has capturado — HECHO
+
+**Lo que hay.** Botón de mapa en la barra de arriba. Un esquema de Kanto (con las
+Islas Sete en lista) o de Hoenn, según el juego, con cada zona libre o gastada
+-por ti, por tu compañero o por los dos- y dónde está cada uno ahora mismo. Arriba
+dice en qué zona estás y si ahí todavía se puede capturar.
+
+- **Dónde estás** se lee de la memoria sin direcciones encontradas a mano
+  (`packages/pokemon/src/mapas.ts`): se busca en la ROM la tabla de mapas por su
+  forma, y en la memoria la copia de la cabecera del mapa actual, que el juego
+  hace al entrar en cada mapa. Vale para los cinco juegos. `test:mapas`, con ROM
+  y estado fabricados.
+- **Lo gastado** es lo que ya apuntaba la regla de RUTA, más la zona de captura
+  de quien va en el equipo.
+- **Al compañero** se le manda la zona y lo gastado por el canal de datos
+  (mensaje `mapa`).
+- Los nombres son los de la versión en español hasta donde se sabe
+  (`apps/web/src/core/zonas.ts`); algún sitio pequeño puede no coincidir letra a
+  letra.
+
+**Falta comprobarlo con una ROM y una partida reales**: que se encuentre la
+tabla, que la zona leída sea la buena y que el esquema cuadre con el juego.
+
+Lo de abajo es como se planteó.
+
 
 En un Soul Link solo se captura una vez por zona, y hoy eso se lleva de memoria
 o en un papel aparte. La idea es marcarlo en un mapa: dónde cayó cada Pokémon y
@@ -1339,8 +1419,12 @@ es la misma pantalla con y sin tus datos dentro.
 
 ## Dificultad: Normal, Nuzlocke y Nuzlocke nivelada
 
-**Hecho lo que se puede vigilar.** Se elige en el menu del aleatorizador, encima
-de las opciones, y es de la PARTIDA: no se cambia despues. Lo que enciende cada
+**Hecho lo que se puede vigilar.** Se elige en la pantalla que sale justo
+despues de aleatorizar, al lado del nombre, porque el menu del aleatorizador ya
+iba cargado. Se genera la copia de Nuzlocke, que es la de serie; si se elige
+Normal se rehace con la misma semilla dejando Revivir en las tiendas, y la
+semilla que se ve es siempre la de la copia que se va a jugar. Al empezar queda
+fijada: es de la PARTIDA y no se cambia despues. Lo que enciende cada
 una vive en `apps/web/src/core/dificultad.ts` y lo vigila `test:dificultad`.
 
 | | Normal | Nuzlocke | Nivelada |
@@ -1549,6 +1633,26 @@ Dos cosas que conviene recordar de cómo se hizo:
 
 `apps/randomizer/src/tiendas.ts`, `test:tiendas`.
 
+### Las reglas del Centro Pokémon, que sí se hacen cumplir
+
+Excepción a "se avisa, no se impide", pedida a propósito:
+
+- **La enfermera no cura con un muerto en el equipo.** Si se cura al equipo con
+  un debilitado dentro -o se revive con un objeto-, se vuelve a cargar el estado
+  de unos segundos antes y sale un aviso: hay que dejarlo en el PC o liberarlo.
+- **No se sale del Centro** con un muerto, ni en Nivelada con alguien por encima
+  del tope del siguiente líder. Subir a la planta de arriba sí se puede.
+
+Cómo se sabe que es un Centro: todos comparten la misma disposición por dentro,
+y se aprende la primera vez que la enfermera cura al equipo (la casa del jugador
+también cura, pero es única y no cuenta). Hasta esa primera cura, la regla de
+salir no puede vigilarse. Lo que se carga es el estado que el propio programa
+guardó al mirar el equipo: no se escribe nada en la partida.
+`apps/web/src/core/centroPokemon.ts`, `test:centro`.
+
+**Falta comprobarlo jugando**: que la cura de la enfermera se detecte, y que
+volver unos segundos atrás no deje al jugador en un bucle incómodo.
+
 ### En un Soul Link, la dificultad viene en la invitación
 
 **Si invitas a alguien, la dificultad va fijada desde el enlace.** No es un
@@ -1570,7 +1674,8 @@ Hoy hay que volver a elegir el fichero en cada sesión. Guardarlo en IndexedDB
 daría una lista de "mis juegos" y se elegiría una vez.
 
 Ojo con el sitio: ya se guardan hasta tres partidas aleatorizadas de 16 MB cada
-una. Antes de añadir más habría que mostrar cuánto ocupa todo y dejar limpiar.
+una. Lo que ocupa ya se enseña, con aviso al acercarse al tope; antes de guardar
+también las ROM habría que contarlas ahí.
 
 ---
 
@@ -1661,7 +1766,7 @@ Los MMO de Pokémon que existen (PokeMMO, Pokémon Revolution) no son emuladores
 con red añadida: son **clientes propios** que reimplementan el juego, hechos por
 equipos durante años.
 
-**Lo que sí está al alcance**, y da buena parte de la sensación, es un **mapa
+**Lo que sí está al alcance — HECHO a nivel de zona**, y da buena parte de la sensación, es un **mapa
 compartido fuera del juego**: leer las coordenadas de los dos, dibujar un mini
 mapa en la interfaz y ver el punto de cada uno moverse en tiempo real. "Estoy en
 Ciudad Celeste, ven" sin escribirlo. No toca la ROM.
@@ -1684,9 +1789,9 @@ Ciudad Celeste, ven" sin escribirlo. No toca la ROM.
   dejado un `npm run dev`, que es lo que habría dejado el arreglo sin efecto en
   la máquina donde más se nota-. En desarrollo se sigue copiando, que ahí es
   justo para lo que sirve. Son 456 KB menos en el despliegue.
-- **Sin límite de espacio visible.** Se guardan hasta tres partidas de 16 MB,
-  pero no se muestra cuánto ocupa ni se avisa si el navegador se queda sin
-  sitio.
+- ~~**Sin límite de espacio visible.**~~ **Resuelto.** La lista de partidas
+  guardadas enseña lo que ocupa el sitio frente a lo que deja el navegador, y
+  avisa al pasar del 80%.
 - **La prueba de paneles falla de vez en cuando.** Una de cada bastantes, y pasa
   al repetirla sin tocar nada: es una carrera, no una rotura. Se midieron las
   búsquedas en la ROM por si eran ellas y no lo son (233 ms los nombres, 52 las

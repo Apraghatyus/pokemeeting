@@ -76,6 +76,8 @@ const resumirBloque = (bloque: Uint8Array, ranura: number): PokemonResumen => {
     personalidad: p.personalidad,
     lugar: lugarDeCaptura(p.lugar, p.nivelEncontrado),
     entrenador: p.idEntrenador,
+    ps: u16(bloque, PS_ACTUALES),
+    psMax: u16(bloque, PS_MAXIMOS),
   };
 };
 

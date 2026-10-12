@@ -16,8 +16,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EquipoResumen } from '@emupoke/protocol';
 import {
+  encontrarTablaMapas,
   enCombate,
   enDerrota,
+  mapaActual,
   enSalonDeLaFama,
   leerCabecera,
   quienPelea,
@@ -26,8 +28,11 @@ import {
   releerEquipo,
   resumirEquipo,
   SIN_SABER,
+  type MapaEnMemoria,
   type Medallas,
+  type TablaMapas,
 } from '@emupoke/pokemon';
+import type { Lectura } from './centroPokemon';
 import type { MgbaModule } from './mgbaCore';
 import type { Especies } from './useEspecies';
 
@@ -75,25 +80,57 @@ export type EstadoEquipo = {
    * por que no hay nada, en vez de enseñar seis huecos sin motivo.
    */
   disponible: boolean;
+  /** El mapa donde esta el jugador, o null si no se sabe. Ver `mapas.ts`. */
+  mapa: MapaEnMemoria | null;
+  /**
+   * La ultima vez que se deshizo algo por romper una regla, con el aviso para
+   * el jugador. Ver `centroPokemon.ts`.
+   */
+  deshecho: { motivo: string; momento: number } | null;
 };
+
+/**
+ * Quien mira cada lectura y decide si hay que deshacerla.
+ *
+ * Recibe la ultima lectura buena y la de ahora; si devuelve un aviso, se vuelve
+ * a cargar el estado de la buena. Ver `centroPokemon.ts`.
+ */
+export type Vigilante = (
+  antes: Lectura | null,
+  ahora: Lectura,
+  tabla: TablaMapas | null,
+) => string | null;
 
 /**
  * @param coreRef   el nucleo, cuando ya este arrancado
  * @param jugando   si hay una partida en marcha
  * @param romName   para olvidar lo aprendido al cambiar de juego
  * @param especies  para completar lo que esta en la ROM y no en la partida
+ * @param romBytesRef la ROM que corre, para saber en que mapa se esta
+ * @param vigilanteRef quien decide si una lectura rompe una regla y se deshace
  */
 export const useEquipo = (
   coreRef: { current: MgbaModule | null },
   jugando: boolean,
   romName: string | null,
   especies: Especies,
+  romBytesRef: { current: Uint8Array | null } = { current: null },
+  vigilanteRef: { current: Vigilante | null } = { current: null },
 ): EstadoEquipo => {
   const [equipo, setEquipo] = useState<EquipoResumen | null>(null);
   const [disponible, setDisponible] = useState(true);
   const [derrota, setDerrota] = useState(false);
   const [victoria, setVictoria] = useState(false);
   const [medallas, setMedallas] = useState<Medallas>(SIN_SABER);
+  const [mapa, setMapa] = useState<MapaEnMemoria | null>(null);
+  const [deshecho, setDeshecho] = useState<EstadoEquipo['deshecho']>(null);
+
+  /** La tabla de mapas de la ROM que corre: se busca una vez por ROM. */
+  const tablaRef = useRef<{ rom: Uint8Array; tabla: TablaMapas | null } | null>(null);
+  /** Donde estaba la cabecera del mapa la ultima vez. */
+  const pistaMapaRef = useRef<number | null>(null);
+  /** La ultima lectura que no rompia ninguna regla, con su estado. */
+  const buenaRef = useRef<{ lectura: Lectura; estado: Uint8Array } | null>(null);
 
   const direccionRef = useRef<number | null>(null);
   const juegoRef = useRef<string>('');
@@ -166,6 +203,35 @@ export const useEquipo = (
         // que diga el equipo, que es lo que habia antes.
       }
 
+      // En que mapa esta. La tabla se busca una vez por ROM.
+      const rom = romBytesRef.current;
+      if (rom && tablaRef.current?.rom !== rom) {
+        tablaRef.current = { rom, tabla: encontrarTablaMapas(rom) };
+        pistaMapaRef.current = null;
+      }
+      const tabla = rom ? (tablaRef.current?.tabla ?? null) : null;
+      const donde = tabla ? mapaActual(estado, tabla, pistaMapaRef.current) : null;
+      if (donde) pistaMapaRef.current = donde.direccion;
+
+      // Las reglas que se hacen cumplir. Si esta lectura rompe una, se vuelve
+      // a la ultima buena y aqui se acaba: lo leido ya no es la partida.
+      const ahora: Lectura = { equipo: leido, mapa: donde };
+      const motivo = vigilanteRef.current?.(buenaRef.current?.lectura ?? null, ahora, tabla) ?? null;
+      const buena = buenaRef.current;
+      if (motivo && buena) {
+        core.FS.writeFile(ruta, buena.estado);
+        if (core.loadStateSlot(RANURA_ESPIA, 0)) {
+          setDeshecho({ motivo, momento: Date.now() });
+          return;
+        }
+      }
+      buenaRef.current = { lectura: ahora, estado };
+      setMapa((antes) =>
+        antes?.grupo === donde?.grupo && antes?.numero === donde?.numero && antes?.zona === donde?.zona
+          ? antes
+          : donde,
+      );
+
       // Se mira en el mismo estado que acabamos de leer.
       setDerrota(enDerrota(estado));
       setVictoria(enSalonDeLaFama(estado));
@@ -199,11 +265,15 @@ export const useEquipo = (
       setDisponible(false);
       direccionRef.current = null;
     }
-  }, [coreRef]);
+  }, [coreRef, romBytesRef, vigilanteRef]);
 
   useEffect(() => {
     // Al cambiar de juego no vale nada de lo aprendido del anterior.
     direccionRef.current = null;
+    pistaMapaRef.current = null;
+    buenaRef.current = null;
+    setMapa(null);
+    setDeshecho(null);
     juegoRef.current = '';
     ultimoRef.current = null;
     setEquipo(null);
@@ -224,5 +294,5 @@ export const useEquipo = (
     };
   }, [jugando, romName, mirar]);
 
-  return { equipo, disponible, derrota, victoria, medallas };
+  return { equipo, disponible, derrota, victoria, medallas, mapa, deshecho };
 };

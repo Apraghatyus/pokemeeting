@@ -23,3 +23,4 @@ export * from './derrota';
 export * from './victoria';
 export * from './medallas';
 export * from './lideres';
+export * from './mapas';
