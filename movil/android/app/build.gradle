@@ -92,6 +92,11 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        // Solo procesadores de telefono. Los x86 son de emuladores de PC y
+        // casi doblaban el tamaño de la APK con un mGBA que nadie iba a usar.
+        ndk {
+            abiFilters "armeabi-v7a", "arm64-v8a"
+        }
     }
     signingConfigs {
         debug {

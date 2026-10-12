@@ -9,6 +9,7 @@
 
 import {useEffect, useMemo, useState} from 'react';
 import {
+  AppState,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -16,6 +17,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import {RTCView} from 'react-native-webrtc';
@@ -123,7 +125,12 @@ const Juego = ({partida, onSalir}: {partida: Partida; onSalir: () => void}) => {
   const {equipo, derrota} = useEquipo(true, partida.especies);
   const sala = useSala(partida.huella);
   const [verSala, setVerSala] = useState(false);
-  const [verSuPantalla, setVerSuPantalla] = useState(false);
+  const [verLoSuyo, setVerLoSuyo] = useState(false);
+  const [menu, setMenu] = useState(false);
+  // Tumbado se juega como en la web: la partida a todo el alto y el mando
+  // flotando encima. Se mira el tamaño y no un sensor: es lo que manda.
+  const {width, height} = useWindowDimensions();
+  const horizontal = width > height;
 
   // Mandarle el equipo al companero cada vez que cambia, y al abrirse el canal.
   const {enviarEquipo} = sala;
@@ -135,9 +142,95 @@ const Juego = ({partida, onSalir}: {partida: Partida; onSalir: () => void}) => {
   const caidosSuyos = useMemo(() => motesDebilitados(sala.estado.equipoCompanero), [sala.estado.equipoCompanero]);
   const conCompanero = sala.estado.fase === 'conectada';
   const suPantalla = sala.estado.pantallaCompanero;
+  // La pantalla y el equipo que se ven son la misma decision, como en la web:
+  // al mirar lo suyo se ve su partida y su equipo.
+  const mirandoLoSuyo = verLoSuyo && conCompanero;
+  const nombreDelOtro = sala.estado.companero ?? 'tu compañero';
+
+  // Al salir de la app el juego se para y deja de sonar; al volver sigue. Sin
+  // esto seguia corriendo de fondo con la pantalla apagada.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', estado => Mgba.pausar(estado !== 'active'));
+    return () => sub.remove();
+  }, []);
+
+  const consola = (
+    <>
+      <Pantalla style={[estilos.pantalla, mirandoLoSuyo && suPantalla ? estilos.oculta : null]} />
+      {mirandoLoSuyo && suPantalla && (
+        <RTCView streamURL={suPantalla.toURL()} style={estilos.pantalla} objectFit="contain" />
+      )}
+    </>
+  );
+
+  if (horizontal) {
+    return (
+      <View style={estilos.tumbado}>
+        <StatusBar hidden />
+        {/* 3:2 a todo el alto y centrada: lo que sobra de ancho se reparte a
+            los lados, y ahi caen los botones. */}
+        <View style={[estilos.consolaTumbada, {height, width: Math.min(width, height * 1.5)}]}>{consola}</View>
+
+        <Mando horizontal />
+
+        {/* El equipo arriba, sobre la banda negra. Tocarlo cambia al del
+            companero, y con el su partida. */}
+        <Pressable
+          style={estilos.tiraArriba}
+          onPress={() => conCompanero && setVerLoSuyo(v => !v)}
+          accessibilityLabel={mirandoLoSuyo ? `Equipo de ${nombreDelOtro}` : 'Tu equipo'}>
+          <Equipo
+            compacta
+            titulo={mirandoLoSuyo ? `Equipo de ${nombreDelOtro}` : 'Tu equipo'}
+            equipo={mirandoLoSuyo ? sala.estado.equipoCompanero : equipo}
+            especies={partida.especies}
+            caidosDelOtro={mirandoLoSuyo ? caidosMios : caidosSuyos}
+          />
+        </Pressable>
+
+        {/* La barra no cabe: lo que tenia va a un menu, encima de Select y Start. */}
+        <Pressable style={estilos.botonMenu} onPress={() => setMenu(true)} hitSlop={8}>
+          <Text style={estilos.botonMenuTexto}>☰</Text>
+        </Pressable>
+
+        {(menu || verSala) && (
+          <View style={estilos.velo}>
+            {verSala ? (
+              <PanelDeSala
+                sala={sala}
+                onCerrar={() => {
+                  setVerSala(false);
+                  setMenu(false);
+                }}
+              />
+            ) : (
+              <View style={estilos.menu}>
+                <Boton texto="Volver al juego" principal onPress={() => setMenu(false)} />
+                <Boton
+                  texto={conCompanero ? `Sala · ${nombreDelOtro}` : 'Sala'}
+                  onPress={() => setVerSala(true)}
+                />
+                {conCompanero && (
+                  <Boton
+                    texto={mirandoLoSuyo ? 'Ver mi partida' : `Ver la partida de ${nombreDelOtro}`}
+                    onPress={() => {
+                      setVerLoSuyo(v => !v);
+                      setMenu(false);
+                    }}
+                  />
+                )}
+                <Boton texto="Salir del juego" onPress={onSalir} />
+              </View>
+            )}
+          </View>
+        )}
+      </View>
+    );
+  }
 
   return (
     <View style={estilos.juego}>
+      <StatusBar hidden={false} />
       <View style={estilos.barra}>
         <Pressable onPress={onSalir} hitSlop={10}>
           <Text style={estilos.barraBoton}>‹ Salir</Text>
@@ -146,21 +239,16 @@ const Juego = ({partida, onSalir}: {partida: Partida; onSalir: () => void}) => {
           {partida.huella.title}
         </Text>
         <Pressable onPress={() => setVerSala(v => !v)} hitSlop={10}>
-          <Text style={estilos.barraBoton}>
-            {conCompanero ? `Sala · ${sala.estado.companero ?? 'compañero'}` : 'Sala'}
-          </Text>
+          <Text style={estilos.barraBoton}>{conCompanero ? `Sala · ${nombreDelOtro}` : 'Sala'}</Text>
         </Pressable>
       </View>
 
       {/* La consola, o la del companero si se esta mirando la suya. */}
       <View style={estilos.consola}>
-        <Pantalla style={[estilos.pantalla, verSuPantalla && suPantalla ? estilos.oculta : null]} />
-        {verSuPantalla && suPantalla && (
-          <RTCView streamURL={suPantalla.toURL()} style={estilos.pantalla} objectFit="contain" />
-        )}
-        {suPantalla && (
-          <Pressable style={estilos.cambiar} onPress={() => setVerSuPantalla(v => !v)}>
-            <Text style={estilos.barraBoton}>{verSuPantalla ? 'Mi partida' : 'Su partida'}</Text>
+        {consola}
+        {conCompanero && (
+          <Pressable style={estilos.cambiar} onPress={() => setVerLoSuyo(v => !v)}>
+            <Text style={estilos.barraBoton}>{mirandoLoSuyo ? 'Mi partida' : 'Su partida'}</Text>
           </Pressable>
         )}
       </View>
@@ -172,7 +260,7 @@ const Juego = ({partida, onSalir}: {partida: Partida; onSalir: () => void}) => {
           <Equipo titulo="Tu equipo" equipo={equipo} especies={partida.especies} caidosDelOtro={caidosSuyos} />
           {conCompanero && (
             <Equipo
-              titulo={`Equipo de ${sala.estado.companero ?? 'tu compañero'}`}
+              titulo={`Equipo de ${nombreDelOtro}`}
               equipo={sala.estado.equipoCompanero}
               especies={partida.especies}
               caidosDelOtro={caidosMios}
@@ -260,6 +348,23 @@ const estilos = StyleSheet.create({
   pantalla: {position: 'absolute', top: 0, left: 0, right: 0, bottom: 0},
   oculta: {opacity: 0},
   cambiar: {position: 'absolute', right: 8, bottom: 8, padding: 8, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.6)'},
+  tumbado: {flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center'},
+  consolaTumbada: {backgroundColor: '#000'},
+  tiraArriba: {position: 'absolute', top: 0, alignSelf: 'center', maxWidth: '62%'},
+  botonMenu: {
+    position: 'absolute',
+    bottom: '14%',
+    alignSelf: 'center',
+    width: 40,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(28, 37, 48, 0.7)',
+  },
+  botonMenuTexto: {color: '#e8eef5', fontSize: 18},
+  velo: {position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(11, 15, 20, 0.92)'},
+  menu: {flex: 1, justifyContent: 'center', paddingHorizontal: '25%', gap: 10},
   panel: {padding: 16, gap: 10},
   codigo: {color: '#ffcb05', fontSize: 34, fontWeight: '800', letterSpacing: 4},
   campo: {
