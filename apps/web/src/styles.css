@@ -6471,3 +6471,20 @@ details.partidas[open] > summary::before {
   gap: 8px;
   margin-top: 4px;
 }
+
+/* Las fichas propias se pulsan para cambiar el mote. */
+.ficha--pulsable {
+  cursor: pointer;
+}
+
+.ficha--pulsable:hover,
+.ficha--pulsable:focus-visible {
+  outline: 1px solid var(--accent-dim);
+  outline-offset: 2px;
+}
+
+.mote {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}

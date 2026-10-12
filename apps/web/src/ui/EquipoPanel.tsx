@@ -106,6 +106,8 @@ type Props = {
    * nombres se entiende de un vistazo que son dos jugadores.
    */
   nombrePropio?: string;
+  /** Al pulsar un Pokemon: para cambiarle el mote. Sin esto no se puede pulsar. */
+  onElegir?: (pokemon: PokemonResumen) => void;
 };
 
 /**
@@ -169,7 +171,9 @@ const Ficha = ({
   tipoRepetido,
   rutaRepetida,
   revivido,
+  onElegir,
 }: {
+  onElegir?: (pokemon: PokemonResumen) => void;
   pokemon: PokemonResumen;
   especies: Especies;
   generacion: number;
@@ -189,6 +193,7 @@ const Ficha = ({
   const sobra = tope && !pokemon.huevo ? pokemon.nivel - tope.nivel : 0;
   const clases = [
     'ficha',
+    onElegir ? 'ficha--pulsable' : '',
     activo ? 'ficha--activo' : '',
     pokemon.estado ? `ficha--${pokemon.estado}` : '',
     parejaRota ? 'ficha--pareja-caida' : '',
@@ -213,6 +218,19 @@ const Ficha = ({
           ? `Su tipo primario (${TIPOS_GEN3[pokemon.tipos[0]] ?? '?'}) ya lo lleva otro Pokémon de los equipos: hay que dejarlo en el PC`
           : undefined
       }
+      onClick={onElegir ? () => onElegir(pokemon) : undefined}
+      onKeyDown={
+        onElegir
+          ? (evento) => {
+              if (evento.key === 'Enter' || evento.key === ' ') {
+                evento.preventDefault();
+                onElegir(pokemon);
+              }
+            }
+          : undefined
+      }
+      role={onElegir ? 'button' : undefined}
+      tabIndex={onElegir ? 0 : undefined}
     >
       {/* Un huevo no enseña quien es dentro, asi que ni sprite ni nombre. */}
       {pokemon.huevo ? (
@@ -328,6 +346,7 @@ export const EquipoPanel = ({
   nombreDelOtro = 'Tu companero',
   nombrePropio = 'Tu equipo',
   onCambiar,
+  onElegir,
 }: Props) => {
   const ranuras = equipo?.ranuras ?? [];
   // La coleccion de sprites se elige por el juego del que viene el equipo, que
@@ -401,6 +420,7 @@ export const EquipoPanel = ({
               // sitio mueve la ficha en vez de rehacerla.
               <Ficha
                 key={pokemon.personalidad}
+                onElegir={pokemon.huevo ? undefined : onElegir}
                 pokemon={pokemon}
                 especies={especies}
                 generacion={generacion}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { EquipoResumen, RomFingerprint } from '@emupoke/protocol';
+import type { EquipoResumen, PokemonResumen, RomFingerprint } from '@emupoke/protocol';
 import { useTeclas } from './core/useTeclas';
 import { useEmulator } from './core/useEmulator';
 import { useKeyboardOwnership } from './core/useKeyboardOwnership';
@@ -75,6 +75,8 @@ import { TouchControls } from './ui/TouchControls';
 import { TopBar } from './ui/TopBar';
 import { MapaModal } from './ui/MapaModal';
 import { SoulLinkModal } from './ui/SoulLinkModal';
+import { MoteModal } from './ui/MoteModal';
+import { renombrarEnPartida } from './core/mote';
 import { VoiceBar } from './ui/VoiceBar';
 
 export const App = () => {
@@ -439,6 +441,35 @@ export const App = () => {
   const caidosMios = motesDebilitados(miEquipo.equipo);
   const caidosSuyos = motesDebilitados(enSoulLink ? session.state.equipoCompanero : null);
 
+  // Cambiar el mote desde la pagina. En una Soul Link se le cambia tambien a
+  // su pareja en la partida del otro, que se reconoce por el mote de antes.
+  const [moteDe, setMoteDe] = useState<PokemonResumen | null>(null);
+  const { enviarMote } = session;
+  const cambiarMote = (nuevo: string): string | null => {
+    if (!moteDe) return null;
+    if (infracciones.memoria.propio !== null && moteDe.entrenador !== infracciones.memoria.propio) {
+      return 'Solo se le puede cambiar el mote a lo que capturaste tú, como en el juego.';
+    }
+    const fallo = renombrarEnPartida(emulator.coreRef.current, moteDe.personalidad, nuevo);
+    if (!fallo && enSoulLink && moteDe.mote) enviarMote(moteDe.mote, nuevo.trim());
+    return fallo;
+  };
+  // Y cuando el companero cambia uno, se le cambia aqui a su pareja.
+  const moteDelOtro = session.state.moteCompanero;
+  useEffect(() => {
+    if (!moteDelOtro || !enSoulLink) return;
+    const pareja = miEquipo.equipo?.ranuras.find((p) => !p.huevo && p.mote === moteDelOtro.antes);
+    if (!pareja) return;
+    const fallo = renombrarEnPartida(emulator.coreRef.current, pareja.personalidad, moteDelOtro.nuevo);
+    setAvisoRegla({
+      texto: fallo
+        ? `${nombreDelCompanero} ha cambiado el mote de ${moteDelOtro.antes}, pero aquí no se ha podido: ${fallo}`
+        : `${nombreDelCompanero} ha llamado ${moteDelOtro.nuevo} a ${moteDelOtro.antes}: su pareja de aquí también se llama así ahora.`,
+      tipo: fallo ? 'error' : 'info',
+    });
+    // Solo al llegar un cambio nuevo del companero.
+  }, [moteDelOtro]);
+
   // Con que reglas se juega esta partida. Se relee al llegar equipo nuevo y no
   // solo al cambiar de ROM: la partida se apunta en la lista justo DESPUES de
   // cargarla, y leyendola al cargar saldria siempre Normal.
@@ -737,6 +768,7 @@ export const App = () => {
           <EquipoPanel
             titulo={unoSolo && verSuEquipo ? `Equipo de ${nombreDelCompanero}` : miNombre}
             lado={unoSolo && verSuEquipo ? 'companero' : 'propio'}
+            onElegir={unoSolo && verSuEquipo ? undefined : setMoteDe}
             equipo={unoSolo && verSuEquipo ? equipoSuyo.equipo : equipoMio.equipo}
             activo={unoSolo && verSuEquipo ? equipoSuyo.alFrente : equipoMio.alFrente}
             especies={especies}
@@ -1034,6 +1066,17 @@ export const App = () => {
           montado debajo. Desmontarlo para ensenar una tabla seria apagarle el
           juego a alguien por mirar quien va ganando, y volver costaria cargar
           el nucleo otra vez. */}
+      <MoteModal
+        pokemon={
+          moteDe
+            ? { mote: moteDe.mote, nombreEspecie: especies.nombre(moteDe.especie) }
+            : null
+        }
+        conPareja={enSoulLink ? nombreDelCompanero : null}
+        onCerrar={() => setMoteDe(null)}
+        onCambiar={cambiarMote}
+      />
+
       <SoulLinkModal
         open={preguntarSoullink}
         nombreDelCompanero={nombreDelCompanero}

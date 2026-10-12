@@ -845,14 +845,22 @@ ordenador, asi que habria que mandarle a cada uno lo que su propia copia dice.
 
 ---
 
-## Cambiarle el mote a un Pokémon desde la página
+## Cambiarle el mote a un Pokémon desde la página — HECHO
+
+**Lo que hay.** Se pulsa un Pokémon de tu equipo, se escribe el mote nuevo y
+queda dentro de la partida. Hasta diez caracteres de la tabla del juego
+(`codificarTexto`, el camino de vuelta de `leerTexto`; `test:mote`). No en mitad
+de un combate, y solo a lo que capturaste tú, como el Tasador. En una Soul Link
+se le cambia también a su pareja en la partida del otro (mensaje `mote`), que se
+reconoce por el mote de antes. `apps/web/src/core/mote.ts`.
+
+**Falta comprobarlo jugando** con una partida de verdad.
+
+Lo de abajo es como se planteó.
 
 Pulsar un Pokémon de tu equipo, escribirle otro nombre, y que ese nombre quede
 **dentro de la partida**: no una etiqueta nuestra encima del juego, sino el mote
 de verdad, el que se ve al abrir el equipo en el emulador.
-
-**Decidido: se renombra a los dos a la vez** (ver el punto 2 de abajo). Está sin
-empezar.
 
 ### La mitad difícil ya está hecha
 

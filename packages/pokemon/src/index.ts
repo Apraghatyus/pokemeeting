@@ -25,3 +25,4 @@ export * from './medallas';
 export * from './lideres';
 export * from './mapas';
 export * from './mochila';
+export * from './mote';

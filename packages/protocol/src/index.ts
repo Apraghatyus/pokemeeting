@@ -346,7 +346,13 @@ export type PeerMessage =
    * Si la partida que se empieza juntos es una Soul Link. Lo elige uno de los
    * dos al principio y el otro lo aplica a la suya: tienen que ir iguales.
    */
-  | { type: 'soullink'; activo: boolean };
+  | { type: 'soullink'; activo: boolean }
+  /**
+   * Se le ha cambiado el mote a un Pokemon. En una Soul Link las parejas se
+   * reconocen por el mote, asi que el otro le pone el mismo a la suya: si no,
+   * la pareja se romperia en silencio.
+   */
+  | { type: 'mote'; antes: string; nuevo: string };
 
 /**
  * Lo que se cuenta del mapa al companero.
@@ -451,6 +457,13 @@ export const parsePeerMessage = (crudo: string): PeerMessage | null => {
     if (zona !== null && !esZona(zona)) return null;
     if (!Array.isArray(mapa.gastadas) || mapa.gastadas.length > MAX_ZONAS) return null;
     return { type: 'mapa', mapa: { zona, gastadas: mapa.gastadas.filter(esZona) } };
+  }
+  if (mensaje.type === 'mote') {
+    const { antes, nuevo } = datos as { antes?: unknown; nuevo?: unknown };
+    // Un mote del juego son diez caracteres: mas que eso viene de otro sitio.
+    if (typeof antes !== 'string' || typeof nuevo !== 'string') return null;
+    if (antes.length === 0 || nuevo.length === 0 || antes.length > 10 || nuevo.length > 10) return null;
+    return { type: 'mote', antes, nuevo };
   }
   if (mensaje.type === 'soullink') {
     const activo = (datos as { activo?: unknown }).activo;
