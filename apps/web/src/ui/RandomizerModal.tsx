@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import {
   checkRandomizer,
   randomizeRom,
@@ -9,6 +9,7 @@ import {
 } from '../net/randomizer';
 import {
   MAX_PARTIDAS,
+  cambiarDificultad,
   cupoDePartidas,
   nombreParaNueva,
   renombrar,
@@ -71,6 +72,8 @@ type Progress =
       fase: 'hecho';
       seed: string | null;
       fileName: string;
+      /** Con que se puede volver a generar esta copia, o null si no se puede. */
+      rehacible: { baseCrc32: string; semilla: string; ajustes: string } | null;
       /** Para poder ponerle nombre desde la pantalla de resultado. */
       /**
        * La partida apuntada, o undefined si no se apunto.
@@ -82,8 +85,6 @@ type Progress =
       partidaId?: string;
       nombre: string;
       summary: RandomizeSummary;
-      /** Como rehacer esta copia, o null si no se va a poder. */
-      semilla: string | null;
     }
   | { fase: 'error'; message: string };
 
@@ -117,6 +118,12 @@ const SUPPORTED = new Set([
  * especie- y eso conviene elegirlo, no encontrarselo.
  */
 const DEFAULT_SELECTION = ['salvajes', 'iniciales', 'entrenadores', 'movimientos'];
+
+/**
+ * Con que dificultad nace una partida: Nuzlocke, que es a lo que se viene a
+ * este programa. Se cambia en la pantalla de despues de aleatorizar.
+ */
+const DIFICULTAD_DE_SERIE: Dificultad = 'nuzlocke';
 
 /**
  * Se abre al cargar una ROM y pregunta como se quiere jugar.
@@ -180,9 +187,18 @@ export const RandomizerModal = ({
   const [partidas, setPartidas] = useState<PartidaGuardada[]>([]);
   const [otras, setOtras] = useState<PartidaGuardada[]>([]);
   const [semillaPegada, setSemillaPegada] = useState('');
-  // Nuzlocke por defecto: es a lo que se viene a este programa. Quien quiera
-  // jugar sin reglas lo cambia con un toque.
-  const [dificultad, setDificultad] = useState<Dificultad>('nuzlocke');
+  /**
+   * Las copias de la partida recien hecha, con y sin los de revivir en las
+   * tiendas, segun se van necesitando. La llave es `sinRevivir`.
+   *
+   * La dificultad se elige DESPUES de aleatorizar, y Normal es la unica que
+   * deja Revivir a la venta: eso es otra ROM. Se genera la de las reglas, que
+   * es la de serie, y la otra solo si alguien elige Normal; y se guardan las
+   * dos para que ir y volver no cueste otra espera.
+   */
+  const variantes = useRef(new Map<boolean, { rom: Uint8Array; crc: string }>());
+  /** Cual de las dos esta cargada en el emulador. */
+  const cargada = useRef(sinRevivirEn(DIFICULTAD_DE_SERIE));
 
   // La lista se relee al abrir: puede haber cambiado desde la vez anterior.
   const releer = useCallback(() => {
@@ -264,7 +280,7 @@ export const RandomizerModal = ({
     try {
       // Siempre desde la original: asi el nombre tampoco se encadena.
       const result = await randomizeRom(
-        { options: [...selected], sinRevivir: sinRevivirEn(dificultad) },
+        { options: [...selected], sinRevivir: sinRevivirEn(DIFICULTAD_DE_SERIE) },
         base.bytes,
         avisarDeLaCola,
       );
@@ -273,6 +289,10 @@ export const RandomizerModal = ({
       // misma ROM sin pisarse el fichero de guardado.
       const fileName = nombreParaNueva(base.fileName);
       const generada = crc32(result.rom);
+      variantes.current = new Map([
+        [sinRevivirEn(DIFICULTAD_DE_SERIE), { rom: result.rom, crc: generada }],
+      ]);
+      cargada.current = sinRevivirEn(DIFICULTAD_DE_SERIE);
       await onRandomized(result.rom, fileName);
       // Un nombre de salida que ya distinga una partida de otra de la misma
       // ROM. El jugador lo cambia en la pantalla siguiente si quiere.
@@ -284,7 +304,7 @@ export const RandomizerModal = ({
         ? registrar({
             // Nace sola. Si luego se invita a alguien, se marca entonces.
             soullink: false,
-            dificultad,
+            dificultad: DIFICULTAD_DE_SERIE,
             fichero: fileName,
             baseNombre: base.fileName,
             baseCrc32: base.crc32,
@@ -305,15 +325,9 @@ export const RandomizerModal = ({
         nombre: nombrePorDefecto,
         summary: result.summary,
         // La semilla solo tiene sentido si de verdad se puede rehacer con ella.
-        semilla:
+        rehacible:
           result.reproducible && result.seed && result.ajustes
-            ? codificarSemilla({
-                baseCrc32: base.crc32,
-                crc32: generada,
-                semilla: result.seed,
-                ajustes: result.ajustes,
-                dificultad,
-              })
+            ? { baseCrc32: base.crc32, semilla: result.seed, ajustes: result.ajustes }
             : null,
       });
     } catch (error) {
@@ -501,6 +515,45 @@ export const RandomizerModal = ({
     }
   };
 
+  /**
+   * La copia que corresponde a una dificultad, generandola si hace falta.
+   *
+   * Es la misma semilla y los mismos ajustes; solo cambia si los de revivir se
+   * quedan en las tiendas. Por eso sale el mismo mundo salvo eso.
+   */
+  const variante = async (
+    rehacible: Extract<Progress, { fase: 'hecho' }>['rehacible'],
+    sinRevivir: boolean,
+  ) => {
+    const ya = variantes.current.get(sinRevivir);
+    if (ya) return ya;
+    const base = baseRom.current;
+    if (!rehacible || !base) {
+      throw new Error(
+        'Esta copia no se puede volver a generar, asi que se queda con las tiendas como salieron.',
+      );
+    }
+    const result = await randomizeRom(
+      { settingsString: rehacible.ajustes, seed: rehacible.semilla, sinRevivir },
+      base.bytes,
+    );
+    const nueva = { rom: result.rom, crc: crc32(result.rom) };
+    variantes.current.set(sinRevivir, nueva);
+    return nueva;
+  };
+
+  /** Deja cargada la copia de la dificultad elegida y cierra. */
+  const empezar = async (fileName: string, sinRevivir: boolean) => {
+    const elegida = variantes.current.get(sinRevivir);
+    if (elegida && cargada.current !== sinRevivir) {
+      // Con el mismo nombre de fichero: todavia no se ha jugado nada, pero si
+      // hubiera guardado, seguiria siendo el suyo.
+      await onRandomized(elegida.rom, fileName);
+      cargada.current = sinRevivir;
+    }
+    onClose();
+  };
+
   return (
     <Modal
       open={open}
@@ -536,7 +589,11 @@ export const RandomizerModal = ({
       }
     >
       {progress.fase === 'hecho' ? (
-        <Resultado progress={progress} onClose={onClose} />
+        <Resultado
+          progress={progress}
+          variante={(sinRevivir) => variante(progress.rehacible, sinRevivir)}
+          onEmpezar={(sinRevivir) => empezar(progress.fileName, sinRevivir)}
+        />
       ) : (
         <div className="aleatorizar">
           {/* Lo que impide o condiciona aleatorizar va arriba del todo y a lo
@@ -712,40 +769,6 @@ export const RandomizerModal = ({
 
               {/* --------- que se aleatoriza --------- */}
               <div className="ajustes__columna">
-                {/* La dificultad va antes que las opciones: decide con que
-                    reglas se juega y en que columna del ranking cuenta, y no se
-                    puede cambiar despues. */}
-                <section className="tarjeta">
-                  <div className="tarjeta__titulo">
-                    <span className="tarjeta__marca" />
-                    <h2>Dificultad</h2>
-                  </div>
-
-                  <div className="interruptores" role="radiogroup" aria-label="Dificultad">
-                    {DIFICULTADES.map((d) => (
-                      <label
-                        className={`interruptor${dificultad === d.id ? ' is-on' : ''}`}
-                        key={d.id}
-                      >
-                        <input
-                          type="radio"
-                          name="dificultad"
-                          checked={dificultad === d.id}
-                          onChange={() => setDificultad(d.id)}
-                        />
-                        <span className="interruptor__texto">
-                          <span className="interruptor__nombre">
-                            {d.nombre} · {d.coletilla}
-                          </span>
-                          <span className="interruptor__nota">{d.reglas.join(' · ')}</span>
-                        </span>
-                        <span className="interruptor__palanca" aria-hidden="true" />
-                      </label>
-                    ))}
-                  </div>
-                  <p className="hint">No se cambia despues: es parte de la partida.</p>
-                </section>
-
                 <section className="tarjeta">
                   <div className="tarjeta__titulo">
                     <span className="tarjeta__marca" />
@@ -805,18 +828,59 @@ export const RandomizerModal = ({
  */
 const Resultado = ({
   progress,
-  onClose,
+  variante,
+  onEmpezar,
 }: {
   progress: Extract<Progress, { fase: 'hecho' }>;
-  onClose: () => void;
+  variante: (sinRevivir: boolean) => Promise<{ crc: string }>;
+  onEmpezar: (sinRevivir: boolean) => Promise<void>;
 }) => {
   const [nombre, setNombre] = useState(progress.nombre);
   const [copiada, setCopiada] = useState<'no' | 'si' | 'fallo'>('no');
+  const [dificultad, setDificultad] = useState<Dificultad>(DIFICULTAD_DE_SERIE);
+  /** El CRC de la copia que va con la dificultad elegida; null mientras se hace. */
+  const [crc, setCrc] = useState<string | null>(null);
+  const [preparando, setPreparando] = useState(false);
+  const [empezando, setEmpezando] = useState(false);
+  const [problema, setProblema] = useState<string | null>(null);
+  /** Solo cuenta la ultima eleccion: tocar dos seguidas no debe cruzarlas. */
+  const ultima = useRef(0);
+
+  useEffect(() => {
+    void variante(sinRevivirEn(DIFICULTAD_DE_SERIE)).then((v) => setCrc(v.crc));
+    // Solo al llegar: la de serie ya esta hecha y esto no espera nada.
+  }, []);
+
+  const elegir = async (siguiente: Dificultad) => {
+    const anterior = dificultad;
+    const turno = ++ultima.current;
+    setDificultad(siguiente);
+    setProblema(null);
+    setPreparando(true);
+    try {
+      const v = await variante(sinRevivirEn(siguiente));
+      if (turno !== ultima.current) return;
+      setCrc(v.crc);
+      if (progress.partidaId) cambiarDificultad(progress.partidaId, siguiente, v.crc);
+    } catch (error) {
+      if (turno !== ultima.current) return;
+      setDificultad(anterior);
+      setProblema(error instanceof Error ? error.message : String(error));
+    } finally {
+      if (turno === ultima.current) setPreparando(false);
+    }
+  };
+
+  // La semilla va con la copia que de verdad se va a jugar, dificultad incluida.
+  const semilla =
+    progress.rehacible && crc
+      ? codificarSemilla({ ...progress.rehacible, crc32: crc, dificultad })
+      : null;
 
   const copiar = async () => {
-    if (!progress.semilla) return;
+    if (!semilla) return;
     try {
-      await navigator.clipboard.writeText(progress.semilla);
+      await navigator.clipboard.writeText(semilla);
       setCopiada('si');
       setTimeout(() => setCopiada('no'), 2200);
     } catch {
@@ -863,15 +927,57 @@ const Resultado = ({
         </p>
       )}
 
-      {progress.semilla ? (
+      {/* Aqui y no en el aleatorizador, que ya va cargado de opciones. Decide
+          con que reglas se juega y en que columna del ranking cuenta, y se
+          queda fijada al empezar. */}
+      <section className="tarjeta">
+        <div className="tarjeta__titulo">
+          <span className="tarjeta__marca" />
+          <h2>Dificultad</h2>
+        </div>
+
+        <div className="interruptores" role="radiogroup" aria-label="Dificultad">
+          {DIFICULTADES.map((d) => (
+            <label className={`interruptor${dificultad === d.id ? ' is-on' : ''}`} key={d.id}>
+              <input
+                type="radio"
+                name="dificultad"
+                checked={dificultad === d.id}
+                disabled={empezando}
+                onChange={() => void elegir(d.id)}
+              />
+              <span className="interruptor__texto">
+                <span className="interruptor__nombre">
+                  {d.nombre} · {d.coletilla}
+                </span>
+                <span className="interruptor__nota">{d.reglas.join(' · ')}</span>
+              </span>
+              <span className="interruptor__palanca" aria-hidden="true" />
+            </label>
+          ))}
+        </div>
+        {preparando ? (
+          <p className="hint" role="status">
+            Preparando la copia: en Normal se pueden comprar los de revivir, y eso cambia las
+            tiendas...
+          </p>
+        ) : (
+          <p className="hint">No se cambia despues: es parte de la partida.</p>
+        )}
+        {problema && <p className="alert">{problema}</p>}
+      </section>
+
+      {!progress.rehacible ? null : semilla ? (
         <div className="hecha__semilla">
           <span className="hecha__etiqueta">Semilla</span>
-          <code className="mono hecha__codigo">{progress.semilla}</code>
+          <code className="mono hecha__codigo">{semilla}</code>
           <button type="button" onClick={() => void copiar()}>
             {copiada === 'si' ? 'Copiada' : 'Copiar'}
           </button>
         </div>
-      ) : (
+      ) : null}
+
+      {progress.rehacible ? null : (
         <p className="warn">
           Esta copia no se va a poder rehacer{progress.seed ? ` (semilla ${progress.seed})` : ''}.
           Vive solo en este navegador: si borras sus datos, se pierde.
@@ -883,8 +989,19 @@ const Resultado = ({
       )}
 
       <div className="modal__acciones">
-        <button type="button" className="button--primary button--wide" onClick={onClose}>
-          Empezar a jugar
+        <button
+          type="button"
+          className="button--primary button--wide"
+          disabled={preparando || empezando}
+          onClick={() => {
+            setEmpezando(true);
+            void onEmpezar(sinRevivirEn(dificultad)).catch((error: unknown) => {
+              setEmpezando(false);
+              setProblema(error instanceof Error ? error.message : String(error));
+            });
+          }}
+        >
+          {empezando ? 'Cargando...' : 'Empezar a jugar'}
         </button>
       </div>
     </div>

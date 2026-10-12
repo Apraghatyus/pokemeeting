@@ -6050,3 +6050,9 @@ details.partidas[open] > summary::before {
     justify-items: center;
   }
 }
+
+/* En la pantalla de partida hecha el modal es estrecho: una dificultad por fila
+   para que se lean sus reglas enteras. */
+.hecha .interruptores {
+  grid-template-columns: 1fr;
+}

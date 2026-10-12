@@ -95,7 +95,7 @@ ejecútala en vez de fiarte de esta lista.
 - **Cola con límite** para que varias copias a la vez no tumben el servicio, y
   el jugador ve su puesto. `test:cola`, `test:cola:servicio`, `test:cola:ui`
 
-- **Tres dificultades**, Normal, Nuzlocke y Nivelada, elegidas al aleatorizar
+- **Tres dificultades**, Normal, Nuzlocke y Nivelada, elegidas tras aleatorizar
   y viajando en la semilla. Se vigilan sus reglas (tope, tipo repetido, segunda
   captura en una ruta, revivir) y se avisa en el panel. `test:dificultad`
 - **Cuánto ocupa todo**, con aviso antes de quedarse sin sitio, en la lista de
@@ -1395,8 +1395,12 @@ es la misma pantalla con y sin tus datos dentro.
 
 ## Dificultad: Normal, Nuzlocke y Nuzlocke nivelada
 
-**Hecho lo que se puede vigilar.** Se elige en el menu del aleatorizador, encima
-de las opciones, y es de la PARTIDA: no se cambia despues. Lo que enciende cada
+**Hecho lo que se puede vigilar.** Se elige en la pantalla que sale justo
+despues de aleatorizar, al lado del nombre, porque el menu del aleatorizador ya
+iba cargado. Se genera la copia de Nuzlocke, que es la de serie; si se elige
+Normal se rehace con la misma semilla dejando Revivir en las tiendas, y la
+semilla que se ve es siempre la de la copia que se va a jugar. Al empezar queda
+fijada: es de la PARTIDA y no se cambia despues. Lo que enciende cada
 una vive en `apps/web/src/core/dificultad.ts` y lo vigila `test:dificultad`.
 
 | | Normal | Nuzlocke | Nivelada |

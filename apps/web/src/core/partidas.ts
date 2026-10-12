@@ -222,6 +222,18 @@ export const renombrar = (id: string, nombre: string): void => {
 };
 
 /**
+ * Cambia la dificultad de una partida recien hecha.
+ *
+ * Solo tiene sentido en la pantalla que sale justo despues de aleatorizar: ahi
+ * todavia no se ha jugado nada. Va con el CRC porque Normal deja los de revivir
+ * en las tiendas y eso es otra copia, y la semilla tiene que poder rehacer la
+ * que de verdad se juega.
+ */
+export const cambiarDificultad = (id: string, dificultad: Dificultad, crc32: string): void => {
+  escribirTodas(leerTodas().map((p) => (p.id === id ? { ...p, dificultad, crc32 } : p)));
+};
+
+/**
  * Como se llama una partida en pantalla.
  *
  * Con nombre propio, el suyo. Sin el -las de antes de que esto existiera-, lo
