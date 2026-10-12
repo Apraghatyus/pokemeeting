@@ -206,7 +206,14 @@ const Ficha = ({
     .join(' ');
 
   return (
-    <li className={clases}>
+    <li
+      className={clases}
+      title={
+        tipoRepetido && pokemon.tipos
+          ? `Su tipo primario (${TIPOS_GEN3[pokemon.tipos[0]] ?? '?'}) ya lo lleva otro Pokémon de los equipos: hay que dejarlo en el PC`
+          : undefined
+      }
+    >
       {/* Un huevo no enseña quien es dentro, asi que ni sprite ni nombre. */}
       {pokemon.huevo ? (
         <span
@@ -247,16 +254,9 @@ const Ficha = ({
               +{sobra}
             </span>
           )}
-          {/* Su tipo primario lo lleva otro, aqui o en el equipo del companero.
-              Dice cual, que es lo que hace falta para decidir a quien guardar. */}
-          {tipoRepetido && pokemon.tipos && (
-            <span
-              className="estado estado--repetido"
-              title={`Otro Pokemon de los dos equipos tambien es de tipo ${TIPOS_GEN3[pokemon.tipos[0]] ?? '?'} primario`}
-            >
-              TIPO
-            </span>
-          )}
+          {/* El tipo primario repetido NO lleva etiqueta: ese sitio es de los
+              estados. Se ve en que la ficha sale apagada, y el porque va en el
+              titulo de la ficha. */}
           {/* Cayo antes y ahora esta en pie: en una Nuzlocke esta muerto, lo
               haya levantado un Revivir o el Centro Pokemon. */}
           {revivido && (
