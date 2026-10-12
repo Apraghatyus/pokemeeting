@@ -7,8 +7,9 @@
 // 2. DEBILITADO = MUERTO. Un Pokemon que cayo tiene que ir al PC o liberarse.
 //    El juego no deja ver si alguien se curo en el Centro "con debilitados en
 //    el equipo" -eso es un guion, no un dato-, pero si se ve el resultado: un
-//    Pokemon que estuvo debilitado vuelve a estar en pie. Da igual si fue con un
-//    Revivir o en el Centro: en los dos casos se ha usado a un muerto.
+//    Pokemon que estuvo debilitado vuelve a estar en pie. La unica forma de
+//    volver que se admite es un Revivir, y entonces se le quita de los muertos
+//    (`resucitar`); el que vuelve por el Centro o el PC sigue muerto.
 //
 // POR QUE HAY MEMORIA Y NO BASTA CON MIRAR EL EQUIPO. Las dos reglas hablan de
 // cosas que pueden irse del equipo. Un Pokemon liberado se lleva su zona con
@@ -30,7 +31,7 @@
 //
 // Como el resto de reglas, AVISA y no impide: se marca la ficha.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { EquipoResumen } from '@emupoke/protocol';
 import { zonaCanonica } from './zonas';
 
@@ -172,7 +173,10 @@ export const useReglasNuzlocke = (
   partida: string | null,
   equipo: EquipoResumen | null,
   activo: boolean,
-): Infracciones & { memoria: MemoriaDeReglas } => {
+): Infracciones & {
+  memoria: MemoriaDeReglas;
+  resucitar: (personalidad: number) => void;
+} => {
   // La memoria va atada a SU partida. Al cambiar de partida hay un render en
   // el que todavia se tiene la de la anterior; sin esta marca se aplicaria a la
   // nueva y se guardaria con su nombre, mezclando las rutas de las dos.
@@ -202,10 +206,35 @@ export const useReglasNuzlocke = (
     setGuardada({ partida, memoria: nueva });
   }, [partida, lista, nueva, memoria]);
 
+  /**
+   * Devuelve a la vida a un muerto: se ha usado un Revivir con el.
+   *
+   * Es la unica forma de volver que se admite. La enfermera y el PC no la
+   * dan: el que vuelve asi sigue muerto. Ver `reglasEnVivo.ts`.
+   */
+  const resucitar = useCallback(
+    (personalidad: number) => {
+      if (!partida) return;
+      setGuardada((actual) => {
+        if (actual.partida !== partida || !actual.memoria.muertos.includes(personalidad)) {
+          return actual;
+        }
+        const nueva = {
+          ...actual.memoria,
+          muertos: actual.memoria.muertos.filter((p) => p !== personalidad),
+        };
+        escribir(partida, nueva);
+        return { partida, memoria: nueva };
+      });
+    },
+    [partida],
+  );
+
   return {
     ...(resultado?.infracciones ?? SIN_INFRACCIONES),
     // Lo apuntado: que zonas se gastaron y quien ha caido. Lo usan el mapa y
     // las reglas del Centro Pokemon.
     memoria: resultado?.memoria ?? memoria,
+    resucitar,
   };
 };

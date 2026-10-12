@@ -15,9 +15,18 @@
 import { pathToFileURL } from 'node:url';
 
 const desde = (ruta) => import(pathToFileURL(`${process.cwd()}/${ruta}`).href);
-const { juzgarCentro, juzgarLider, juzgarCaptura, apuntarEncuentro, seCuroElEquipo, ENCUENTROS_VACIOS } =
+const {
+  juzgarCentro,
+  juzgarLider,
+  juzgarCaptura,
+  apuntarEncuentro,
+  seCuroElEquipo,
+  revividoConObjeto,
+  juzgarPokeball,
+  ENCUENTROS_VACIOS,
+} =
   await desde('apps/web/src/core/reglasEnVivo.ts');
-const { rivalEnCombate, familiasEvolutivas, TAMANO_ESTADO, REGIONES } = await desde(
+const { rivalEnCombate, familiasEvolutivas, bolsilloDeBalls, TAMANO_ESTADO, REGIONES } = await desde(
   'packages/pokemon/src/index.ts',
 );
 
@@ -68,13 +77,17 @@ check('la cura se reconoce', seCuroElEquipo(conMuerto, curados));
 const cura = juzgarCentro(conMuerto, curados, centroReglas);
 check('la enfermera no cura con un muerto', cura?.motivo.includes('enfermera') === true, cura?.motivo);
 check('y se vuelve a antes de hablar con ella', cura?.atras >= 8);
+// Con un Revivir si: es la unica forma de volver.
+const conRevivir = [
+  lectura(ruta, [pk(1, 'BULBA', { ps: 10 }), pk(2, 'PIDGEY', { ps: 0 })]),
+  lectura(ruta, [pk(1, 'BULBA', { ps: 10 }), pk(2, 'PIDGEY', { ps: 15 })]),
+];
+check('revivir con un objeto no se deshace', juzgarCentro(...conRevivir, centroReglas) === null);
+check('y deja de estar muerto', revividoConObjeto(...conRevivir, centroReglas) === 2);
+check('la cura de la enfermera no cuenta como Revivir', revividoConObjeto(conMuerto, curados, centroReglas) === null);
 check(
-  'revivir con un objeto tampoco',
-  juzgarCentro(
-    lectura(ruta, [pk(2, 'PIDGEY', { ps: 0 })]),
-    lectura(ruta, [pk(2, 'PIDGEY', { ps: 15 })]),
-    centroReglas,
-  )?.motivo.includes('no se puede revivir') === true,
+  'un Revivir en Normal no hace nada',
+  revividoConObjeto(...conRevivir, { ...centroReglas, muertoEsMuerto: false }) === null,
 );
 check(
   'curar sin muertos, adelante',
@@ -90,6 +103,21 @@ check(
   'en Normal no hay nada que impedir',
   juzgarCentro(conMuerto, curados, { ...centroReglas, muertoEsMuerto: false }) === null,
 );
+
+// --- un muerto sacado del PC: en pie, pero muerto ---
+const sacadoDelPC = lectura(centro, [pk(1, 'BULBA', { ps: 10 }), pk(2, 'PIDGEY')]);
+const curaConSacado = juzgarCentro(sacadoDelPC, lectura(centro, [pk(1, 'BULBA'), pk(2, 'PIDGEY')]), centroReglas);
+check(
+  'la enfermera tampoco cura con un muerto sacado del PC',
+  curaConSacado?.motivo.includes('PIDGEY') === true && curaConSacado?.atras >= 8,
+  curaConSacado?.motivo,
+);
+const salirConSacado = juzgarCentro(
+  lectura(centro, [pk(1, 'BULBA'), pk(2, 'PIDGEY')]),
+  lectura(calle, [pk(1, 'BULBA'), pk(2, 'PIDGEY')]),
+  centroReglas,
+);
+check('ni se sale del Centro con el', salirConSacado?.motivo.includes('PIDGEY') === true, salirConSacado?.motivo);
 
 // --- salir del Centro ---
 const dentroConMuerto = lectura(centro, [pk(1, 'BULBA'), pk(2, 'PIDGEY', { ps: 0 })]);
@@ -172,7 +200,10 @@ let paso = apuntarEncuentro(ENCUENTROS_VACIOS, lectura(ruta, equipoBase, salvaje
 check('el primer salvaje de la zona se apunta', paso.memoria.zonas[String(0x67)]?.personalidad === 500);
 check('y se avisa', paso.aviso?.includes('RATTATA') === true, paso.aviso);
 const tras = apuntarEncuentro(paso.memoria, lectura(ruta, equipoBase, salvaje(16, 501)), contexto, nombreDe);
-check('el segundo ya no cambia nada', tras.memoria.zonas[String(0x67)]?.personalidad === 500 && tras.aviso === null);
+check(
+  'el segundo no cambia la zona, pero avisa de que no se le lanzan Poke Balls',
+  tras.memoria.zonas[String(0x67)]?.personalidad === 500 && tras.aviso?.includes('Poké Balls') === true,
+);
 
 const captura = juzgarCaptura(
   lectura(ruta, equipoBase, salvaje(16, 501)),
@@ -229,6 +260,72 @@ const yaCapturada = apuntarEncuentro(
   nombreDe,
 );
 check('una zona ya gastada no apunta otro', yaCapturada.memoria.zonas[String(0x67)] === undefined);
+
+// --- lanzar una Poke Ball donde no toca ---
+const enCombate = (ranuras, rival, balls) => ({
+  mapa: ruta,
+  equipo: { ...equipo(...ranuras), enCombate: true },
+  rival,
+  balls,
+});
+const otroSalvaje = salvaje(16, 501);
+const lanzar = juzgarPokeball(
+  enCombate(equipoBase, otroSalvaje, 'aa'),
+  enCombate(equipoBase, otroSalvaje, 'ab'),
+  tras.memoria,
+  contexto,
+  () => 'Ruta 3',
+);
+check('lanzar una Poke Ball en una zona gastada se deshace', lanzar?.motivo.includes('Poké Balls') === true, lanzar?.motivo);
+check('volviendo a antes del combate', lanzar?.antesDe === 501);
+check(
+  'al primero de la zona si se le puede lanzar',
+  juzgarPokeball(
+    enCombate(equipoBase, salvaje(19, 500), 'aa'),
+    enCombate(equipoBase, salvaje(19, 500), 'ab'),
+    tras.memoria,
+    contexto,
+    () => 'Ruta 3',
+  ) === null,
+);
+check(
+  'sin lanzar nada, nada',
+  juzgarPokeball(enCombate(equipoBase, otroSalvaje, 'aa'), enCombate(equipoBase, otroSalvaje, 'aa'), tras.memoria, contexto, () => '') ===
+    null,
+);
+check(
+  'fuera de combate, comprar no es lanzar',
+  juzgarPokeball(
+    { ...enCombate(equipoBase, otroSalvaje, 'aa'), equipo: equipo(...equipoBase) },
+    { ...enCombate(equipoBase, otroSalvaje, 'ab'), equipo: equipo(...equipoBase) },
+    tras.memoria,
+    contexto,
+    () => '',
+  ) === null,
+);
+const aviso = apuntarEncuentro(tras.memoria, lectura(ruta, equipoBase, salvaje(16, 502)), contexto, nombreDe);
+check('al empezar en una zona gastada se avisa', aviso.aviso?.includes('Poké Balls') === true, aviso.aviso);
+
+// --- el bolsillo de Poke Balls en la memoria ---
+{
+  const est = new Uint8Array(TAMANO_ESTADO);
+  const base = REGIONES.ewram.inicio;
+  const bloque = 0x1a48;
+  est[base + bloque + 4] = 3;
+  est[base + bloque + 5] = 20;
+  const v = new DataView(est.buffer);
+  v.setUint16(base + bloque + 0x430, 4, true); // Poke Ball
+  v.setUint16(base + bloque + 0x432, 7, true);
+  v.setUint16(base + bloque + 0x434, 3, true); // Super Ball
+  const bolsillo = bolsilloDeBalls(est, 'BPRS', { grupo: 3, numero: 20 });
+  check('se encuentra el bolsillo de Poke Balls', bolsillo?.tipos === 2, JSON.stringify(bolsillo?.tipos));
+  const firma = bolsillo?.firma;
+  v.setUint16(base + bloque + 0x432, 6, true);
+  check('y cambia al gastar una', bolsilloDeBalls(est, 'BPRS', { grupo: 3, numero: 20 }, bolsillo?.bloque)?.firma !== firma);
+  check('en otro mapa no se reconoce', bolsilloDeBalls(est, 'BPRS', { grupo: 4, numero: 20 }) === null);
+  v.setUint16(base + bloque + 0x438, 99, true);
+  check('con algo que no es una Poke Ball, no es el bolsillo', bolsilloDeBalls(est, 'BPRS', { grupo: 3, numero: 20 }) === null);
+}
 
 // --- el rival en la memoria ---
 const estado = new Uint8Array(TAMANO_ESTADO);

@@ -19,6 +19,7 @@ import {
   encontrarTablaMapas,
   enCombate,
   enDerrota,
+  bolsilloDeBalls,
   mapaActual,
   rivalEnCombate,
   enSalonDeLaFama,
@@ -142,6 +143,8 @@ export const useEquipo = (
   const tablaRef = useRef<{ rom: Uint8Array; tabla: TablaMapas | null } | null>(null);
   /** Donde estaba la cabecera del mapa la ultima vez. */
   const pistaMapaRef = useRef<number | null>(null);
+  /** Donde estaba el bloque con la mochila la ultima vez. */
+  const pistaMochilaRef = useRef<number | null>(null);
   /** Las ultimas lecturas que no rompian ninguna regla, con su estado. */
   const historialRef = useRef<{ lectura: Lectura; estado: Uint8Array; momento: number }[]>([]);
   /** La ultima vez que se deshizo algo, para ir mas atras si se repite. */
@@ -230,10 +233,15 @@ export const useEquipo = (
 
       // Lo que se tiene delante si hay combate.
       const rival = leido ? rivalEnCombate(estado, leido, juegoRef.current || leido.juego) : null;
+      // Y el bolsillo de Poke Balls, para saber si se lanza alguna en combate.
+      const mochila = donde
+        ? bolsilloDeBalls(estado, juegoRef.current || leido?.juego || '', donde, pistaMochilaRef.current)
+        : null;
+      if (mochila) pistaMochilaRef.current = mochila.bloque;
 
       // Las reglas que se hacen cumplir. Si esta lectura rompe una, se vuelve
       // a un estado bueno de antes y aqui se acaba: lo leido ya no es la partida.
-      const ahora: Lectura = { equipo: leido, mapa: donde, rival };
+      const ahora: Lectura = { equipo: leido, mapa: donde, rival, balls: mochila?.firma ?? null };
       const historial = historialRef.current;
       const veredicto =
         vigilanteRef.current?.(historial.at(-1)?.lectura ?? null, ahora, tabla) ?? null;
@@ -312,6 +320,7 @@ export const useEquipo = (
     // Al cambiar de juego no vale nada de lo aprendido del anterior.
     direccionRef.current = null;
     pistaMapaRef.current = null;
+    pistaMochilaRef.current = null;
     historialRef.current = [];
     ultimoDeshechoRef.current = null;
     setMapa(null);

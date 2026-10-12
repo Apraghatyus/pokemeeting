@@ -103,6 +103,8 @@ export type SessionState = {
   mapaCompanero: MapaCompartido | null;
   /** Lo ultimo que dijo el companero sobre hacer la partida Soul Link. */
   soullinkCompanero: { activo: boolean; momento: number } | null;
+  /** El ultimo cambio de mote que hizo el companero, para su pareja de aqui. */
+  moteCompanero: { antes: string; nuevo: string; momento: number } | null;
 };
 
 /** Donde se recuerda si este aparato manda su pantalla. Es del aparato, no de la cuenta. */
@@ -141,6 +143,7 @@ const initialState: SessionState = {
   peerSinVideo: false,
   mapaCompanero: null,
   soullinkCompanero: null,
+  moteCompanero: null,
 };
 
 /**
@@ -279,6 +282,10 @@ export const useSession = (
             }
             if (mensaje.type === 'mapa') {
               patch({ mapaCompanero: mensaje.mapa });
+              return;
+            }
+            if (mensaje.type === 'mote') {
+              patch({ moteCompanero: { antes: mensaje.antes, nuevo: mensaje.nuevo, momento: Date.now() } });
               return;
             }
             if (mensaje.type === 'soullink') {
@@ -628,6 +635,15 @@ export const useSession = (
     }
   }, []);
 
+  /** Le dice al companero que un mote ha cambiado, para su pareja. */
+  const enviarMote = useCallback((antes: string, nuevo: string) => {
+    try {
+      peerRef.current?.send(JSON.stringify({ type: 'mote', antes, nuevo }));
+    } catch {
+      // Sin canal no hay pareja que renombrar ahora.
+    }
+  }, []);
+
   /** Le dice al companero si la partida es Soul Link. */
   const enviarSoullink = useCallback((activo: boolean) => {
     try {
@@ -697,6 +713,7 @@ export const useSession = (
     enviarEquipo,
     enviarMapa,
     enviarSoullink,
+    enviarMote,
     enviarDelTrato,
     escucharTrato,
     createRoom,

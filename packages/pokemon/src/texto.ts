@@ -120,3 +120,32 @@ export const pareceNombre = (bytes: Uint8Array): boolean => {
   }
   return letras > 0;
 };
+
+/** Lo que mide un mote en el juego: diez bytes, uno por caracter. */
+export const LARGO_MOTE = 10;
+
+/**
+ * Pasa un texto al juego de caracteres del juego, o null si no se puede.
+ *
+ * El camino de vuelta de `leerTexto`, con la misma tabla. Cada caracter es un
+ * byte, asi que diez caracteres son diez bytes; y lo que no esta en la tabla
+ * -un emoji, una letra de otro alfabeto- no se puede escribir, y se dice en
+ * vez de inventarse algo parecido.
+ */
+export const codificarTexto = (texto: string, largo = LARGO_MOTE): Uint8Array | null => {
+  const caracteres = [...texto];
+  if (caracteres.length === 0 || caracteres.length > largo) return null;
+  const inversa = new Map<string, number>();
+  for (const [byte, caracter] of tabla) {
+    // El primero gana: las letras y los numeros van en sus tramos y se
+    // cargaron antes que los sueltos.
+    if (!inversa.has(caracter)) inversa.set(caracter, byte);
+  }
+  const bytes: number[] = [];
+  for (const caracter of caracteres) {
+    const byte = inversa.get(caracter);
+    if (byte === undefined) return null;
+    bytes.push(byte);
+  }
+  return Uint8Array.from(bytes);
+};
