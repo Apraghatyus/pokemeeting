@@ -8,13 +8,59 @@
 // nucleo lleva la cuenta de cada boton por separado. Ver `mandoFisico.ts` para
 // que boton va a cual.
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MgbaModule } from './mgbaCore';
-import { algoPulsado, entradasDelMando, type EntradaGba } from './mandoFisico';
+import {
+  algoPulsado,
+  asignarBoton,
+  entradasDelMando,
+  MAPA_POR_DEFECTO,
+  primerBotonPulsado,
+  type EntradaGba,
+  type MapaMando,
+} from './mandoFisico';
 
 export type MandoFisico = {
   /** El nombre del que este conectado, o null. Para decirlo en Ajustes. */
   conectado: string | null;
+  /** Que botones van a cada entrada. */
+  mapa: MapaMando;
+  /** La entrada que espera a que se pulse un boton para quedarselo, o null. */
+  esperando: EntradaGba | null;
+  aprender: (entrada: EntradaGba) => void;
+  cancelar: () => void;
+  restaurar: () => void;
+};
+
+/** Es de este aparato, como las teclas: otro mando en otro sitio va distinto. */
+const CLAVE = 'emupoke.mandoFisico';
+
+const leerMapa = (): MapaMando => {
+  try {
+    const crudo = localStorage.getItem(CLAVE);
+    if (!crudo) return MAPA_POR_DEFECTO;
+    const datos = JSON.parse(crudo) as Partial<MapaMando>;
+    // Lo que falte o no se entienda, de fabrica: un mapa a medias no puede
+    // dejar una entrada sin boton.
+    const mapa = { ...MAPA_POR_DEFECTO };
+    for (const entrada of Object.keys(MAPA_POR_DEFECTO) as EntradaGba[]) {
+      const botones = datos[entrada];
+      if (Array.isArray(botones) && botones.every((b) => Number.isInteger(b) && b >= 0 && b < 64)) {
+        mapa[entrada] = botones;
+      }
+    }
+    return mapa;
+  } catch {
+    return MAPA_POR_DEFECTO;
+  }
+};
+
+const guardarMapa = (mapa: MapaMando): void => {
+  try {
+    localStorage.setItem(CLAVE, JSON.stringify(mapa));
+  } catch {
+    // Sin almacenamiento vale para esta sesion.
+  }
 };
 
 /**
@@ -28,6 +74,12 @@ export const useMandoFisico = (
   alUsarlo: () => void,
 ): MandoFisico => {
   const [conectado, setConectado] = useState<string | null>(null);
+  const [mapa, setMapa] = useState<MapaMando>(leerMapa);
+  const [esperando, setEsperando] = useState<EntradaGba | null>(null);
+  const mapaRef = useRef(mapa);
+  mapaRef.current = mapa;
+  const esperandoRef = useRef(esperando);
+  esperandoRef.current = esperando;
   const pulsadas = useRef(new Set<EntradaGba>());
   const avisado = useRef(false);
   const alUsarloRef = useRef(alUsarlo);
@@ -47,9 +99,16 @@ export const useMandoFisico = (
     };
   }, []);
 
+  // Mientras se aprende un boton se mira el mando aunque no haya partida: se
+  // reasigna desde Ajustes, y puede que no haya nada cargado.
+  const mirando = conectado !== null && (activo || esperando !== null);
+
   useEffect(() => {
-    if (!activo || conectado === null) return;
+    if (!mirando) return;
     let vuelta = 0;
+    // Lo que estuviera pulsado al empezar a aprender no cuenta: se espera a
+    // que se suelte todo y se pulse uno nuevo.
+    let suelto = false;
 
     const soltarTodo = () => {
       const core = coreRef.current;
@@ -60,9 +119,28 @@ export const useMandoFisico = (
     const mirar = () => {
       const core = coreRef.current;
       const ahora = new Set<EntradaGba>();
+      const aprendiendo = esperandoRef.current;
+      if (aprendiendo) {
+        // Lo que estuviera pulsado en el juego se suelta antes de nada.
+        soltarTodo();
+        const nuevo = globalThis.navigator
+          .getGamepads()
+          .map((m) => (m ? primerBotonPulsado(m) : null))
+          .find((b) => b !== null);
+        if (nuevo === undefined || nuevo === null) suelto = true;
+        else if (suelto) {
+          const siguiente = asignarBoton(mapaRef.current, aprendiendo, nuevo);
+          guardarMapa(siguiente);
+          setMapa(siguiente);
+          setEsperando(null);
+        }
+        // Aprendiendo no se juega: el boton que se pulsa es para Ajustes.
+        vuelta = requestAnimationFrame(mirar);
+        return;
+      }
       for (const mando of globalThis.navigator.getGamepads()) {
         if (!mando) continue;
-        for (const entrada of entradasDelMando(mando)) ahora.add(entrada);
+        for (const entrada of entradasDelMando(mando, mapaRef.current)) ahora.add(entrada);
         // La primera vez que se usa, el mando tactil sobra: quien coge un mando
         // no va a tocar la pantalla.
         if (!avisado.current && algoPulsado(mando)) {
@@ -70,7 +148,7 @@ export const useMandoFisico = (
           alUsarloRef.current();
         }
       }
-      if (core) {
+      if (core && activo) {
         for (const entrada of ahora) if (!pulsadas.current.has(entrada)) core.buttonPress(entrada);
         for (const entrada of pulsadas.current) if (!ahora.has(entrada)) core.buttonUnpress(entrada);
       }
@@ -84,7 +162,15 @@ export const useMandoFisico = (
       // Desconectarlo con un boton pulsado no puede dejar al personaje andando solo.
       soltarTodo();
     };
-  }, [activo, conectado, coreRef]);
+  }, [mirando, activo, coreRef]);
 
-  return { conectado };
+  const aprender = useCallback((entrada: EntradaGba) => setEsperando(entrada), []);
+  const cancelar = useCallback(() => setEsperando(null), []);
+  const restaurar = useCallback(() => {
+    guardarMapa(MAPA_POR_DEFECTO);
+    setMapa(MAPA_POR_DEFECTO);
+    setEsperando(null);
+  }, []);
+
+  return { conectado, mapa, esperando, aprender, cancelar, restaurar };
 };

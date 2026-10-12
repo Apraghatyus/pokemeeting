@@ -4,9 +4,6 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import com.aguaquim.emupoke.mgba.Mando
 import com.facebook.react.ReactActivity
-import android.view.KeyEvent
-import android.view.MotionEvent
-import com.aguaquim.emupoke.mgba.Mando
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
 import com.facebook.react.defaults.DefaultReactActivityDelegate

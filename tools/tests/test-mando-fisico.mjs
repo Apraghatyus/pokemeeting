@@ -7,7 +7,7 @@
 // Uso: npx tsx tools/tests/test-mando-fisico.mjs
 import { pathToFileURL } from 'node:url';
 
-const { entradasDelMando, ZONA_MUERTA } = await import(
+const { entradasDelMando, ZONA_MUERTA, asignarBoton, MAPA_POR_DEFECTO, primerBotonPulsado } = await import(
   pathToFileURL(`${process.cwd()}/apps/web/src/core/mandoFisico.ts`).href
 );
 
@@ -25,7 +25,7 @@ const mando = (pulsados = [], axes = [0, 0, 0, 0], valores = {}) => ({
   })),
   axes,
 });
-const ver = (m) => [...entradasDelMando(m)].sort().join(',');
+const ver = (m, mapa) => [...entradasDelMando(m, mapa)].sort().join(',');
 
 check('sin tocar nada no hay nada', ver(mando()) === '');
 check('el de la derecha es A', ver(mando([1])) === 'A', ver(mando([1])));
@@ -46,6 +46,14 @@ check(
   ver(mando([], [ZONA_MUERTA - 0.1, -(ZONA_MUERTA - 0.1)])) === '',
 );
 check('un mando a medio leer no rompe nada', ver({ buttons: [], axes: [] }) === '');
+
+// --- reasignar ---
+const cambiado = asignarBoton(MAPA_POR_DEFECTO, 'B', 3);
+check('reasignar pone el boton nuevo', ver(mando([3]), cambiado) === 'B', ver(mando([3]), cambiado));
+check('y se lo quita a quien lo tenia', !cambiado.A.includes(3));
+check('lo demas se queda igual', ver(mando([1, 9]), cambiado) === 'A,Start');
+check('aprender mira el primer boton pulsado', primerBotonPulsado(mando([7])) === 7);
+check('sin pulsar nada no aprende nada', primerBotonPulsado(mando()) === null);
 
 console.log(fallos === 0 ? '\nTodo bien.' : `\n${fallos} fallo(s).`);
 process.exit(fallos === 0 ? 0 : 1);

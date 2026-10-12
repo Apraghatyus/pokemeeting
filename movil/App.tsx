@@ -29,7 +29,8 @@ import {Equipo} from './src/Equipo';
 import {useEquipo} from './src/equipo';
 import {leerEspecies, SIN_ESPECIES, type Especies} from './src/especies';
 import {Mando} from './src/Mando';
-import {Mgba, Pantalla, type Rom} from './src/nativo';
+import {eventosDelEmulador, Mgba, Pantalla, type Rom} from './src/nativo';
+import {PanelDelMando} from './src/PanelDelMando';
 import {useSala} from './src/sala';
 
 type Partida = {rom: Rom; huella: RomFingerprint; especies: Especies};
@@ -127,6 +128,19 @@ const Juego = ({partida, onSalir}: {partida: Partida; onSalir: () => void}) => {
   const [verSala, setVerSala] = useState(false);
   const [verLoSuyo, setVerLoSuyo] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [verMando, setVerMando] = useState(false);
+  // Con un mando fisico en la mano el tactil sobra, como en la web: se aparta
+  // al usarlo y vuelve en cuanto se toca la pantalla.
+  const [conMandoFisico, setConMandoFisico] = useState(false);
+  useEffect(() => {
+    const sub = eventosDelEmulador.addListener('mandoFisicoUsado', () => setConMandoFisico(true));
+    return () => sub.remove();
+  }, []);
+  const alTocarLaPantalla = () => {
+    if (!conMandoFisico) return;
+    setConMandoFisico(false);
+    Mgba.mandoTactilVisible();
+  };
   // Tumbado se juega como en la web: la partida a todo el alto y el mando
   // flotando encima. Se mira el tamaño y no un sensor: es lo que manda.
   const {width, height} = useWindowDimensions();
@@ -165,13 +179,13 @@ const Juego = ({partida, onSalir}: {partida: Partida; onSalir: () => void}) => {
 
   if (horizontal) {
     return (
-      <View style={estilos.tumbado}>
+      <View style={estilos.tumbado} onTouchStart={alTocarLaPantalla}>
         <StatusBar hidden />
         {/* 3:2 a todo el alto y centrada: lo que sobra de ancho se reparte a
             los lados, y ahi caen los botones. */}
         <View style={[estilos.consolaTumbada, {height, width: Math.min(width, height * 1.5)}]}>{consola}</View>
 
-        <Mando horizontal />
+        {!conMandoFisico && <Mando horizontal />}
 
         {/* El equipo arriba, sobre la banda negra. Tocarlo cambia al del
             companero, y con el su partida. */}
@@ -193,9 +207,16 @@ const Juego = ({partida, onSalir}: {partida: Partida; onSalir: () => void}) => {
           <Text style={estilos.botonMenuTexto}>☰</Text>
         </Pressable>
 
-        {(menu || verSala) && (
+        {(menu || verSala || verMando) && (
           <View style={estilos.velo}>
-            {verSala ? (
+            {verMando ? (
+              <PanelDelMando
+                onCerrar={() => {
+                  setVerMando(false);
+                  setMenu(false);
+                }}
+              />
+            ) : verSala ? (
               <PanelDeSala
                 sala={sala}
                 onCerrar={() => {
@@ -219,6 +240,7 @@ const Juego = ({partida, onSalir}: {partida: Partida; onSalir: () => void}) => {
                     }}
                   />
                 )}
+                <Boton texto="Mando físico" onPress={() => setVerMando(true)} />
                 <Boton texto="Salir del juego" onPress={onSalir} />
               </View>
             )}
@@ -229,7 +251,7 @@ const Juego = ({partida, onSalir}: {partida: Partida; onSalir: () => void}) => {
   }
 
   return (
-    <View style={estilos.juego}>
+    <View style={estilos.juego} onTouchStart={alTocarLaPantalla}>
       <StatusBar hidden={false} />
       <View style={estilos.barra}>
         <Pressable onPress={onSalir} hitSlop={10}>
@@ -238,9 +260,14 @@ const Juego = ({partida, onSalir}: {partida: Partida; onSalir: () => void}) => {
         <Text style={estilos.barraTitulo} numberOfLines={1}>
           {partida.huella.title}
         </Text>
-        <Pressable onPress={() => setVerSala(v => !v)} hitSlop={10}>
-          <Text style={estilos.barraBoton}>{conCompanero ? `Sala · ${nombreDelOtro}` : 'Sala'}</Text>
-        </Pressable>
+        <View style={estilos.barraDerecha}>
+          <Pressable onPress={() => setVerMando(v => !v)} hitSlop={10} accessibilityLabel="Mando físico">
+            <Text style={estilos.barraBoton}>🎮</Text>
+          </Pressable>
+          <Pressable onPress={() => setVerSala(v => !v)} hitSlop={10}>
+            <Text style={estilos.barraBoton}>{conCompanero ? `Sala · ${nombreDelOtro}` : 'Sala'}</Text>
+          </Pressable>
+        </View>
       </View>
 
       {/* La consola, o la del companero si se esta mirando la suya. */}
@@ -253,7 +280,9 @@ const Juego = ({partida, onSalir}: {partida: Partida; onSalir: () => void}) => {
         )}
       </View>
 
-      {verSala ? (
+      {verMando ? (
+        <PanelDelMando onCerrar={() => setVerMando(false)} />
+      ) : verSala ? (
         <PanelDeSala sala={sala} onCerrar={() => setVerSala(false)} />
       ) : (
         <>
@@ -266,7 +295,7 @@ const Juego = ({partida, onSalir}: {partida: Partida; onSalir: () => void}) => {
               caidosDelOtro={caidosMios}
             />
           )}
-          <Mando />
+          {!conMandoFisico && <Mando />}
         </>
       )}
     </View>
@@ -341,6 +370,7 @@ const estilos = StyleSheet.create({
   principalTexto: {color: '#2a2a2a'},
   juego: {flex: 1},
   barra: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, height: 44},
+  barraDerecha: {flexDirection: 'row', alignItems: 'center', gap: 16},
   barraTitulo: {color: '#e8eef5', fontWeight: '700', flexShrink: 1, marginHorizontal: 8},
   barraBoton: {color: '#ffcb05', fontWeight: '700', fontSize: 14},
   // 3:2, la proporcion de la GBA. El sistema escala los pixeles.

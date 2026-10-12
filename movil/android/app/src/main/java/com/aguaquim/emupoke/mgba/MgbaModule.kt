@@ -11,6 +11,7 @@ import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
+import com.facebook.react.modules.core.DeviceEventManagerModule
 import java.io.File
 import java.util.concurrent.Executors
 
@@ -32,7 +33,34 @@ class MgbaModule(private val contexto: ReactApplicationContext) :
 
   init {
     contexto.addActivityEventListener(this)
+    Mando.iniciar(contexto)
+    // Lo que el mando tenga que contar llega a JavaScript como evento.
+    Mando.avisar = { nombre, datos ->
+      if (contexto.hasActiveReactInstance()) {
+        contexto
+            .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+            .emit(nombre, Arguments.createMap().apply { datos.forEach { (k, v) -> putString(k, v) } })
+      }
+    }
   }
+
+  /** Que boton del mando va a cada entrada, con nombres legibles. */
+  @ReactMethod
+  fun mandoFisico(promesa: Promise) {
+    promesa.resolve(Arguments.createMap().apply { Mando.descripcion().forEach { (k, v) -> putString(k, v) } })
+  }
+
+  /** El siguiente boton que se pulse en el mando ira a esta entrada. Null para dejarlo. */
+  @ReactMethod fun aprenderBoton(entrada: String?) = Mando.aprender(entrada)
+
+  @ReactMethod fun restaurarMando() = Mando.restaurar(contexto)
+
+  @ReactMethod fun mandoTactilVisible() = Mando.tactilVisible()
+
+  // Necesarios para emitir eventos con la arquitectura de siempre.
+  @ReactMethod fun addListener(nombre: String) {}
+
+  @ReactMethod fun removeListeners(cuantos: Int) {}
 
   private val carpetaRoms
     get() = File(contexto.filesDir, "roms").apply { mkdirs() }

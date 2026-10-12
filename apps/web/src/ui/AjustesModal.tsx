@@ -13,6 +13,8 @@
 // es, como se aleatorizo-. Es la division que hace que no haya que leerlo todo
 // para encontrar una cosa.
 
+import type { MandoFisico } from '../core/useMandoFisico';
+import { nombreDeBoton } from '../core/mandoFisico';
 import { useCallback, useEffect, useState, type ReactNode, type RefObject } from 'react';
 import {
   MAX_PARTIDAS,
@@ -44,8 +46,8 @@ type Props = {
   };
   teclas: Teclas;
   mando: MandoTactil;
-  /** El nombre del mando fisico conectado, o null. */
-  mandoFisico: string | null;
+  /** El mando fisico, si hay uno, y sus botones. */
+  mandoFisico: MandoFisico;
   /** Si este aparato manda su pantalla al companero. */
   video: { enviando: boolean; cambiar: (enviar: boolean) => void };
   hasRom: boolean;
@@ -224,10 +226,41 @@ export const AjustesModal = ({
               Se dice cual se ha reconocido y como van los botones, porque
               cada fabricante pone otras letras. */}
           <p className="hint">
-            {mandoFisico
-              ? `Mando conectado: ${mandoFisico.replace(/\s*\(.*$/, '')}. El botón de la derecha es A y el de abajo B, como en la consola.`
+            {mandoFisico.conectado
+              ? `Mando conectado: ${mandoFisico.conectado.replace(/\s*\(.*$/, '')}. El botón de la derecha es A y el de abajo B, como en la consola.`
               : 'Puedes conectar un mando por Bluetooth o USB: pulsa cualquier botón para que el navegador lo reconozca.'}
           </p>
+
+          {/* Sus botones, reasignables igual que las teclas: se pulsa la fila
+              y luego el boton del mando. Solo con un mando conectado, que sin
+              el no hay nada que pulsar. */}
+          {mandoFisico.conectado && (
+            <>
+              <div className="teclas">
+                {BOTONES.map(({ entrada, etiqueta }) => (
+                  <div className="teclas__fila" key={entrada}>
+                    <span className="teclas__que">{etiqueta}</span>
+                    <button
+                      type="button"
+                      className={`tecla${mandoFisico.esperando === entrada ? ' tecla--esperando' : ''}`}
+                      onClick={() =>
+                        mandoFisico.esperando === entrada
+                          ? mandoFisico.cancelar()
+                          : mandoFisico.aprender(entrada)
+                      }
+                    >
+                      {mandoFisico.esperando === entrada
+                        ? 'Pulsa…'
+                        : mandoFisico.mapa[entrada].map(nombreDeBoton).join(' · ') || '—'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button type="button" className="boton-fantasma" onClick={mandoFisico.restaurar}>
+                Restablecer el mando
+              </button>
+            </>
+          )}
 
           {/* En un movil que no da abasto, mandar la partida a 60 por segundo
               es lo que mas cuesta despues de emularla. Sin ella siguen el

@@ -24,23 +24,70 @@ export type MandoLeido = {
   axes: readonly number[];
 };
 
-/** Que boton del mapeo estandar va a que entrada del GBA. */
-const BOTONES: readonly (readonly [number, EntradaGba])[] = [
-  [1, 'A'], // derecha
-  [0, 'B'], // abajo
-  [3, 'A'], // arriba: sobra un boton y A es el que mas se pulsa
-  [2, 'B'], // izquierda
-  [4, 'L'],
-  [6, 'L'],
-  [5, 'R'],
-  [7, 'R'],
-  [8, 'Select'],
-  [9, 'Start'],
-  [12, 'Up'],
-  [13, 'Down'],
-  [14, 'Left'],
-  [15, 'Right'],
-];
+/**
+ * Que botones van a cada entrada del GBA, por su numero en el mapeo estandar.
+ *
+ * Se puede cambiar desde Ajustes: hay mandos que el navegador no reconoce y
+ * reparten los numeros a su manera, y hay quien prefiere el B arriba.
+ */
+export type MapaMando = Record<EntradaGba, readonly number[]>;
+
+export const MAPA_POR_DEFECTO: MapaMando = {
+  A: [1, 3], // derecha, y arriba: sobra un boton y A es el que mas se pulsa
+  B: [0, 2], // abajo, e izquierda
+  L: [4, 6],
+  R: [5, 7],
+  Select: [8],
+  Start: [9],
+  Up: [12],
+  Down: [13],
+  Left: [14],
+  Right: [15],
+};
+
+/** Como se llama cada boton del mapeo estandar, para enseñarlo. */
+const NOMBRES: Readonly<Record<number, string>> = {
+  0: 'Abajo',
+  1: 'Derecha',
+  2: 'Izquierda',
+  3: 'Arriba',
+  4: 'LB',
+  5: 'RB',
+  6: 'LT',
+  7: 'RT',
+  8: 'Select',
+  9: 'Start',
+  10: 'Stick izq.',
+  11: 'Stick der.',
+  12: 'Cruceta ↑',
+  13: 'Cruceta ↓',
+  14: 'Cruceta ←',
+  15: 'Cruceta →',
+  16: 'Inicio',
+};
+
+export const nombreDeBoton = (indice: number): string => NOMBRES[indice] ?? `Botón ${indice}`;
+
+/**
+ * Asigna un boton a una entrada.
+ *
+ * Ese boton deja de hacer lo que hiciera antes: un boton que pulsa dos cosas a
+ * la vez es justo lo que no se quiere al reasignar.
+ */
+export const asignarBoton = (mapa: MapaMando, entrada: EntradaGba, indice: number): MapaMando => {
+  const nuevo = {} as Record<EntradaGba, readonly number[]>;
+  for (const [otra, botones] of Object.entries(mapa) as [EntradaGba, readonly number[]][]) {
+    nuevo[otra] = botones.filter((b) => b !== indice);
+  }
+  nuevo[entrada] = [indice];
+  return nuevo;
+};
+
+/** El primer boton pulsado de un mando, para aprender uno nuevo. */
+export const primerBotonPulsado = (mando: MandoLeido): number | null => {
+  const indice = mando.buttons.findIndex((b) => b.pressed || (b.value ?? 0) > 0.5);
+  return indice >= 0 ? indice : null;
+};
 
 /**
  * Cuanto hay que inclinar el stick para que cuente.
@@ -54,12 +101,16 @@ export const ZONA_MUERTA = 0.5;
 const GATILLO = 0.5;
 
 /** Lo que tiene pulsado un mando ahora mismo, en entradas del GBA. */
-export const entradasDelMando = (mando: MandoLeido): Set<EntradaGba> => {
+export const entradasDelMando = (
+  mando: MandoLeido,
+  mapa: MapaMando = MAPA_POR_DEFECTO,
+): Set<EntradaGba> => {
   const pulsadas = new Set<EntradaGba>();
-  for (const [indice, entrada] of BOTONES) {
-    const boton = mando.buttons[indice];
-    if (!boton) continue;
-    if (boton.pressed || (boton.value ?? 0) > GATILLO) pulsadas.add(entrada);
+  for (const [entrada, botones] of Object.entries(mapa) as [EntradaGba, readonly number[]][]) {
+    for (const indice of botones) {
+      const boton = mando.buttons[indice];
+      if (boton && (boton.pressed || (boton.value ?? 0) > GATILLO)) pulsadas.add(entrada);
+    }
   }
   // El stick izquierdo hace de cruceta, diagonales incluidas.
   const [x = 0, y = 0] = mando.axes;

@@ -648,7 +648,7 @@ export const App = () => {
           emulator={emulator}
           teclas={teclas}
           mando={mando}
-          mandoFisico={mandoFisico.conectado}
+          mandoFisico={mandoFisico}
           video={{ enviando: session.enviandoVideo, cambiar: session.cambiarEnvioDeVideo }}
           hasRom={hasRom}
           conCompanero={conCompanero}
