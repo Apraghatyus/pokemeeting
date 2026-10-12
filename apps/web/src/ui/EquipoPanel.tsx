@@ -75,6 +75,14 @@ type Props = {
    */
   tope?: TopeDeNivel | null;
   /**
+   * Los tipos primarios que estan repetidos, contando tambien el equipo del
+   * otro. Es la regla de la Nivelada; fuera de ella llega vacio o no llega.
+   *
+   * Como el tope, AVISA y no impide: se marca la ficha y quien decide cual deja
+   * en la computadora es su dueno.
+   */
+  tiposRepetidos?: ReadonlySet<number>;
+  /**
    * Como se llama el otro jugador, para la pestana.
    *
    * Su apodo si lo dijo al entrar en la sala, y "tu companero" si no. Lo decide
@@ -151,6 +159,7 @@ const Ficha = ({
   activo,
   parejaRota,
   tope,
+  tipoRepetido,
 }: {
   pokemon: PokemonResumen;
   especies: Especies;
@@ -158,6 +167,8 @@ const Ficha = ({
   activo: boolean;
   parejaRota: boolean;
   tope: TopeDeNivel | null;
+  /** Si su tipo primario lo lleva otro Pokemon de los dos equipos. */
+  tipoRepetido: boolean;
 }) => {
   const nombre = pokemon.huevo ? 'Huevo' : especies.nombre(pokemon.especie);
   // Cuantos niveles se ha pasado del tope, si se lo ha pasado. Un huevo no
@@ -218,6 +229,16 @@ const Ficha = ({
               +{sobra}
             </span>
           )}
+          {/* Su tipo primario lo lleva otro, aqui o en el equipo del companero.
+              Dice cual, que es lo que hace falta para decidir a quien guardar. */}
+          {tipoRepetido && pokemon.tipos && (
+            <span
+              className="estado estado--repetido"
+              title={`Otro Pokemon de los dos equipos tambien es de tipo ${TIPOS_GEN3[pokemon.tipos[0]] ?? '?'} primario`}
+            >
+              TIPO
+            </span>
+          )}
           {/* En un Soul Link un debilitado no es un detalle: suele ser el final
               de una pareja. Por eso el estado se ve antes que nada. */}
           {pokemon.estado && (
@@ -242,6 +263,7 @@ const Ficha = ({
         {nombre}
         {pokemon.estado ? `, ${pokemon.estado}` : ''}
         {sobra > 0 ? `, ${sobra} niveles por encima del tope` : ''}
+        {tipoRepetido ? ', tipo primario repetido' : ''}
       </span>
     </li>
   );
@@ -255,6 +277,7 @@ export const EquipoPanel = ({
   activo = null,
   caidosDelOtro,
   tope = null,
+  tiposRepetidos,
   nombreDelOtro = 'Tu companero',
   nombrePropio = 'Tu equipo',
   onCambiar,
@@ -339,6 +362,12 @@ export const EquipoPanel = ({
                   caidosDelOtro !== undefined && parejaCaida(pokemon.mote, caidosDelOtro)
                 }
                 tope={tope}
+                tipoRepetido={
+                  !pokemon.huevo &&
+                  pokemon.tipos !== null &&
+                  tiposRepetidos !== undefined &&
+                  tiposRepetidos.has(pokemon.tipos[0])
+                }
               />
             ) : (
               <li key={`hueco-${i}`} className="ficha ficha--hueco" aria-hidden="true" />

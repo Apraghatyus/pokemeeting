@@ -6,6 +6,7 @@ import { useKeyboardOwnership } from './core/useKeyboardOwnership';
 import { useSession } from './net/useSession';
 import { useEquipo } from './core/useEquipo';
 import { useTopeDeNivel } from './core/useTopeDeNivel';
+import { reglasActivas, tiposPrimariosRepetidos } from './core/dificultad';
 import { useFinDePartida } from './core/useFinDePartida';
 import { useEquipoOrdenado } from './core/ordenEquipo';
 import { useEsEstrecha } from './core/useEsEstrecha';
@@ -15,7 +16,15 @@ import { useMandoTactil } from './core/useMandoTactil';
 import { apodoGuardado, comoSeLlama } from './core/apodo';
 import { codificarSemilla, type Semilla } from './core/semilla';
 import { leerInvitacion, olvidarInvitacion, type Invitacion } from './core/invitacion';
-import { esSoullink, marcarSoullink, nombreDePartida, sePuedeRehacer, todasLasPartidas } from './core/partidas';
+import {
+  dificultadDe,
+  esSoullink,
+  marcarSoullink,
+  nombreDePartida,
+  semillaDePartida,
+  sePuedeRehacer,
+  todasLasPartidas,
+} from './core/partidas';
 import { motesDebilitados, parseGameCode } from '@emupoke/pokemon';
 import { EquipoPanel } from './ui/EquipoPanel';
 import { AjustesModal } from './ui/AjustesModal';
@@ -279,6 +288,14 @@ export const App = () => {
   const caidosMios = motesDebilitados(miEquipo.equipo);
   const caidosSuyos = motesDebilitados(session.state.equipoCompanero);
 
+  // Con que reglas se juega esta partida. Se relee al llegar equipo nuevo y no
+  // solo al cambiar de ROM: la partida se apunta en la lista justo DESPUES de
+  // cargarla, y leyendola al cargar saldria siempre Normal.
+  const dificultad = useMemo(
+    () => dificultadDe(state.romName),
+    [state.romName, miEquipo.equipo],
+  );
+
   const fin = useFinDePartida(
     miEquipo.equipo,
     state.romName,
@@ -308,7 +325,19 @@ export const App = () => {
       // cuando cayo el ultimo Pokemon.
       modo: esSoullink(state.romName) ? 'soullink' : 'sola',
       companero: conCompanero ? session.state.peerNombre ?? null : null,
+      dificultad,
     },
+  );
+
+  // Lo que vigila la dificultad, y solo mientras el reto siga vivo: despues de
+  // caer se puede seguir jugando, pero ya no hay reglas que cumplir.
+  const reglas = reglasActivas(dificultad, fin.acabada);
+  const tiposRepetidos = useMemo(
+    () =>
+      reglas.tipoPrimarioUnico
+        ? tiposPrimariosRepetidos(miEquipo.equipo, session.state.equipoCompanero)
+        : undefined,
+    [reglas.tipoPrimarioUnico, miEquipo.equipo, session.state.equipoCompanero],
   );
 
   // Mandarle el equipo al companero. Se hace desde un solo sitio y no al
@@ -410,7 +439,10 @@ export const App = () => {
                ROM y de SUS medallas, y ni una ni otras salen de su ordenador.
                Ponerle el tuyo marcaria a sus Pokemon por una regla que no es la
                suya. */
-            tope={unoSolo && verSuEquipo ? null : topes.siguiente}
+            tope={(unoSolo && verSuEquipo) || !reglas.topeDeNivel ? null : topes.siguiente}
+            /* La regla mira los dos equipos a la vez, asi que la marca sale en
+               los dos lados: tu ves cual de los tuyos choca y cual de los suyos. */
+            tiposRepetidos={tiposRepetidos}
             onCambiar={unoSolo ? () => setVerSuEquipo((v) => !v) : undefined}
             nombreDelOtro={nombreDelCompanero}
             nombrePropio={miNombre}
@@ -494,6 +526,7 @@ export const App = () => {
               activo={equipoSuyo.alFrente}
               especies={especies}
               caidosDelOtro={caidosMios}
+              tiposRepetidos={tiposRepetidos}
             />
           )}
         </div>
@@ -736,13 +769,7 @@ const semillaEnCurso = (crc32: string | null): Semilla | null => {
   const partida = crc32
     ? todasLasPartidas().find((p) => p.crc32 === crc32 && sePuedeRehacer(p))
     : undefined;
-  if (!partida) return null;
-  return {
-    baseCrc32: partida.baseCrc32,
-    crc32: partida.crc32!,
-    semilla: partida.semilla!,
-    ajustes: partida.ajustes!,
-  };
+  return partida ? semillaDePartida(partida) : null;
 };
 
 const nombreDeLaPartidaEnCurso = (crc32: string | null): string | null => {

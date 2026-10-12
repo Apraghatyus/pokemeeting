@@ -19,6 +19,7 @@ import {
   nombreDePartida,
   olvidar,
   renombrar,
+  semillaDePartida,
   sePuedeRehacer,
   tocar,
   type PartidaGuardada,
@@ -73,14 +74,10 @@ export const IconoNo = () => (
 const BotonSemilla = ({ partida }: { partida: PartidaGuardada }) => {
   const [copiada, setCopiada] = useState(false);
 
-  if (!sePuedeRehacer(partida) || !partida.crc32) return null;
+  const datos = semillaDePartida(partida);
+  if (!datos) return null;
 
-  const semilla = codificarSemilla({
-    baseCrc32: partida.baseCrc32,
-    crc32: partida.crc32,
-    semilla: partida.semilla!,
-    ajustes: partida.ajustes!,
-  });
+  const semilla = codificarSemilla(datos);
 
   const copiar = async () => {
     try {

@@ -124,6 +124,7 @@ export const subirLoDeAqui = async (): Promise<ResultadoDeSubida> => {
     cambiado: p.cambiado,
     creada: p.creada,
     jugada: p.jugada,
+    dificultad: p.dificultad ?? null,
   }));
 
   const finales: FinalParaSubir[] = historial().map((f) => ({
@@ -136,6 +137,7 @@ export const subirLoDeAqui = async (): Promise<ResultadoDeSubida> => {
     juego: f.juego,
     modo: f.modo,
     companero: f.companero,
+    dificultad: f.dificultad ?? null,
     equipo: f.equipo,
   }));
 

@@ -9,6 +9,7 @@
 // pedir que te registres para ver quien va ganando seria poner una puerta
 // donde no hace falta.
 
+import type { Dificultad } from '@emupoke/protocol';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type PokemonDelRanking = {
@@ -26,6 +27,8 @@ export type PartidaDelRanking = {
   juego: string | null;
   modo: 'sola' | 'soullink' | null;
   companero: string | null;
+  /** Con que reglas se jugo. Las de antes de que existieran llegan como Normal. */
+  dificultad?: Dificultad;
   medallas: number | null;
   equipo: PokemonDelRanking[];
 };
@@ -45,6 +48,8 @@ export type JugadorDelRanking = {
 export type FiltrosDelRanking = {
   modo: 'sola' | 'soullink';
   juego: string | null;
+  /** Una de las tres, o null para todas. */
+  dificultad: Dificultad | null;
 };
 
 export type EstadoDelRanking = {
@@ -77,6 +82,7 @@ export const useRanking = (filtros: FiltrosDelRanking, activo: boolean): EstadoD
 
     const parametros = new URLSearchParams({ modo: filtros.modo });
     if (filtros.juego) parametros.set('juego', filtros.juego);
+    if (filtros.dificultad) parametros.set('dificultad', filtros.dificultad);
 
     try {
       const respuesta = await fetch(`/cuentas/ranking?${parametros}`, { credentials: 'include' });
@@ -102,7 +108,7 @@ export const useRanking = (filtros: FiltrosDelRanking, activo: boolean): EstadoD
         problema: 'No puedo hablar con el servidor del ranking.',
       }));
     }
-  }, [filtros.modo, filtros.juego]);
+  }, [filtros.modo, filtros.juego, filtros.dificultad]);
 
   useEffect(() => {
     if (!activo) return;

@@ -38,7 +38,15 @@
 import { useEffect, useState, type RefObject } from 'react';
 import { describeGame, parseGameCode } from '@emupoke/pokemon';
 import type { Invitacion } from '../core/invitacion';
-import { cuando, nombreDePartida, partidasDe, tocar, type PartidaGuardada } from '../core/partidas';
+import {
+  cuando,
+  nombreDePartida,
+  partidasDe,
+  reglasDe,
+  tocar,
+  type PartidaGuardada,
+} from '../core/partidas';
+import { infoDe } from '../core/dificultad';
 import { nuevaConLosMismosAjustes, type BaseRom } from '../core/rehacer';
 import { descodificarSemilla, type Semilla } from '../core/semilla';
 import { consultarSala } from '../net/signalingClient';
@@ -170,7 +178,12 @@ export const InvitacionModal = ({
     semilla === null
       ? []
       : partidasDe(semilla.baseCrc32).filter(
-          (p) => p.ajustes === semilla.ajustes && existeGuardada(p.fichero),
+          // Y con la misma dificultad: una partida con las mismas opciones pero
+          // otras reglas no es la que te piden jugar.
+          (p) =>
+            p.ajustes === semilla.ajustes &&
+            reglasDe(p) === (semilla.dificultad ?? 'normal') &&
+            existeGuardada(p.fichero),
         );
 
   const trabajando = fase.nombre === 'preparando' || fase.nombre === 'entrando';
@@ -313,6 +326,16 @@ export const InvitacionModal = ({
               {guardadas.length > 0 ? '+ Empezar una partida nueva' : '+ Entrar y empezar'}
             </button>
           </div>
+
+          {/* La dificultad se dice ANTES de aceptar: viene fijada por quien
+              invita y no se puede cambiar, porque en un Soul Link los dos
+              tienen que jugar con las mismas reglas. */}
+          {semilla && (
+            <p className="hint">
+              Dificultad: <strong>{infoDe(semilla.dificultad ?? 'normal').nombre}</strong> —{' '}
+              {infoDe(semilla.dificultad ?? 'normal').reglas.join(' · ')}
+            </p>
+          )}
 
           <p className="hint">
             {!semilla

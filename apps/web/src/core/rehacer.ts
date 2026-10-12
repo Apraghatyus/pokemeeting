@@ -18,7 +18,7 @@
 //     el mismo sitio y los Pokemon de cada ruta no serian los mismos.
 
 import { randomizeRom, type PuestoEnCola } from '../net/randomizer';
-import { nombreParaNueva, registrar } from './partidas';
+import { nombreParaNueva, registrar, sinRevivirDe } from './partidas';
 import { crc32 } from './romHeader';
 import type { Semilla } from './semilla';
 
@@ -92,7 +92,13 @@ export const nuevaConLosMismosAjustes = async ({
 
   // Sin `seed`: el servicio escoge uno y lo devuelve. Eso es lo unico que
   // separa esta copia de la del anfitrion.
-  const result = await randomizeRom({ settingsString: semilla.ajustes }, base.bytes, alEsperar);
+  // Con la dificultad de quien invita: son las mismas reglas aunque el mundo
+  // sea otro.
+  const result = await randomizeRom(
+    { settingsString: semilla.ajustes, sinRevivir: sinRevivirDe(semilla.dificultad) },
+    base.bytes,
+    alEsperar,
+  );
 
   const generada = crc32(result.rom);
   const fileName = nombreParaNueva(base.fileName);
@@ -111,6 +117,7 @@ export const nuevaConLosMismosAjustes = async ({
     generacion: juego.generacion,
     // Esta partida nace de una invitacion: es de Soul Link por definicion.
     soullink: true,
+    dificultad: semilla.dificultad ?? null,
   });
 };
 
@@ -131,7 +138,12 @@ export const rehacerDesdeSemilla = async ({
   if (semilla.baseCrc32 !== base.crc32) throw new SemillaDeOtraRomError();
 
   const result = await randomizeRom(
-    { settingsString: semilla.ajustes, seed: semilla.semilla },
+    {
+      settingsString: semilla.ajustes,
+      seed: semilla.semilla,
+      // Cambia la copia, asi que sin ella no saldria el mismo mundo.
+      sinRevivir: sinRevivirDe(semilla.dificultad),
+    },
     base.bytes,
     alEsperar,
   );
@@ -155,5 +167,6 @@ export const rehacerDesdeSemilla = async ({
     // Una semilla pegada a mano puede ser para jugar con alguien o para repetir
     // un mundo que te gusto. No se sabe, y null dice eso.
     soullink: null,
+    dificultad: semilla.dificultad ?? null,
   });
 };

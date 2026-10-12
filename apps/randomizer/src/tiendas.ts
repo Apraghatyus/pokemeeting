@@ -272,6 +272,15 @@ export const aleatorizarTiendas = (
   jar: Buffer,
   rom: Buffer,
   semilla: string,
+  /**
+   * Si los de revivir salen de las tiendas. Lo decide la dificultad: en Normal
+   * se venden como en el juego, y en Nuzlocke y Nivelada no.
+   *
+   * Por defecto SI se quitan, porque es lo que hacian todas las copias hechas
+   * antes de que hubiera dificultades: sus recetas no lo dicen y tienen que
+   * seguir rehaciendose byte a byte.
+   */
+  sinRevivir = true,
 ): ResultadoTiendas | null => {
   const mapa = tiendasDeLaRom(jar, rom);
   if (!mapa) return null;
@@ -294,7 +303,7 @@ export const aleatorizarTiendas = (
     if (mapa.saltadas.includes(indice)) {
       // Los de revivir no entran en el reparto: por eso se quitan aqui, al
       // hacer el catalogo, y no al escribir. Ver `REVIVIR`.
-      for (const id of plazas) if (!REVIVIR.includes(id)) catalogo.add(id);
+      for (const id of plazas) if (!sinRevivir || !REVIVIR.includes(id)) catalogo.add(id);
     }
   }
 
@@ -348,6 +357,7 @@ export const aleatorizarTiendas = (
   //
   // Se recorre en orden y con el mismo dado, asi que sigue saliendo lo mismo
   // para la misma semilla.
+  if (!sinRevivir) return { tiendas, plazas: plazasCambiadas };
   for (const donde of mapa.offsets) {
     const plazas = plazasDe(rom, donde);
     if (!plazas) continue;
@@ -358,5 +368,45 @@ export const aleatorizarTiendas = (
     }
   }
 
+  return { tiendas, plazas: plazasCambiadas };
+};
+
+/**
+ * Quita los de revivir de todas las tiendas SIN aleatorizarlas.
+ *
+ * Es lo que pide una Nuzlocke en la que no se marco "Objetos de tienda": las
+ * tiendas se quedan como en el juego, pero sin Revivir. Cada uno se cambia por
+ * otro objeto que esa ROM ya vendia en alguna tienda, con un dado propio de la
+ * semilla para que la copia se rehaga igual.
+ *
+ * Escribe sobre `rom`. Devuelve cuantas plazas cambio, o null si de esta ROM no
+ * se sabe donde estan las tiendas: entonces no se toca nada.
+ */
+export const quitarRevivir = (jar: Buffer, rom: Buffer, semilla: string): ResultadoTiendas | null => {
+  const mapa = tiendasDeLaRom(jar, rom);
+  if (!mapa) return null;
+
+  const catalogo = new Set<number>();
+  for (const donde of mapa.offsets) {
+    for (const id of plazasDe(rom, donde) ?? []) if (!REVIVIR.includes(id)) catalogo.add(id);
+  }
+  const pool = [...catalogo].sort((a, b) => a - b);
+  if (pool.length < 4) return null;
+
+  const dado = dadoDe(`revivir:${semilla}`);
+  let tiendas = 0;
+  let plazasCambiadas = 0;
+  for (const donde of mapa.offsets) {
+    const plazas = plazasDe(rom, donde);
+    if (!plazas) continue;
+    let tocada = false;
+    for (const [i, id] of plazas.entries()) {
+      if (!REVIVIR.includes(id)) continue;
+      rom.writeUInt16LE(pool[Math.floor(dado() * pool.length)] as number, donde + i * 2);
+      plazasCambiadas += 1;
+      tocada = true;
+    }
+    if (tocada) tiendas += 1;
+  }
   return { tiendas, plazas: plazasCambiadas };
 };

@@ -142,6 +142,11 @@ export type RandomizeRequest = {
   seed?: string;
   /** Con que preguntar por el puesto en la cola. Lo pone `randomizeRom`. */
   ticket?: string;
+  /**
+   * Si los de revivir salen de las tiendas, segun la dificultad. Sin el campo
+   * se hace lo de antes de que hubiera dificultades. Ver `sinRevivirDe`.
+   */
+  sinRevivir?: boolean;
 };
 
 export class RandomizerError extends Error {}

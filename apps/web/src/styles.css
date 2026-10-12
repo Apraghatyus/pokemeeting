@@ -3144,6 +3144,14 @@ details.partidas[open] > summary::before {
   color: #fff;
 }
 
+/* Tipo primario repetido en una Nivelada. En ambar y no en rojo: no es que el
+   Pokemon no se pueda usar, es que uno de los que comparten tipo sobra, y el
+   jugador elige cual. */
+.estado--repetido {
+  background: var(--wait);
+  color: var(--accent-ink);
+}
+
 /* ====================================================================
    Movil: que el mando quepa entero
    ====================================================================
@@ -5129,13 +5137,6 @@ details.partidas[open] > summary::before {
   position: absolute;
   left: 0;
   color: var(--accent-dim);
-}
-
-.rank__aviso {
-  margin: 0;
-  font-family: var(--tipo-texto);
-  font-size: 13px;
-  color: var(--muted);
 }
 
 /* --- filtros --- */

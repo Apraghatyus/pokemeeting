@@ -67,6 +67,26 @@ export const limpiarApodo = (valor: unknown): string | null => {
   return limpio === '' ? null : limpio;
 };
 
+/**
+ * Las tres dificultades de una partida.
+ *
+ * No cambian como se juega dentro del juego: cambian que reglas vigila el
+ * programa, que se apaga en el panel y en que columna del ranking cuenta. La
+ * unica que toca la copia es que los de revivir salgan o no de las tiendas.
+ *
+ * Es de la PARTIDA y se elige al aleatorizar. En un Soul Link viaja dentro de
+ * la semilla, asi que quien entra por la invitacion juega con la misma.
+ */
+export type Dificultad = 'normal' | 'nuzlocke' | 'nivelada';
+
+export const DIFICULTADES: readonly Dificultad[] = ['normal', 'nuzlocke', 'nivelada'];
+
+export const esDificultad = (valor: unknown): valor is Dificultad =>
+  typeof valor === 'string' && (DIFICULTADES as readonly string[]).includes(valor);
+
+/** Si en esa dificultad los de revivir salen de las tiendas. */
+export const sinRevivirEn = (dificultad: Dificultad): boolean => dificultad !== 'normal';
+
 export type DatosDeSala = {
   roomCode: string;
   /** Como se llama quien monto la sala, para poder decirlo en la invitacion. */

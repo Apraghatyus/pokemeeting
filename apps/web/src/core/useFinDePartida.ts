@@ -72,6 +72,14 @@ export type FinDePartida = {
   /** Si hay que enseñar el cartel ahora mismo. */
   terminada: boolean;
   /**
+   * Si el reto ya se acabo, aunque se este siguiendo la partida.
+   *
+   * No es lo mismo que `terminada`, que dice si hay que ENSEÑAR el cartel.
+   * Esto es lo que apaga las reglas de la dificultad: despues de caer se puede
+   * seguir jugando, pero ya no se compite y no hay nada que vigilar.
+   */
+  acabada: boolean;
+  /**
    * Si se acabo por el Soul Link y no por tu propia partida.
    *
    * Importa para contarlo: en ese caso tus Pokemon siguen vivos en el juego, y
@@ -430,6 +438,7 @@ export const useFinDePartida = (
     // Ya decidido, no se vuelve a preguntar: `continuada` sobrevive a recargar
     // la pagina, y sin mirarlo el cartel salia otra vez en cada arranque.
     terminada: estado.terminada && !estado.continuada && !descartada,
+    acabada: estado.terminada,
     resultado: estado.resultado,
     porElEnlace: estado.porElEnlace,
     equipoFinal,

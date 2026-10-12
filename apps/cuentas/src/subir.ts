@@ -16,6 +16,7 @@
 // base de datos sin repartir el juego de nadie.
 
 import {
+  esDificultad,
   MAX_SUBIDA_FINALES,
   MAX_SUBIDA_PARTIDAS,
   type FinalParaSubir,
@@ -80,8 +81,8 @@ const guardarPartida = async (
   const { rows } = await cliente.query<{ nueva: boolean }>(
     `insert into partidas
        (usuario_id, llave, fichero, nombre, juego, generacion,
-        base_crc32, crc32, semilla, ajustes, cambiado, creada, jugada)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+        base_crc32, crc32, semilla, ajustes, cambiado, creada, jugada, dificultad)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
      on conflict (usuario_id, llave) do update set
        fichero = excluded.fichero,
        nombre = excluded.nombre,
@@ -90,6 +91,8 @@ const guardarPartida = async (
        crc32 = excluded.crc32,
        ajustes = excluded.ajustes,
        cambiado = excluded.cambiado,
+       -- No cambia en la vida de una partida: solo se completa si faltaba.
+       dificultad = coalesce(partidas.dificultad, excluded.dificultad),
        -- La mas reciente de las dos: si se jugo en el movil despues que aqui,
        -- la buena es la del movil.
        jugada = greatest(partidas.jugada, excluded.jugada),
@@ -112,6 +115,7 @@ const guardarPartida = async (
         .map((c) => c.slice(0, 40)),
       fecha(partida.creada),
       fecha(partida.jugada),
+      esDificultad(partida.dificultad) ? partida.dificultad : null,
     ],
   );
 
@@ -135,13 +139,13 @@ const guardarFinal = async (
   const { rows } = await cliente.query<{ id: string }>(
     `insert into partidas_terminadas
        (usuario_id, partida_id, llave, cuando, resultado, por_el_enlace, medallas,
-        juego, modo, companero)
+        juego, modo, companero, dificultad)
      values (
        $1,
        -- Se ata a la partida de la que salio si todavia esta. Si se borro, la
        -- fila se queda igual: el historial sobrevive a la copia.
        (select id from partidas where usuario_id = $1 and fichero = $2 limit 1),
-       $3, $4, $5, $6, $7, $8, $9, $10
+       $3, $4, $5, $6, $7, $8, $9, $10, $11
      )
      on conflict (usuario_id, llave) do update set
        -- Lo que antes no se sabia y ahora si, se completa; lo que ya estaba no
@@ -149,7 +153,8 @@ const guardarFinal = async (
        -- aparato no borra lo que se apunto bien.
        juego = coalesce(partidas_terminadas.juego, excluded.juego),
        modo = coalesce(partidas_terminadas.modo, excluded.modo),
-       companero = coalesce(partidas_terminadas.companero, excluded.companero)
+       companero = coalesce(partidas_terminadas.companero, excluded.companero),
+       dificultad = coalesce(partidas_terminadas.dificultad, excluded.dificultad)
      returning (xmax = 0) as nueva, id`,
     [
       usuarioId,
@@ -162,6 +167,9 @@ const guardarFinal = async (
       recortar(final.juego, 80),
       modo,
       recortar(final.companero, 40),
+      // Una de las tres o nada, igual que el modo: la base la rechazaria y se
+      // perderia la subida entera por un valor inventado.
+      esDificultad(final.dificultad) ? final.dificultad : null,
     ],
   );
 
