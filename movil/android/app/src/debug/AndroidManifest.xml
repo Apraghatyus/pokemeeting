@@ -5,5 +5,16 @@
     <application
         android:usesCleartextTraffic="true"
         tools:targetApi="28"
-        tools:ignore="GoogleAppIndexingWarning"/>
+        tools:ignore="GoogleAppIndexingWarning">
+
+        <!-- El QR de `npx expo start` abre el dev client con este esquema. -->
+        <activity android:name=".MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="exp+pokemeeting" />
+            </intent-filter>
+        </activity>
+    </application>
 </manifest>

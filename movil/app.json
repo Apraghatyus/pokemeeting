@@ -1,4 +1,17 @@
 {
   "name": "EmupokeMovil",
-  "displayName": "Pokemeeting"
+  "displayName": "Pokemeeting",
+  "expo": {
+    "name": "Pokemeeting",
+    "slug": "pokemeeting",
+    "android": {
+      "package": "com.aguaquim.emupoke"
+    },
+    "plugins": [
+      "expo-asset"
+    ],
+    "experiments": {
+      "tsconfigPaths": false
+    }
+  }
 }

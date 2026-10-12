@@ -8,6 +8,11 @@
 # Es una APK "release" firmada con la clave de depuracion del proyecto: lleva el
 # JavaScript dentro -no necesita un ordenador al lado- pero no es para la
 # tienda. Para publicarla haria falta una clave propia.
+#
+# Al lado sale la APK de desarrollo (el "dev client" de Expo): no lleva el
+# JavaScript, lo pide a `npx expo start` en el ordenador. Sirve para probar en
+# el telefono y ver cada cambio al momento sin volver a compilar. Ver
+# movil/README.md.
 name: APK Android
 
 on:
@@ -15,7 +20,7 @@ on:
     paths:
       - 'movil/**'
       - 'packages/**'
-      - 'apps/web/src/core/romHeader.ts'
+      - 'apps/web/src/core/**'
       - '.github/workflows/apk.yml'
   workflow_dispatch:
 
@@ -55,4 +60,14 @@ jobs:
         with:
           name: pokemeeting-apk
           path: movil/android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+
+      - name: Compilar la APK de desarrollo
+        working-directory: movil/android
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pokemeeting-dev-client-apk
+          path: movil/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
