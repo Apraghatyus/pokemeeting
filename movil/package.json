@@ -1,0 +1,32 @@
+{
+  "name": "emupoke-movil",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "android": "react-native run-android",
+    "start": "react-native start",
+    "typecheck": "tsc --noEmit",
+    "bundle": "react-native bundle --platform android --dev false --entry-file index.js --bundle-output /tmp/emupoke.bundle"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-native": "0.76.9",
+    "react-native-webrtc": "124.0.8"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@babel/preset-env": "^7.25.3",
+    "@babel/runtime": "^7.25.0",
+    "@react-native-community/cli": "15.0.1",
+    "@react-native-community/cli-platform-android": "15.0.1",
+    "@react-native/babel-preset": "0.76.9",
+    "@react-native/metro-config": "0.76.9",
+    "@react-native/typescript-config": "0.76.9",
+    "@types/react": "^18.2.6",
+    "typescript": "~5.9.3"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "description": "Pokemeeting para Android: emulador nativo y la misma sala que la web. No distribuye ROMs."
+}

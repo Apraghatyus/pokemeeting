@@ -13,6 +13,7 @@
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import {
+  esDificultad,
   limpiarApodo,
   normalizarUsuario,
   problemaDeLaClave,
@@ -277,7 +278,7 @@ const atender = async (req: IncomingMessage, res: ServerResponse): Promise<void>
     const filtros: Filtros = {
       modo: modo === 'sola' || modo === 'soullink' ? modo : null,
       juego: parametros.get('juego')?.slice(0, 80) || null,
-      dificultad: parametros.get('dificultad')?.slice(0, 20) || null,
+      dificultad: esDificultad(parametros.get('dificultad')) ? parametros.get('dificultad') : null,
     };
     responder(res, 200, {
       jugadores: await ranking(filtros),

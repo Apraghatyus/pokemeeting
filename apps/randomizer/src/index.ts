@@ -23,7 +23,7 @@ import { spawn } from 'node:child_process';
 import { gunzip as gunzipCallback, gzip as gzipCallback } from 'node:zlib';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { aleatorizarTiendas, tocoLasTiendas } from './tiendas.ts';
+import { aleatorizarTiendas, quitarRevivir, tocoLasTiendas } from './tiendas.ts';
 import { existsSync, readdirSync } from 'node:fs';
 import { cpus, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -185,6 +185,16 @@ type RandomizeRequest = {
    * falta.
    */
   ticket?: string;
+  /**
+   * Si los objetos de revivir salen de las tiendas. Lo decide la dificultad
+   * -Nuzlocke y Nivelada si, Normal no- y viaja en la receta de la partida,
+   * porque cambia la copia y sin el no se rehace igual.
+   *
+   * Sin el campo se hace lo de antes de que existieran las dificultades:
+   * quitarlos solo al aleatorizar las tiendas. Es lo que hicieron todas las
+   * copias viejas, y sus recetas no lo dicen.
+   */
+  sinRevivir?: boolean;
 };
 
 /**
@@ -770,9 +780,15 @@ const handleRandomize = async (req: IncomingMessage, res: ServerResponse): Promi
       try {
         const jarBuf = await readFile(jarPath());
         if (tocoLasTiendas(jarBuf, await readFile(input), randomized)) {
-          const extra = aleatorizarTiendas(jarBuf, randomized, seed);
+          const extra = aleatorizarTiendas(jarBuf, randomized, seed, request.sinRevivir !== false);
           if (extra) console.log(`  tiendas extra: ${extra.tiendas} (${extra.plazas} plazas)`);
           else console.log('  tiendas extra: de esta ROM no se sabe donde estan, no se tocan');
+        } else if (request.sinRevivir === true) {
+          // Tiendas sin aleatorizar en una dificultad que no vende Revivir:
+          // se quedan como en el juego, menos esos dos.
+          const quitados = quitarRevivir(jarBuf, randomized, seed);
+          if (quitados) console.log(`  revivir fuera de ${quitados.tiendas} tiendas`);
+          else console.log('  revivir: de esta ROM no se sabe donde estan las tiendas, no se tocan');
         }
       } catch (error) {
         // Que esto falle no puede llevarse por delante una copia que ya esta

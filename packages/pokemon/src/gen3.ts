@@ -77,6 +77,22 @@ export type PokemonGen3 = {
    * un huevo sin nivel ni PS: paso al fabricar un Pokemon para probar.
    */
   esHuevo: boolean;
+  /**
+   * Donde se encontro: el numero de zona del mapa, en el byte 1 de la
+   * subestructura M.
+   *
+   * Es una ZONA con nombre -"RUTA 3", "MT. MOON"- y no un mapa: todas las
+   * plantas de una cueva comparten el mismo. Justo la medida de una Nuzlocke.
+   * Dos valores no son sitios: 254 es un intercambio dentro del juego y 255 un
+   * encuentro de evento.
+   */
+  lugar: number;
+  /**
+   * El nivel al que se encontro, en los siete bits de abajo de la palabra de
+   * origen. Cero quiere decir que salio de un huevo: entonces `lugar` es donde
+   * eclosiono, no donde se capturo.
+   */
+  nivelEncontrado: number;
   /** true si el checksum cuadra: la senal de que el bloque esta intacto. */
   valido: boolean;
 };
@@ -152,6 +168,8 @@ export const leerPokemon = (bloque: Uint8Array): PokemonGen3 => {
     movimientos: [u16(datos, a), u16(datos, a + 2), u16(datos, a + 4), u16(datos, a + 6)],
     nivel: bloque[OFF.combate + 4] ?? 0,
     esHuevo: ((u32(datos, m + 4) >>> 30) & 1) === 1,
+    lugar: datos[m + 1] ?? 0,
+    nivelEncontrado: u16(datos, m + 2) & 0x7f,
     valido: calcularChecksum(datos) === u16(bloque, OFF.checksum),
   };
 };

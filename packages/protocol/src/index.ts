@@ -67,6 +67,26 @@ export const limpiarApodo = (valor: unknown): string | null => {
   return limpio === '' ? null : limpio;
 };
 
+/**
+ * Las tres dificultades de una partida.
+ *
+ * No cambian como se juega dentro del juego: cambian que reglas vigila el
+ * programa, que se apaga en el panel y en que columna del ranking cuenta. La
+ * unica que toca la copia es que los de revivir salgan o no de las tiendas.
+ *
+ * Es de la PARTIDA y se elige al aleatorizar. En un Soul Link viaja dentro de
+ * la semilla, asi que quien entra por la invitacion juega con la misma.
+ */
+export type Dificultad = 'normal' | 'nuzlocke' | 'nivelada';
+
+export const DIFICULTADES: readonly Dificultad[] = ['normal', 'nuzlocke', 'nivelada'];
+
+export const esDificultad = (valor: unknown): valor is Dificultad =>
+  typeof valor === 'string' && (DIFICULTADES as readonly string[]).includes(valor);
+
+/** Si en esa dificultad los de revivir salen de las tiendas. */
+export const sinRevivirEn = (dificultad: Dificultad): boolean => dificultad !== 'normal';
+
 export type DatosDeSala = {
   roomCode: string;
   /** Como se llama quien monto la sala, para poder decirlo en la invitacion. */
@@ -206,6 +226,21 @@ export type PokemonResumen = {
    * esto, cambiar de sitio dos Pokemon pareceria que uno se transformo en otro.
    */
   personalidad: number;
+  /**
+   * La zona donde se capturo, o null si no se capturo en ninguna: salio de un
+   * huevo, llego por un intercambio del juego o de un evento.
+   *
+   * Es lo que permite vigilar la regla de "solo el primero de cada ruta" sin
+   * apuntar nada a mano: cada Pokemon lleva su sitio dentro. Ausente en los
+   * resumenes que no lo leen, como los de segunda generacion.
+   */
+  lugar?: number | null;
+  /**
+   * El numero de su entrenador original. Sirve para no contar como captura
+   * tuya lo que te llego por un intercambio: ese trae la zona de la partida
+   * del otro.
+   */
+  entrenador?: number;
 };
 
 /** El equipo entero en un momento dado. */
@@ -280,7 +315,13 @@ export type PeerMessage =
   | { type: 'oferta'; oferta: OfertaIntercambio }
   /** "Por mi adelante": el que lo manda ya ha confirmado. */
   | { type: 'trato-listo'; trato: string }
-  | { type: 'trato-roto'; trato: string };
+  | { type: 'trato-roto'; trato: string }
+  /**
+   * Si estoy mandando mi pantalla. En un movil que no da abasto se puede
+   * apagar y quedarse con el equipo y la voz; al otro lado se dice en vez de
+   * dejar el ultimo fotograma congelado, que parece un fallo.
+   */
+  | { type: 'video'; enviando: boolean };
 
 /** Cuanto ocupa un Pokemon de tercera generacion, y por tanto su bloque. */
 const BYTES_DE_UN_POKEMON = 100;
@@ -357,6 +398,10 @@ export const parsePeerMessage = (crudo: string): PeerMessage | null => {
   // Los del intercambio se miran aqui arriba porque no llevan equipo dentro.
   if (mensaje.type === 'oferta') {
     return esOferta(mensaje.oferta) ? { type: 'oferta', oferta: mensaje.oferta } : null;
+  }
+  if (mensaje.type === 'video') {
+    const enviando = (datos as { enviando?: unknown }).enviando;
+    return typeof enviando === 'boolean' ? { type: 'video', enviando } : null;
   }
   if (mensaje.type === 'trato-listo' || mensaje.type === 'trato-roto') {
     const trato = mensaje.trato;

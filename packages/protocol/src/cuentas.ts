@@ -11,6 +11,8 @@
 // porque ahora haya donde iniciar sesion.
 
 /** Lo maximo que puede medir un nombre de usuario. */
+import type { Dificultad } from './index';
+
 export const MAX_USUARIO = 20;
 
 /** Y lo minimo, para que no haya usuarios de una letra. */
@@ -106,6 +108,8 @@ export type PartidaParaSubir = {
   cambiado: string[];
   creada: number;
   jugada: number;
+  /** Con que reglas se juega. Null en las de antes de que existieran. */
+  dificultad?: Dificultad | null;
 };
 
 /** Y lo que se sube de una partida terminada. */
@@ -122,6 +126,8 @@ export type FinalParaSubir = {
   modo?: 'sola' | 'soullink' | null;
   /** Con quien, si fue en Soul Link. */
   companero?: string | null;
+  /** Con que reglas se jugo. Null en las de antes de que existieran. */
+  dificultad?: Dificultad | null;
   equipo: {
     especie: number;
     mote: string;

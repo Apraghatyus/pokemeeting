@@ -1193,7 +1193,7 @@ decision, no un descuido.
 | Modo: sola o Soul Link | No. Solo se sabe si el final vino por el enlace |
 | Con quién se jugó | No |
 | Descartadas | No. Borrar no deja rastro |
-| Dificultad | **No puede**: las dificultades todavía no existen |
+| Dificultad | **Sí**, desde que existen. Lo de antes cuenta como Normal |
 | Hasta dónde llegó, más allá de las 8 medallas | No |
 
 Dos de esas merecen explicación:
@@ -1339,9 +1339,59 @@ es la misma pantalla con y sin tus datos dentro.
 
 ## Dificultad: Normal, Nuzlocke y Nuzlocke nivelada
 
-En el modal del aleatorizador, junto a las opciones, un selector de dificultad.
-No cambia la ROM: cambia **las reglas que el programa vigila** y lo que se
-apunta en el historial.
+**Hecho lo que se puede vigilar.** Se elige en el menu del aleatorizador, encima
+de las opciones, y es de la PARTIDA: no se cambia despues. Lo que enciende cada
+una vive en `apps/web/src/core/dificultad.ts` y lo vigila `test:dificultad`.
+
+| | Normal | Nuzlocke | Nivelada |
+| --- | --- | --- | --- |
+| Revivir en las tiendas | Si | No | No |
+| Fin de partida al caer el equipo | Si | Si | Si |
+| Apagar al que se pasa del tope | No | No | **Si** |
+| Avisar de tipo primario repetido (los dos equipos) | No | No | **Si** |
+| Avisar de segunda captura en una zona ("RUTA") | No | **Si** | **Si** |
+| Avisar de un muerto en pie ("REVIVIDO") | No | **Si** | **Si** |
+| El numero del tope bajo las medallas | Se ve | Se ve | Se ve |
+
+Decisiones tomadas, para no volver a discutirlas:
+
+- **El fin de partida es igual en las tres.** Al caer el equipo sale el cartel,
+  se puede seguir jugando, y desde ahi **se apaga todo lo que vigila la
+  dificultad**: ya no se compite, asi que no hay reglas que cumplir. Lo que
+  cuenta para el historial es hasta donde se llego. Ver `acabada` en
+  `useFinDePartida.ts`.
+- **Se avisa, no se impide.** El tope y el tipo repetido marcan la ficha; quien
+  decide a quien guardar es el jugador.
+- **Viaja en la semilla**, como sexto campo. Asi la invitacion de un Soul Link
+  la fija sola -quien entra la ve antes de aceptar y no la puede cambiar- y la
+  receta rehace la copia igual, que importa porque Revivir cambia la ROM. Las
+  semillas de cinco campos se leen como antes y se rehacen como se hicieron.
+- **Revivir fuera de las tiendas tambien sin "Objetos de tienda".** En una
+  Nuzlocke con las tiendas sin aleatorizar se quitan igual, sustituidos por
+  otro objeto que esa ROM ya vendia (`quitarRevivir` en `tiendas.ts`).
+- **El ranking filtra por dificultad.** Lo jugado antes cuenta como Normal.
+
+**Las dos de Nuzlocke tambien se vigilan**, en `reglasNuzlocke.ts`:
+
+- **Solo el primero de cada ruta.** Cada Pokemon lleva la zona donde se
+  capturo (byte 1 de la subestructura M). Es la zona con nombre y no el mapa,
+  asi que las plantas de una cueva cuentan como una, que es como se juega. Se
+  apunta que Pokemon gasto cada zona, asi que liberarlo no la deja libre. No
+  cuentan los huevos, los intercambios del juego, los eventos ni lo que te llega
+  por intercambio, que trae la zona de la partida del otro: se reconoce porque
+  su entrenador original no eres tu.
+- **Debilitado = muerto.** Curarse en el Centro con debilitados es un guion y
+  no se ve, pero su resultado si: un Pokemon que estuvo debilitado vuelve a
+  estar en pie, por un Revivir o por el Centro. Se apunta quien cayo, asi que
+  tambien se pilla si se curo en el PC y vuelve despues. El combate del
+  laboratorio no cuenta: hasta haber visto dos Pokemon distintos una caida no
+  es muerte, la misma regla que el fin de partida.
+
+Lo que no se puede: impedirlo, y avisar ANTES de lanzar la ball en una zona
+gastada, que pide saber en que mapa esta el jugador ahora mismo. Ver "Que rutas
+estan gastadas", mas abajo.
+
+Lo que sigue es como se penso antes de hacerlo.
 
 **Normal.** Como hasta ahora. Se captura lo que se quiera cuando se quiera y el
 nivel máximo de los líderes no afecta a nada. Es lo que hay hoy.

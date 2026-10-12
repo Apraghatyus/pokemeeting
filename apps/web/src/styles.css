@@ -461,6 +461,21 @@ body {
   pointer-events: none;
 }
 
+/* El companero no manda su pantalla: se dice encima del ultimo fotograma. */
+.pantalla__sin-video {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  background: rgba(11, 15, 20, 0.82);
+  color: var(--muted);
+  font-family: var(--tipo-texto);
+  font-size: 13px;
+  text-align: center;
+}
+
 .pantalla--pequena .pantalla__etiqueta {
   top: 6px;
   left: 6px;
@@ -3144,6 +3159,14 @@ details.partidas[open] > summary::before {
   color: #fff;
 }
 
+/* Tipo primario repetido en una Nivelada. En ambar y no en rojo: no es que el
+   Pokemon no se pueda usar, es que uno de los que comparten tipo sobra, y el
+   jugador elige cual. */
+.estado--repetido {
+  background: var(--wait);
+  color: var(--accent-ink);
+}
+
 /* ====================================================================
    Movil: que el mando quepa entero
    ====================================================================
@@ -5129,13 +5152,6 @@ details.partidas[open] > summary::before {
   position: absolute;
   left: 0;
   color: var(--accent-dim);
-}
-
-.rank__aviso {
-  margin: 0;
-  font-family: var(--tipo-texto);
-  font-size: 13px;
-  color: var(--muted);
 }
 
 /* --- filtros --- */

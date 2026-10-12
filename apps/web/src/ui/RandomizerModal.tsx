@@ -14,11 +14,14 @@ import {
   renombrar,
   partidasDe,
   registrar,
+  sinRevivirDe,
   tocar,
   todasLasPartidas,
   type PartidaGuardada,
 } from '../core/partidas';
 import { parseGameCode } from '@emupoke/pokemon';
+import { sinRevivirEn, type Dificultad } from '@emupoke/protocol';
+import { DIFICULTADES } from '../core/dificultad';
 import { crc32 } from '../core/romHeader';
 import { codificarSemilla, descodificarSemilla } from '../core/semilla';
 import { rehacerDesdeSemilla } from '../core/rehacer';
@@ -177,6 +180,9 @@ export const RandomizerModal = ({
   const [partidas, setPartidas] = useState<PartidaGuardada[]>([]);
   const [otras, setOtras] = useState<PartidaGuardada[]>([]);
   const [semillaPegada, setSemillaPegada] = useState('');
+  // Nuzlocke por defecto: es a lo que se viene a este programa. Quien quiera
+  // jugar sin reglas lo cambia con un toque.
+  const [dificultad, setDificultad] = useState<Dificultad>('nuzlocke');
 
   // La lista se relee al abrir: puede haber cambiado desde la vez anterior.
   const releer = useCallback(() => {
@@ -257,7 +263,11 @@ export const RandomizerModal = ({
     setProgress({ fase: 'trabajando' });
     try {
       // Siempre desde la original: asi el nombre tampoco se encadena.
-      const result = await randomizeRom({ options: [...selected] }, base.bytes, avisarDeLaCola);
+      const result = await randomizeRom(
+        { options: [...selected], sinRevivir: sinRevivirEn(dificultad) },
+        base.bytes,
+        avisarDeLaCola,
+      );
 
       // Nombre propio para cada copia: asi conviven varias partidas de la
       // misma ROM sin pisarse el fichero de guardado.
@@ -274,6 +284,7 @@ export const RandomizerModal = ({
         ? registrar({
             // Nace sola. Si luego se invita a alguien, se marca entonces.
             soullink: false,
+            dificultad,
             fichero: fileName,
             baseNombre: base.fileName,
             baseCrc32: base.crc32,
@@ -301,6 +312,7 @@ export const RandomizerModal = ({
                 crc32: generada,
                 semilla: result.seed,
                 ajustes: result.ajustes,
+                dificultad,
               })
             : null,
       });
@@ -355,7 +367,11 @@ export const RandomizerModal = ({
     setProgress({ fase: 'trabajando' });
     try {
       const result = await randomizeRom(
-        { settingsString: traida.semilla.ajustes, seed: traida.semilla.semilla },
+        {
+          settingsString: traida.semilla.ajustes,
+          seed: traida.semilla.semilla,
+          sinRevivir: sinRevivirDe(traida.semilla.dificultad),
+        },
         base.bytes,
         avisarDeLaCola,
       );
@@ -375,6 +391,7 @@ export const RandomizerModal = ({
         // Viene de un fichero de partida traido de otro aparato: es la misma
         // partida que alla, pero aqui no se sabe si era de Soul Link.
         soullink: null,
+        dificultad: traida.semilla.dificultad ?? null,
         fichero: nombre,
         baseNombre: base.fileName,
         baseCrc32: base.crc32,
@@ -454,7 +471,11 @@ export const RandomizerModal = ({
     setProgress({ fase: 'trabajando' });
     try {
       const result = await randomizeRom(
-        { settingsString: partida.ajustes, seed: partida.semilla },
+        {
+          settingsString: partida.ajustes,
+          seed: partida.semilla,
+          sinRevivir: sinRevivirDe(partida.dificultad),
+        },
         base.bytes,
         avisarDeLaCola,
       );
@@ -691,6 +712,40 @@ export const RandomizerModal = ({
 
               {/* --------- que se aleatoriza --------- */}
               <div className="ajustes__columna">
+                {/* La dificultad va antes que las opciones: decide con que
+                    reglas se juega y en que columna del ranking cuenta, y no se
+                    puede cambiar despues. */}
+                <section className="tarjeta">
+                  <div className="tarjeta__titulo">
+                    <span className="tarjeta__marca" />
+                    <h2>Dificultad</h2>
+                  </div>
+
+                  <div className="interruptores" role="radiogroup" aria-label="Dificultad">
+                    {DIFICULTADES.map((d) => (
+                      <label
+                        className={`interruptor${dificultad === d.id ? ' is-on' : ''}`}
+                        key={d.id}
+                      >
+                        <input
+                          type="radio"
+                          name="dificultad"
+                          checked={dificultad === d.id}
+                          onChange={() => setDificultad(d.id)}
+                        />
+                        <span className="interruptor__texto">
+                          <span className="interruptor__nombre">
+                            {d.nombre} · {d.coletilla}
+                          </span>
+                          <span className="interruptor__nota">{d.reglas.join(' · ')}</span>
+                        </span>
+                        <span className="interruptor__palanca" aria-hidden="true" />
+                      </label>
+                    ))}
+                  </div>
+                  <p className="hint">No se cambia despues: es parte de la partida.</p>
+                </section>
+
                 <section className="tarjeta">
                   <div className="tarjeta__titulo">
                     <span className="tarjeta__marca" />

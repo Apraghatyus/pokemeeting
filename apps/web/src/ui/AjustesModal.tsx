@@ -13,6 +13,8 @@
 // es, como se aleatorizo-. Es la division que hace que no haya que leerlo todo
 // para encontrar una cosa.
 
+import type { MandoFisico } from '../core/useMandoFisico';
+import { nombreDeBoton } from '../core/mandoFisico';
 import { useCallback, useEffect, useState, type ReactNode, type RefObject } from 'react';
 import {
   MAX_PARTIDAS,
@@ -44,6 +46,10 @@ type Props = {
   };
   teclas: Teclas;
   mando: MandoTactil;
+  /** El mando fisico, si hay uno, y sus botones. */
+  mandoFisico: MandoFisico;
+  /** Si este aparato manda su pantalla al companero. */
+  video: { enviando: boolean; cambiar: (enviar: boolean) => void };
   hasRom: boolean;
   conCompanero: boolean;
   /**
@@ -88,6 +94,8 @@ export const AjustesModal = ({
   emulator,
   teclas,
   mando,
+  mandoFisico,
+  video,
   hasRom,
   conCompanero,
   onAleatorizar,
@@ -213,6 +221,77 @@ export const AjustesModal = ({
               </div>
             </div>
           </div>
+
+          {/* Un mando por Bluetooth o USB funciona solo, sin configurar nada.
+              Se dice cual se ha reconocido y como van los botones, porque
+              cada fabricante pone otras letras. */}
+          <p className="hint">
+            {mandoFisico.conectado
+              ? `Mando conectado: ${mandoFisico.conectado.replace(/\s*\(.*$/, '')}. El botón de la derecha es A y el de abajo B, como en la consola.`
+              : 'Puedes conectar un mando por Bluetooth o USB: pulsa cualquier botón para que el navegador lo reconozca.'}
+          </p>
+
+          {/* Sus botones, reasignables igual que las teclas: se pulsa la fila
+              y luego el boton del mando. Solo con un mando conectado, que sin
+              el no hay nada que pulsar. */}
+          {mandoFisico.conectado && (
+            <>
+              <div className="teclas">
+                {BOTONES.map(({ entrada, etiqueta }) => (
+                  <div className="teclas__fila" key={entrada}>
+                    <span className="teclas__que">{etiqueta}</span>
+                    <button
+                      type="button"
+                      className={`tecla${mandoFisico.esperando === entrada ? ' tecla--esperando' : ''}`}
+                      onClick={() =>
+                        mandoFisico.esperando === entrada
+                          ? mandoFisico.cancelar()
+                          : mandoFisico.aprender(entrada)
+                      }
+                    >
+                      {mandoFisico.esperando === entrada
+                        ? 'Pulsa…'
+                        : mandoFisico.mapa[entrada].map(nombreDeBoton).join(' · ') || '—'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button type="button" className="boton-fantasma" onClick={mandoFisico.restaurar}>
+                Restablecer el mando
+              </button>
+            </>
+          )}
+
+          {/* En un movil que no da abasto, mandar la partida a 60 por segundo
+              es lo que mas cuesta despues de emularla. Sin ella siguen el
+              equipo, la voz y todo lo demas. */}
+          <div className="teclas">
+            <div className="teclas__fila teclas__fila--ancha">
+              <span className="teclas__que">Enviar mi pantalla</span>
+              <div className="modos">
+                {[
+                  { valor: true, etiqueta: 'Si' },
+                  { valor: false, etiqueta: 'No' },
+                ].map(({ valor, etiqueta }) => (
+                  <button
+                    key={etiqueta}
+                    type="button"
+                    className={video.enviando === valor ? 'is-active' : undefined}
+                    aria-pressed={video.enviando === valor}
+                    onClick={() => video.cambiar(valor)}
+                  >
+                    {etiqueta}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          {!video.enviando && (
+            <p className="hint">
+              Tu compañero no ve tu partida, pero sí tu equipo y tu voz. Útil si el móvil va
+              lento.
+            </p>
+          )}
 
           {teclas.problema && <p className="warn">{teclas.problema}</p>}
         </section>

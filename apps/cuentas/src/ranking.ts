@@ -50,6 +50,7 @@ export type PartidaDelRanking = {
   juego: string | null;
   modo: 'sola' | 'soullink' | null;
   companero: string | null;
+  dificultad: string;
   medallas: number | null;
   equipo: PokemonDelRanking[];
 };
@@ -114,7 +115,10 @@ export const ranking = async (filtros: Filtros): Promise<JugadorDelRanking[]> =>
 
   if (filtros.dificultad) {
     valores.push(filtros.dificultad);
-    condiciones.push(`f.dificultad = $${valores.length}`);
+    // Lo jugado antes de que hubiera dificultades no la tiene, y cuenta como
+    // Normal: es como se jugaba. Sin el coalesce esas partidas no saldrian en
+    // ninguna pestaña.
+    condiciones.push(`coalesce(f.dificultad, 'normal') = $${valores.length}`);
   }
 
   const donde = condiciones.length > 0 ? `where ${condiciones.join(' and ')}` : '';
@@ -153,6 +157,8 @@ export const ranking = async (filtros: Filtros): Promise<JugadorDelRanking[]> =>
                  'juego', f.juego_real,
                  'modo', f.modo,
                  'companero', f.companero,
+                 -- Las de antes de que hubiera dificultades se jugaban como Normal.
+                 'dificultad', coalesce(f.dificultad, 'normal'),
                  'medallas', f.medallas,
                  'equipo', coalesce(e.equipo, '[]'::json)
                ) order by f.cuando desc

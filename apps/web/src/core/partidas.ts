@@ -9,6 +9,9 @@
 // tiraba partidas en las que alguien podia llevar horas. Ahora se conservan y
 // se elige.
 
+import { sinRevivirEn, type Dificultad } from '@emupoke/protocol';
+import type { Semilla } from './semilla';
+
 export type PartidaGuardada = {
   id: string;
   /** Nombre del fichero dentro del sistema de ficheros del nucleo. */
@@ -73,7 +76,45 @@ export type PartidaGuardada = {
    * no se sabe.
    */
   soullink: boolean | null;
+  /**
+   * Con que reglas se juega: Normal, Nuzlocke o Nivelada. Se elige al crearla y
+   * no cambia, igual que el modo: cambiarla a mitad seria otra partida.
+   *
+   * Opcional porque las partidas de antes no lo tienen, y entonces es null: no
+   * se sabe. Para las reglas cuentan como Normal, que es como se jugaban.
+   */
+  dificultad?: Dificultad | null;
 };
+
+/** Con que reglas se juega una partida. Las de antes de que existieran, Normal. */
+export const reglasDe = (partida: PartidaGuardada | undefined | null): Dificultad =>
+  partida?.dificultad ?? 'normal';
+
+/** La dificultad de la partida que corre en ese fichero. */
+export const dificultadDe = (fichero: string | null): Dificultad =>
+  reglasDe(fichero ? leerTodas().find((p) => p.fichero === fichero) : null);
+
+/**
+ * Que pedirle al randomizer sobre los de revivir al hacer o rehacer una copia.
+ *
+ * Sin dificultad -una partida o una semilla de antes de que existieran- no se
+ * dice nada, y el servicio hace lo de entonces. Es lo que deja rehacerlas byte
+ * a byte: con cualquier otra cosa saldria otra copia y el guardado no encajaria.
+ */
+export const sinRevivirDe = (dificultad: Dificultad | null | undefined): boolean | undefined =>
+  dificultad ? sinRevivirEn(dificultad) : undefined;
+
+/** La semilla de una partida, o null si no se puede rehacer. */
+export const semillaDePartida = (partida: PartidaGuardada): Semilla | null =>
+  sePuedeRehacer(partida) && partida.crc32
+    ? {
+        baseCrc32: partida.baseCrc32,
+        crc32: partida.crc32,
+        semilla: partida.semilla!,
+        ajustes: partida.ajustes!,
+        dificultad: partida.dificultad ?? null,
+      }
+    : null;
 
 /** Marca una partida como de Soul Link. Solo se enciende, nunca se apaga. */
 export const marcarSoullink = (fichero: string): void => {

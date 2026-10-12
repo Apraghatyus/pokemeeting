@@ -46,6 +46,8 @@ tools/cloudflared.exe
 
 # Capturas que dejan las pruebas al correrlas sin indicar carpeta.
 *.png
+# Menos los iconos de la app de Android, que son parte de ella.
+!movil/android/app/src/main/res/**/*.png
 
 # Pero los de la marca SI van: son parte del producto, no basura de una prueba.
 # Sin estas dos lineas el icono y el logotipo se quedaban fuera del commit sin

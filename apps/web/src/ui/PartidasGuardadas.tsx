@@ -19,11 +19,14 @@ import {
   nombreDePartida,
   olvidar,
   renombrar,
+  semillaDePartida,
   sePuedeRehacer,
   tocar,
   type PartidaGuardada,
 } from '../core/partidas';
 import { apuntarDescartada } from '../core/historial';
+import { olvidarReglas } from '../core/reglasNuzlocke';
+import { AVISO_ESPACIO, cabeOtra, enPalabras, useEspacio } from '../core/espacio';
 import { yaTermino } from '../core/useFinDePartida';
 import { codificarSemilla } from '../core/semilla';
 
@@ -73,14 +76,10 @@ export const IconoNo = () => (
 const BotonSemilla = ({ partida }: { partida: PartidaGuardada }) => {
   const [copiada, setCopiada] = useState(false);
 
-  if (!sePuedeRehacer(partida) || !partida.crc32) return null;
+  const datos = semillaDePartida(partida);
+  if (!datos) return null;
 
-  const semilla = codificarSemilla({
-    baseCrc32: partida.baseCrc32,
-    crc32: partida.crc32,
-    semilla: partida.semilla!,
-    ajustes: partida.ajustes!,
-  });
+  const semilla = codificarSemilla(datos);
 
   const copiar = async () => {
     try {
@@ -160,6 +159,9 @@ export const PartidasGuardadas = ({
   const [renombrando, setRenombrando] = useState<string | null>(null);
   const [nombreNuevo, setNombreNuevo] = useState('');
   const [borrando, setBorrando] = useState<string | null>(null);
+  // Se relee al abrir y cada vez que cambia la lista: crear o borrar una
+  // partida mueve dieciseis megas.
+  const espacio = useEspacio(`${visible}:${partidas.length}`);
 
   useEffect(() => {
     if (visible) return;
@@ -274,10 +276,16 @@ export const PartidasGuardadas = ({
                     // lo unico que separa un 90% limpio de uno hecho a base de
                     // borrar lo que iba mal.
                     if (!yaTermino(partida.fichero)) {
-                      apuntarDescartada(partida.fichero, { juego: juegoDePartida(partida) });
+                      apuntarDescartada(partida.fichero, {
+                        juego: juegoDePartida(partida),
+                        // Una Nuzlocke descartada cuenta en la columna de las
+                        // Nuzlocke: es justo donde descartar sale a cuenta.
+                        dificultad: partida.dificultad ?? null,
+                      });
                     }
                     onBorrarFichero(partida.fichero);
                     olvidar(partida.id);
+                    olvidarReglas(partida.fichero);
                     releer();
                   }}
                 >
@@ -361,6 +369,22 @@ export const PartidasGuardadas = ({
           + Crear partida
         </button>
       ))}
+
+      {/* Lo que ocupa, para que nadie descubra que se acabo el sitio cuando
+          falla un guardado. Sin datos del navegador no se dice nada. */}
+      {espacio && espacio.cuota > 0 && (
+        <p
+          className={
+            espacio.usado / espacio.cuota >= AVISO_ESPACIO || !cabeOtra(espacio) ? 'warn' : 'hint'
+          }
+        >
+          Ocupa {enPalabras(espacio.usado)} de {enPalabras(espacio.cuota)} que deja el navegador.
+          {!cabeOtra(espacio) && ' No cabe otra partida: borra alguna antes de crear otra.'}
+          {cabeOtra(espacio) &&
+            espacio.usado / espacio.cuota >= AVISO_ESPACIO &&
+            ' Queda poco sitio: si se llena, lo que falla es el siguiente guardado.'}
+        </p>
+      )}
 
       {pie}
     </div>

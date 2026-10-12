@@ -6,16 +6,27 @@ import { useKeyboardOwnership } from './core/useKeyboardOwnership';
 import { useSession } from './net/useSession';
 import { useEquipo } from './core/useEquipo';
 import { useTopeDeNivel } from './core/useTopeDeNivel';
+import { reglasActivas, tiposPrimariosRepetidos } from './core/dificultad';
+import { useReglasNuzlocke } from './core/reglasNuzlocke';
 import { useFinDePartida } from './core/useFinDePartida';
 import { useEquipoOrdenado } from './core/ordenEquipo';
 import { useEsEstrecha } from './core/useEsEstrecha';
 import { usePantallaCompleta } from './core/usePantallaCompleta';
 import { useEspecies } from './core/useEspecies';
 import { useMandoTactil } from './core/useMandoTactil';
+import { useMandoFisico } from './core/useMandoFisico';
 import { apodoGuardado, comoSeLlama } from './core/apodo';
 import { codificarSemilla, type Semilla } from './core/semilla';
 import { leerInvitacion, olvidarInvitacion, type Invitacion } from './core/invitacion';
-import { esSoullink, marcarSoullink, nombreDePartida, sePuedeRehacer, todasLasPartidas } from './core/partidas';
+import {
+  dificultadDe,
+  esSoullink,
+  marcarSoullink,
+  nombreDePartida,
+  semillaDePartida,
+  sePuedeRehacer,
+  todasLasPartidas,
+} from './core/partidas';
 import { motesDebilitados, parseGameCode } from '@emupoke/pokemon';
 import { EquipoPanel } from './ui/EquipoPanel';
 import { AjustesModal } from './ui/AjustesModal';
@@ -94,6 +105,12 @@ export const App = () => {
   // El mando en pantalla aparece solo cuando hace falta: lo decide con que se
   // esta jugando, no que aparato es. Desde el menu se fuerza a mano.
   const mando = useMandoTactil();
+  // Un mando fisico, si hay alguno. Al jugar con el, el tactil se aparta.
+  const mandoFisico = useMandoFisico(
+    emulator.coreRef,
+    state.status === 'running',
+    mando.apartar,
+  );
 
   // Con el modal o el menu abiertos el teclado es de la interfaz aunque el foco
   // este en un boton: si no, las flechas moverian al personaje por detras.
@@ -279,6 +296,14 @@ export const App = () => {
   const caidosMios = motesDebilitados(miEquipo.equipo);
   const caidosSuyos = motesDebilitados(session.state.equipoCompanero);
 
+  // Con que reglas se juega esta partida. Se relee al llegar equipo nuevo y no
+  // solo al cambiar de ROM: la partida se apunta en la lista justo DESPUES de
+  // cargarla, y leyendola al cargar saldria siempre Normal.
+  const dificultad = useMemo(
+    () => dificultadDe(state.romName),
+    [state.romName, miEquipo.equipo],
+  );
+
   const fin = useFinDePartida(
     miEquipo.equipo,
     state.romName,
@@ -308,7 +333,27 @@ export const App = () => {
       // cuando cayo el ultimo Pokemon.
       modo: esSoullink(state.romName) ? 'soullink' : 'sola',
       companero: conCompanero ? session.state.peerNombre ?? null : null,
+      dificultad,
     },
+  );
+
+  // Lo que vigila la dificultad, y solo mientras el reto siga vivo: despues de
+  // caer se puede seguir jugando, pero ya no hay reglas que cumplir.
+  const reglas = reglasActivas(dificultad, fin.acabada);
+  // Las dos de Nuzlocke que se ven en el equipo: segunda captura en una zona
+  // gastada, y un muerto que vuelve a estar en pie. Solo del equipo propio: las
+  // del companero las vigila su navegador, con su partida.
+  const infracciones = useReglasNuzlocke(
+    state.romName,
+    miEquipo.equipo,
+    reglas.primeraCaptura || reglas.muertoEsMuerto,
+  );
+  const tiposRepetidos = useMemo(
+    () =>
+      reglas.tipoPrimarioUnico
+        ? tiposPrimariosRepetidos(miEquipo.equipo, session.state.equipoCompanero)
+        : undefined,
+    [reglas.tipoPrimarioUnico, miEquipo.equipo, session.state.equipoCompanero],
   );
 
   // Mandarle el equipo al companero. Se hace desde un solo sitio y no al
@@ -410,7 +455,12 @@ export const App = () => {
                ROM y de SUS medallas, y ni una ni otras salen de su ordenador.
                Ponerle el tuyo marcaria a sus Pokemon por una regla que no es la
                suya. */
-            tope={unoSolo && verSuEquipo ? null : topes.siguiente}
+            tope={(unoSolo && verSuEquipo) || !reglas.topeDeNivel ? null : topes.siguiente}
+            /* La regla mira los dos equipos a la vez, asi que la marca sale en
+               los dos lados: tu ves cual de los tuyos choca y cual de los suyos. */
+            tiposRepetidos={tiposRepetidos}
+            /* Solo en la columna propia, como el tope. */
+            infracciones={unoSolo && verSuEquipo ? undefined : infracciones}
             onCambiar={unoSolo ? () => setVerSuEquipo((v) => !v) : undefined}
             nombreDelOtro={nombreDelCompanero}
             nombrePropio={miNombre}
@@ -445,6 +495,7 @@ export const App = () => {
           mirandoLoSuyo={verSuPantalla}
           onCambiarPantalla={cambiarDePantalla}
           canvasRef={emulator.canvasRef}
+          companeroSinVideo={session.state.peerSinVideo}
           remoteStream={session.state.remoteStream}
           /* Su apodo, si lo dijo al entrar en la sala. El nombre del fichero
              de su ROM no sale nunca: no le dice nada a nadie y ademas delata
@@ -494,6 +545,7 @@ export const App = () => {
               activo={equipoSuyo.alFrente}
               especies={especies}
               caidosDelOtro={caidosMios}
+              tiposRepetidos={tiposRepetidos}
             />
           )}
         </div>
@@ -596,6 +648,8 @@ export const App = () => {
           emulator={emulator}
           teclas={teclas}
           mando={mando}
+          mandoFisico={mandoFisico}
+          video={{ enviando: session.enviandoVideo, cambiar: session.cambiarEnvioDeVideo }}
           hasRom={hasRom}
           conCompanero={conCompanero}
           onAleatorizar={() => {
@@ -736,13 +790,7 @@ const semillaEnCurso = (crc32: string | null): Semilla | null => {
   const partida = crc32
     ? todasLasPartidas().find((p) => p.crc32 === crc32 && sePuedeRehacer(p))
     : undefined;
-  if (!partida) return null;
-  return {
-    baseCrc32: partida.baseCrc32,
-    crc32: partida.crc32!,
-    semilla: partida.semilla!,
-    ajustes: partida.ajustes!,
-  };
+  return partida ? semillaDePartida(partida) : null;
 };
 
 const nombreDeLaPartidaEnCurso = (crc32: string | null): string | null => {

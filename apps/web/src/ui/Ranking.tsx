@@ -23,6 +23,8 @@ import {
 } from '../core/useRanking';
 import type { Especies } from '../core/useEspecies';
 import { SpriteEspecie, SpriteMedalla } from './Sprite';
+import { DIFICULTADES, infoDe } from '../core/dificultad';
+import type { Dificultad } from '@emupoke/protocol';
 
 type Props = {
   /** Cierra el ranking y devuelve a la partida. */
@@ -33,35 +35,6 @@ type Props = {
   especies: Especies;
 };
 
-/** Las tres dificultades y sus reglas, tal y como se van a jugar. */
-const DIFICULTADES = [
-  {
-    id: 'normal',
-    nombre: 'Normal',
-    coletilla: 'Captura libre',
-    reglas: ['Captura lo que quieras, cuando quieras', 'El nivel de los lideres no afecta'],
-  },
-  {
-    id: 'nuzlocke',
-    nombre: 'Nuzlocke',
-    coletilla: '3 reglas',
-    reglas: [
-      'Solo el primer Pokemon de cada ruta',
-      'Debilitado = muerto (PC o liberado)',
-      'No curar ni salir del Centro con debilitados en el equipo',
-    ],
-  },
-  {
-    id: 'nivelada',
-    nombre: 'Nivelada',
-    coletilla: 'La mas dura',
-    reglas: [
-      'Todo lo de Nuzlocke',
-      'Tope de nivel del proximo lider',
-      'Sin repetir tipo primario (ambos jugadores)',
-    ],
-  },
-];
 
 const TOTAL_MEDALLAS = 8;
 
@@ -206,6 +179,7 @@ const Partida = ({
       <p className="rank__donde">
         {partida.modo === 'soullink' ? 'Soul Link' : 'En solitario'}
         {partida.companero ? ` con ${partida.companero}` : ''}
+        {partida.dificultad ? ` · ${infoDe(partida.dificultad).nombre}` : ''}
         {partida.medallas !== null ? ` · ${partida.medallas} medallas` : ''}
       </p>
 
@@ -319,10 +293,11 @@ const Fila = ({
 export const Ranking = ({ onVolver, usuario, especies }: Props) => {
   const [modo, setModo] = useState<'sola' | 'soullink'>('sola');
   const [juego, setJuego] = useState<string | null>(null);
+  const [dificultad, setDificultad] = useState<Dificultad | null>(null);
   const [busqueda, setBusqueda] = useState('');
   const [abierta, setAbierta] = useState<string | null>(null);
 
-  const filtros = useMemo(() => ({ modo, juego }), [modo, juego]);
+  const filtros = useMemo(() => ({ modo, juego, dificultad }), [modo, juego, dificultad]);
   const { jugadores, juegos, cargando, problema } = useRanking(filtros, true);
 
   const visibles = useMemo(() => {
@@ -389,15 +364,30 @@ export const Ranking = ({ onVolver, usuario, especies }: Props) => {
           ))}
         </div>
 
-        {/* Las dificultades todavia no existen como opcion al aleatorizar, asi
-            que no hay con que filtrar: se dice en vez de poner unas pestanas
-            que no harian nada. */}
-        <p className="rank__aviso">
-          Las dificultades se podran elegir al aleatorizar; hasta entonces, todas las partidas
-          cuentan igual.
-        </p>
-
         <div className="rank__filtros">
+          {/* Lo jugado antes de que existieran las dificultades cuenta como
+              Normal, que es como se jugaba. */}
+          <div className="rank__juegos" role="group" aria-label="Filtrar por dificultad">
+            <span className="rank__etiqueta">Dificultad</span>
+            <button
+              type="button"
+              className={dificultad === null ? 'is-activo' : undefined}
+              onClick={() => setDificultad(null)}
+            >
+              Todas
+            </button>
+            {DIFICULTADES.map((d) => (
+              <button
+                key={d.id}
+                type="button"
+                className={dificultad === d.id ? 'is-activo' : undefined}
+                onClick={() => setDificultad(d.id)}
+              >
+                {d.nombre}
+              </button>
+            ))}
+          </div>
+
           <div className="rank__juegos" role="group" aria-label="Filtrar por juego">
             <span className="rank__etiqueta">Juego</span>
             <button

@@ -88,6 +88,22 @@ export type SessionState = {
    * acababa de entrar, porque solo se manda cuando cambia algo.
    */
   canalListo: number | null;
+  /**
+   * Si el companero ha apagado el envio de su pantalla. Sin esto su ventana se
+   * quedaria con el ultimo fotograma congelado, que parece un fallo.
+   */
+  peerSinVideo: boolean;
+};
+
+/** Donde se recuerda si este aparato manda su pantalla. Es del aparato, no de la cuenta. */
+const CLAVE_VIDEO = 'emupoke.video';
+
+const leerEnviarVideo = (): boolean => {
+  try {
+    return globalThis.localStorage?.getItem(CLAVE_VIDEO) !== 'no';
+  } catch {
+    return true;
+  }
 };
 
 const initialState: SessionState = {
@@ -111,6 +127,7 @@ const initialState: SessionState = {
   },
   equipoCompanero: null,
   canalListo: null,
+  peerSinVideo: false,
 };
 
 /**
@@ -140,6 +157,9 @@ export const useSession = (
   // La pista del microfono sobrevive a la conexion: si el companero se va y
   // vuelve, se reengancha al nuevo enlace sin volver a pedir permiso.
   const micTrackRef = useRef<MediaStreamTrack | null>(null);
+  /** Si este aparato manda su pantalla. Ref para leerlo desde los avisos del enlace. */
+  const [enviandoVideo, setEnviandoVideo] = useState(leerEnviarVideo);
+  const enviarVideoRef = useRef(enviandoVideo);
   /**
    * Con que volver a entrar en la sala.
    *
@@ -191,7 +211,11 @@ export const useSession = (
       // Con esto el codificador sabe que esto es movimiento y no un documento:
       // ante un apuro prefiere bajar la nitidez antes que saltarse fotogramas,
       // que para ver jugar a alguien es justo lo que se quiere.
-      for (const pista of captura.getVideoTracks()) pista.contentHint = 'motion';
+      for (const pista of captura.getVideoTracks()) {
+        pista.contentHint = 'motion';
+        // Si este aparato no manda pantalla, el lienzo no se captura.
+        pista.enabled = enviarVideoRef.current;
+      }
 
       localStreamRef.current = captura;
       return localStreamRef.current;
@@ -218,7 +242,14 @@ export const useSession = (
               reconnectRef.current();
             }
           },
-          onCanalListo: () => patch({ canalListo: Date.now() }),
+          onCanalListo: () => {
+            patch({ canalListo: Date.now() });
+            // Se dice siempre al abrir, no solo al cambiarlo: quien acaba de
+            // entrar no sabe si el otro lo apago antes de que llegara.
+            peerRef.current?.send(
+              JSON.stringify({ type: 'video', enviando: enviarVideoRef.current }),
+            );
+          },
           onData: (crudo) => {
             // Al otro lado hay un navegador que no controlamos: lo que no
             // cuadre se descarta y la partida sigue.
@@ -229,6 +260,10 @@ export const useSession = (
             // estado. Un intercambio es una conversacion de varios pasos: si un
             // mensaje se guardara en una variable de estado, dos que llegaran
             // en el mismo instante se pisarian y el trato se quedaria colgado.
+            if (mensaje.type === 'video') {
+              patch({ peerSinVideo: !mensaje.enviando });
+              return;
+            }
             if (mensaje.type !== 'equipo') {
               for (const oyente of oyentesDelTrato.current) oyente(mensaje);
               return;
@@ -256,6 +291,8 @@ export const useSession = (
       peerRef.current = peer;
       // Si el microfono ya estaba encendido, se reengancha al enlace nuevo.
       if (micTrackRef.current) void peer.setVoiceTrack(micTrackRef.current);
+      // Y si este aparato no manda pantalla, tampoco la manda el enlace nuevo.
+      if (!enviarVideoRef.current) void peer.setVideoEnviado(false);
       patch({ phase: 'conectando' });
       if (asOfferer) void peer.offer();
     },
@@ -572,6 +609,33 @@ export const useSession = (
     }
   }, []);
 
+  /**
+   * Manda o deja de mandar la pantalla al companero.
+   *
+   * Para un movil que no da abasto: codificar la partida a 60 por segundo es lo
+   * que mas le cuesta despues de emularla. Sin ella sigue el equipo, la voz y
+   * todo lo demas. Se recuerda en este aparato.
+   */
+  const cambiarEnvioDeVideo = useCallback((enviar: boolean) => {
+    enviarVideoRef.current = enviar;
+    setEnviandoVideo(enviar);
+    try {
+      globalThis.localStorage?.setItem(CLAVE_VIDEO, enviar ? 'si' : 'no');
+    } catch {
+      // Sin almacenamiento vale para esta sesion.
+    }
+    // Tampoco se captura el lienzo sin necesidad.
+    for (const pista of localStreamRef.current?.getVideoTracks() ?? []) pista.enabled = enviar;
+    const peer = peerRef.current;
+    if (!peer) return;
+    void peer.setVideoEnviado(enviar);
+    try {
+      peer.send(JSON.stringify({ type: 'video', enviando: enviar }));
+    } catch {
+      // Con el canal cerrado se dira al abrirlo: ver onCanalListo.
+    }
+  }, []);
+
   /** Se apunta a los mensajes del intercambio. Devuelve como darse de baja. */
   const escucharTrato = useCallback((oyente: (mensaje: PeerMessage) => void) => {
     oyentesDelTrato.current.add(oyente);
@@ -582,6 +646,8 @@ export const useSession = (
 
   return {
     state,
+    enviandoVideo,
+    cambiarEnvioDeVideo,
     enviarEquipo,
     enviarDelTrato,
     escucharTrato,

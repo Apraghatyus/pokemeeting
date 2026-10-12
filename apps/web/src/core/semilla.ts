@@ -10,8 +10,17 @@
 // este navegador se queda sin datos o si juegas desde otro ordenador, y darle
 // a tu companero exactamente el mismo mundo que el tuyo.
 //
+// Desde que hay dificultades lleva tambien la de la partida, como un sexto
+// campo al final. Va aqui porque cambia la copia -los de revivir salen o no de
+// las tiendas- y porque asi viaja sola en la invitacion de un Soul Link: los
+// dos tienen que jugar con las mismas reglas. Las semillas de antes, de cinco
+// campos, se siguen leyendo, y entonces no hay dificultad: se rehacen como se
+// hicieron.
+//
 // Lo que NO lleva es la ROM. Una semilla sin la ROM original no vale para nada,
 // que es justo lo que se quiere: se puede compartir sin repartir el juego.
+
+import { esDificultad, type Dificultad } from '@emupoke/protocol';
 
 /** Marca de version al principio: si algun dia cambia el formato, se sabra. */
 const MARCA = 'EMUPOKE1';
@@ -26,10 +35,20 @@ export type Semilla = {
   ajustes: string;
   /** CRC de la copia generada, para comprobar que lo rehecho es lo mismo. */
   crc32: string;
+  /** Con que reglas se juega. Null en las semillas de antes de que existieran. */
+  dificultad?: Dificultad | null;
 };
 
 export const codificarSemilla = (semilla: Semilla): string =>
-  [MARCA, semilla.baseCrc32, semilla.crc32, semilla.semilla, semilla.ajustes].join(SEPARADOR);
+  [
+    MARCA,
+    semilla.baseCrc32,
+    semilla.crc32,
+    semilla.semilla,
+    semilla.ajustes,
+    // Sin dificultad se escribe como antes, con cinco campos.
+    ...(semilla.dificultad ? [semilla.dificultad] : []),
+  ].join(SEPARADOR);
 
 /**
  * Lee una semilla pegada por el jugador.
@@ -42,9 +61,10 @@ export const codificarSemilla = (semilla: Semilla): string =>
 export const descodificarSemilla = (texto: string): Semilla | null => {
   const limpio = texto.replace(/\s+/g, '');
   const partes = limpio.split(SEPARADOR);
-  if (partes.length !== 5) return null;
+  if (partes.length !== 5 && partes.length !== 6) return null;
 
-  const [marca, baseCrc32, crc32, semilla, ajustes] = partes;
+  const [marca, baseCrc32, crc32, semilla, ajustes, dificultad] = partes;
+  if (dificultad !== undefined && !esDificultad(dificultad)) return null;
   if (marca !== MARCA) return null;
   if (!baseCrc32 || !crc32 || !semilla || !ajustes) return null;
   if (!/^[0-9a-f]{8}$/i.test(baseCrc32) || !/^[0-9a-f]{8}$/i.test(crc32)) return null;
@@ -55,5 +75,6 @@ export const descodificarSemilla = (texto: string): Semilla | null => {
     crc32: crc32.toLowerCase(),
     semilla,
     ajustes,
+    dificultad: dificultad ?? null,
   };
 };

@@ -5,6 +5,8 @@ type Props = {
   canvasRef: RefObject<HTMLCanvasElement | null>;
   /** Video de la partida del companero, o null si no hay conexion. */
   remoteStream: MediaStream | null;
+  /** Si el companero ha apagado el envio de su pantalla. */
+  companeroSinVideo?: boolean;
   /** Nombre con el que etiquetar su pantalla. */
   partnerLabel: string;
   hasRom: boolean;
@@ -243,6 +245,7 @@ const useDeslizar = (
 export const Stage = ({
   canvasRef,
   remoteStream,
+  companeroSinVideo = false,
   partnerLabel,
   hasRom,
   proporcion,
@@ -455,6 +458,13 @@ export const Stage = ({
           }
         >
           <video ref={videoRef} className="pantalla__media" playsInline muted />
+          {/* Encima del ultimo fotograma, que se queda congelado: sin esto
+              parece que se ha colgado la conexion. */}
+          {companeroSinVideo && (
+            <span className="pantalla__sin-video" role="status">
+              No manda su pantalla. Su equipo y su voz siguen llegando.
+            </span>
+          )}
           <span className="pantalla__etiqueta">
             <span className="dot dot--on" />
             {partnerLabel}

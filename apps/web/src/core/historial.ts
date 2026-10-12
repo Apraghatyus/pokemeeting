@@ -20,7 +20,7 @@
 // Vive en este navegador, como el resto. Cuando haya cuentas, esto es lo que se
 // subira.
 
-import type { EquipoResumen } from '@emupoke/protocol';
+import type { Dificultad, EquipoResumen } from '@emupoke/protocol';
 
 const CLAVE = 'emupoke.historial';
 
@@ -86,6 +86,11 @@ export type PartidaTerminada = {
   /** Con quien se jugo, si fue en Soul Link. Su apodo. */
   companero: string | null;
   /**
+   * Con que reglas se jugo. Opcional porque las apuntadas antes de que hubiera
+   * dificultades no la tienen; el ranking las cuenta como Normal.
+   */
+  dificultad?: Dificultad | null;
+  /**
    * Si lo que la acabo fue una pareja caida en la partida del companero.
    *
    * En un Soul Link eso es un final distinto de perder en tu juego, y contarlo
@@ -125,6 +130,7 @@ export type Apunte = {
   juego?: string | null;
   modo?: Modo | null;
   companero?: string | null;
+  dificultad?: Dificultad | null;
 };
 
 export const apuntarPartidaTerminada = (
@@ -149,6 +155,7 @@ export const apuntarPartidaTerminada = (
     juego: apunte.juego ?? null,
     modo: apunte.modo ?? null,
     companero: apunte.companero ?? null,
+    dificultad: apunte.dificultad ?? null,
     porElEnlace,
     medallas,
     equipo: (equipo?.ranuras ?? [])
