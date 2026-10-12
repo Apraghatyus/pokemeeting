@@ -5022,18 +5022,29 @@ details.partidas[open] > summary::before {
 }
 
 .rank__volver {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 50%;
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text);
-  font-size: 18px;
   cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.rank__volver svg {
+  width: 22px;
+  height: 22px;
 }
 
 .rank__volver:hover {
-  border-color: var(--accent-dim);
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
 }
 
 .rank__marca {

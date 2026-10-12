@@ -312,9 +312,6 @@ export const Ranking = ({ onVolver, usuario, especies }: Props) => {
   return (
     <div className="rank">
       <header className="rank__barra">
-        <button type="button" className="rank__volver" onClick={onVolver} aria-label="Volver">
-          ←
-        </button>
         <img className="rank__marca" src="/icono-192.png" alt="" aria-hidden="true" />
         <div className="rank__titulos">
           <strong>Pokemeeting</strong>
@@ -345,6 +342,19 @@ export const Ranking = ({ onVolver, usuario, especies }: Props) => {
             Soul Link
           </button>
         </div>
+
+        {/* De vuelta a la partida: un mando, que es a donde se vuelve. */}
+        <button
+          type="button"
+          className="rank__volver"
+          onClick={onVolver}
+          aria-label="Volver a la partida"
+          title="Volver a la partida"
+        >
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M7.5 6h9a5.5 5.5 0 0 1 5.4 6.6l-1 5a2.6 2.6 0 0 1-4.5 1.2L14.2 16H9.8l-2.2 2.8a2.6 2.6 0 0 1-4.5-1.2l-1-5A5.5 5.5 0 0 1 7.5 6Zm-.3 3.2v1.5H5.7v1.6h1.5v1.5h1.6v-1.5h1.5v-1.6H8.8V9.2H7.2Zm9.3.3a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm-2 2.2a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z" />
+          </svg>
+        </button>
       </header>
 
       <div className="rank__cuerpo">
