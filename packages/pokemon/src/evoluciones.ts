@@ -191,3 +191,34 @@ export const alIntercambiar = (
   }
   return null;
 };
+
+/**
+ * A que familia evolutiva pertenece cada especie.
+ *
+ * Dos especies son de la misma familia si una evoluciona en la otra, directa o
+ * indirectamente: Pidgey, Pidgeotto y Pidgeot. Sale de la tabla de ESTA ROM, que
+ * el aleatorizador puede haber cambiado, y no de una lista: en una copia
+ * aleatorizada Pidgey puede evolucionar en cualquier cosa.
+ *
+ * Devuelve un numero por especie; dos especies con el mismo numero son de la
+ * misma familia.
+ */
+export const familiasEvolutivas = (tabla: TablaEvoluciones): ((especie: number) => number) => {
+  const padre = Array.from({ length: ESPECIES_GEN3 }, (_, i) => i);
+  const raiz = (x: number): number => {
+    while (padre[x] !== x) {
+      padre[x] = padre[padre[x]!]!;
+      x = padre[x]!;
+    }
+    return x;
+  };
+  for (let especie = 1; especie < ESPECIES_GEN3; especie += 1) {
+    for (const { destino } of tabla.evolucionesDe(especie)) {
+      if (destino <= 0 || destino >= ESPECIES_GEN3) continue;
+      const a = raiz(especie);
+      const b = raiz(destino);
+      if (a !== b) padre[Math.max(a, b)] = Math.min(a, b);
+    }
+  }
+  return (especie) => (especie > 0 && especie < ESPECIES_GEN3 ? raiz(especie) : especie);
+};

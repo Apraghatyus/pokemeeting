@@ -6,12 +6,18 @@ import { useKeyboardOwnership } from './core/useKeyboardOwnership';
 import { useSession } from './net/useSession';
 import { useEquipo, type Vigilante } from './core/useEquipo';
 import {
+  apuntarEncuentro,
   guardarDisposicionDelCentro,
-  juzgar,
+  guardarEncuentros,
+  juzgarCaptura,
+  juzgarCentro,
+  juzgarLider,
   leerDisposicionDelCentro,
+  leerEncuentros,
   seCuroElEquipo,
-} from './core/centroPokemon';
-import { zonaCanonica } from './core/zonas';
+  type MemoriaDeEncuentros,
+} from './core/reglasEnVivo';
+import { nombreDeZona, zonaCanonica } from './core/zonas';
 import { useTopeDeNivel } from './core/useTopeDeNivel';
 import { reglasActivas, tiposPrimariosRepetidos } from './core/dificultad';
 import { useReglasNuzlocke } from './core/reglasNuzlocke';
@@ -34,7 +40,15 @@ import {
   sePuedeRehacer,
   todasLasPartidas,
 } from './core/partidas';
-import { aprenderCentro, motesDebilitados, parseGameCode } from '@emupoke/pokemon';
+import {
+  aprenderCentro,
+  encontrarTablaEvoluciones,
+  equiposDeLosLideres,
+  familiasEvolutivas,
+  motesDebilitados,
+  parseGameCode,
+  type PokemonDeEntrenador,
+} from '@emupoke/pokemon';
 import { EquipoPanel } from './ui/EquipoPanel';
 import { AjustesModal } from './ui/AjustesModal';
 import { CuentaModal } from './ui/CuentaModal';
@@ -266,6 +280,30 @@ export const App = () => {
   // equipo. Quien decide se define mas abajo, cuando ya se saben la dificultad
   // y el tope; aqui solo se le hace sitio.
   const vigilanteRef = useRef<Vigilante | null>(null);
+  /** Los encuentros apuntados de la partida que corre. */
+  const encuentrosRef = useRef<{ partida: string; memoria: MemoriaDeEncuentros } | null>(null);
+  /**
+   * Lo que las reglas necesitan de la ROM: los equipos de los lideres y las
+   * familias evolutivas. Se busca la primera vez que hace falta, una por ROM.
+   */
+  const datosRomRef = useRef<{
+    rom: Uint8Array;
+    lideres: PokemonDeEntrenador[][] | null;
+    familia: (especie: number) => number;
+  } | null>(null);
+  const datosDeLaRom = () => {
+    const rom = emulator.romBytesRef.current;
+    if (!rom) return { lideres: null, familia: (especie: number) => especie };
+    if (datosRomRef.current?.rom !== rom) {
+      const evoluciones = encontrarTablaEvoluciones(rom);
+      datosRomRef.current = {
+        rom,
+        lideres: equiposDeLosLideres(rom),
+        familia: evoluciones ? familiasEvolutivas(evoluciones) : (especie: number) => especie,
+      };
+    }
+    return datosRomRef.current;
+  };
   const miEquipo = useEquipo(
     emulator.coreRef,
     state.status === 'running',
@@ -363,7 +401,7 @@ export const App = () => {
     reglas.primeraCaptura || reglas.muertoEsMuerto,
   );
   // Las reglas del Centro Pokemon: no curar ni salir con un muerto, ni en
-  // Nivelada con alguien por encima del tope. Ver `centroPokemon.ts`.
+  // Nivelada con alguien por encima del tope. Ver `reglasEnVivo.ts`.
   const codigoJuego = state.header?.gameCode ?? '';
   vigilanteRef.current = (antes, ahora, tabla) => {
     // Donde cura la enfermera es un Centro: asi se aprende cual es.
@@ -371,13 +409,53 @@ export const App = () => {
       const aprendida = aprenderCentro(ahora.mapa, tabla);
       if (aprendida !== null) guardarDisposicionDelCentro(codigoJuego, aprendida);
     }
-    if (!reglas.muertoEsMuerto && !reglas.topeDeNivel) return null;
-    return juzgar(antes, ahora, {
+    const partida = state.romName;
+    const propio = infracciones.memoria.propio;
+
+    // --- Centro: curar y salir ---
+    const delCentro = juzgarCentro(antes, ahora, {
       muertoEsMuerto: reglas.muertoEsMuerto,
       muertos: infracciones.memoria.muertos,
-      tope: reglas.topeDeNivel ? (topes.siguiente?.nivel ?? null) : null,
+      tiposRepetidos: reglas.tipoPrimarioUnico ? (tiposRepetidos ?? null) : null,
       disposicionDelCentro: codigoJuego ? leerDisposicionDelCentro(codigoJuego) : null,
     });
+    if (delCentro) return delCentro;
+
+    // --- Nivelada: el lider, con todos dentro del tope ---
+    if (reglas.topeDeNivel && topes.siguiente) {
+      const veredicto = juzgarLider(
+        antes,
+        ahora,
+        {
+          nombre: topes.siguiente.lider,
+          tope: topes.siguiente.nivel,
+          equipo: datosDeLaRom().lideres?.[topes.siguiente.gimnasio - 1] ?? [],
+        },
+        propio,
+      );
+      if (veredicto) return veredicto;
+    }
+
+    // --- solo el primer encuentro de cada zona ---
+    // Empieza a contar con la primera captura: antes no hay Poke Balls.
+    if (!reglas.primeraCaptura || !partida || infracciones.memoria.vistos.length < 2) return null;
+    const contexto = {
+      propio,
+      rutas: infracciones.memoria.rutas,
+      familia: datosDeLaRom().familia,
+    };
+    const memoria = encuentrosRef.current?.partida === partida
+      ? encuentrosRef.current.memoria
+      : leerEncuentros(partida);
+    const captura = juzgarCaptura(antes, ahora, memoria, contexto, nombreDeZona);
+    if (captura) return captura;
+    const apuntado = apuntarEncuentro(memoria, ahora, contexto, especies.nombre);
+    if (apuntado.memoria !== memoria) {
+      encuentrosRef.current = { partida, memoria: apuntado.memoria };
+      guardarEncuentros(partida, apuntado.memoria);
+    }
+    if (apuntado.aviso) setAvisoRegla({ texto: apuntado.aviso, tipo: 'info' });
+    return null;
   };
 
   // Lo que se ve en el mapa: las zonas donde ya se capturo -las apuntadas y
@@ -407,14 +485,20 @@ export const App = () => {
   }, [miEquipo.equipo]);
 
   // El aviso de una regla que se acaba de hacer cumplir. Se va solo.
-  const [avisoRegla, setAvisoRegla] = useState<string | null>(null);
+  const [avisoRegla, setAvisoRegla] = useState<{ texto: string; tipo: 'error' | 'info' } | null>(
+    null,
+  );
   const deshecho = miEquipo.deshecho;
   useEffect(() => {
     if (!deshecho) return;
-    setAvisoRegla(deshecho.motivo);
-    const quitar = setTimeout(() => setAvisoRegla(null), 9000);
-    return () => clearTimeout(quitar);
+    setAvisoRegla({ texto: deshecho.motivo, tipo: 'error' });
   }, [deshecho]);
+  // Se va solo: los de una regla rota tardan mas, que hay que leerlos.
+  useEffect(() => {
+    if (!avisoRegla) return;
+    const quitar = setTimeout(() => setAvisoRegla(null), avisoRegla.tipo === 'error' ? 9000 : 6000);
+    return () => clearTimeout(quitar);
+  }, [avisoRegla]);
 
   // Y se le cuenta al companero, igual que el equipo.
   const { enviarMapa } = session;
@@ -510,11 +594,27 @@ export const App = () => {
         onOpenCuenta={() => setCuentaOpen(true)}
         cuentaOpen={cuentaOpen}
         onOpenRanking={() => setRankingOpen(true)}
-        onOpenMapa={hasRom ? () => setMapaOpen(true) : undefined}
       />
 
       <main className="app__main">
        <div className="juego" ref={marcoDeJuego}>
+        {/* Dentro del marco que va a pantalla completa: fuera de el no se veria
+            jugando a pantalla completa, que es justo cuando salta. */}
+        {avisoRegla && (
+          <div
+            className={`aviso-regla aviso-regla--${avisoRegla.tipo}`}
+            role={avisoRegla.tipo === 'error' ? 'alert' : 'status'}
+          >
+            <span className="aviso-regla__marca" aria-hidden="true">
+              {avisoRegla.tipo === 'error' ? '!' : 'i'}
+            </span>
+            <span>{avisoRegla.texto}</span>
+            <button type="button" onClick={() => setAvisoRegla(null)}>
+              Entendido
+            </button>
+          </div>
+        )}
+
         {/* Con una sola columna de equipo -pantalla completa, o estrecha- la mesa
             es la de jugar solo: si no, se quedaba reservada la columna del
             companero, vacia, y la partida perdia 230 pixeles de ancho por un
@@ -572,6 +672,7 @@ export const App = () => {
              deslizar a su partida tiene que verse tambien su equipo. */
           mirandoLoSuyo={verSuPantalla}
           onCambiarPantalla={cambiarDePantalla}
+          onAbrirMapa={() => setMapaOpen(true)}
           canvasRef={emulator.canvasRef}
           companeroSinVideo={session.state.peerSinVideo}
           remoteStream={session.state.remoteStream}
@@ -832,18 +933,6 @@ export const App = () => {
         gastadasSuyas={conCompanero ? (session.state.mapaCompanero?.gastadas ?? []) : null}
         nombreSuyo={nombreDelCompanero}
       />
-
-      {avisoRegla && (
-        <div className="aviso-regla" role="alert">
-          <span className="aviso-regla__marca" aria-hidden="true">
-            !
-          </span>
-          <span>{avisoRegla}</span>
-          <button type="button" onClick={() => setAvisoRegla(null)}>
-            Entendido
-          </button>
-        </div>
-      )}
 
       {rankingOpen && (
         <Ranking

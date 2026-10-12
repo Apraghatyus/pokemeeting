@@ -170,3 +170,88 @@ export const quienPelea = (
     return null;
   }
 };
+
+/** Donde caen, dentro de la copia de combate, los campos que se leen del rival. */
+const PS = 0x28;
+const PS_MAXIMOS = 0x2c;
+const ENTRENADOR = 0x54;
+
+/** Las especies de tercera generacion van de 1 a 411. */
+const ESPECIE_MAXIMA = 411;
+
+/** El Pokemon que tienes delante en un combate. */
+export type Rival = {
+  especie: number;
+  nivel: number;
+  personalidad: number;
+  /**
+   * El numero de su entrenador original.
+   *
+   * Es lo que distingue un combate salvaje de uno contra un entrenador: el
+   * juego crea a los salvajes CON TU NUMERO, para que al capturarlos ya sean
+   * tuyos. Los de un entrenador llevan otro.
+   */
+  entrenador: number;
+};
+
+/**
+ * El rival del combate, o null si no se sabe o no hay combate.
+ *
+ * El juego guarda a los que pelean en una lista de copias de 88 bytes seguidas:
+ * la tuya, la del rival, y en un combate doble otra tuya y otra suya. Asi que el
+ * rival es la copia que va JUSTO DESPUES de la tuya, que ya se sabe encontrar
+ * por personalidad, especie y nivel (ver `quienPelea`).
+ *
+ * Lo que sale de ahi se comprueba antes de creerselo: una especie que existe,
+ * un nivel de 1 a 100 y una vida que no pase de su maximo. Si algo no cuadra,
+ * null.
+ *
+ * Igual que `quienPelea`: al acabar el combate la copia se queda ahi con lo
+ * ultimo que hubo. Quien lo use tiene que mirar si el rival es NUEVO (otra
+ * personalidad), no si lo hay.
+ */
+export const rivalEnCombate = (
+  estado: Uint8Array,
+  equipo: EquipoResumen | null,
+  codigoJuego = '',
+): Rival | null => {
+  if (!equipo || equipo.ranuras.length === 0) return null;
+  if (codigoJuego && enCombate(estado, codigoJuego) === false) return null;
+
+  try {
+    const memoria = region(estado, 'ewram');
+    const vista = new DataView(memoria.buffer, memoria.byteOffset, memoria.byteLength);
+    const porPersonalidad = new Map(
+      equipo.ranuras.filter((r) => !r.huevo).map((r) => [r.personalidad, r]),
+    );
+    if (porPersonalidad.size === 0) return null;
+
+    for (let donde = PERSONALIDAD; donde + 4 <= memoria.length; donde += 4) {
+      const quien = porPersonalidad.get(vista.getUint32(donde, true));
+      if (!quien) continue;
+      const inicio = donde - PERSONALIDAD;
+      if (vista.getUint16(inicio + ESPECIE, true) !== quien.especie) continue;
+      if (memoria[inicio + NIVEL] !== quien.nivel) continue;
+
+      // La siguiente copia es la del rival.
+      const rival = inicio + TAMANO_COMBATIENTE;
+      if (rival + TAMANO_COMBATIENTE > memoria.length) return null;
+      const especie = vista.getUint16(rival + ESPECIE, true);
+      const nivel = memoria[rival + NIVEL]!;
+      const ps = vista.getUint16(rival + PS, true);
+      const psMaximos = vista.getUint16(rival + PS_MAXIMOS, true);
+      if (especie < 1 || especie > ESPECIE_MAXIMA) return null;
+      if (nivel < 1 || nivel > 100) return null;
+      if (psMaximos === 0 || ps > psMaximos) return null;
+      return {
+        especie,
+        nivel,
+        personalidad: vista.getUint32(rival + PERSONALIDAD, true),
+        entrenador: vista.getUint32(rival + ENTRENADOR, true),
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};

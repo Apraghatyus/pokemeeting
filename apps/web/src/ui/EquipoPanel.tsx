@@ -79,8 +79,8 @@ type Props = {
    * Los tipos primarios que estan repetidos, contando tambien el equipo del
    * otro. Es la regla de la Nivelada; fuera de ella llega vacio o no llega.
    *
-   * Como el tope, AVISA y no impide: se marca la ficha y quien decide cual deja
-   * en la computadora es su dueno.
+   * Se apaga la ficha, y no se deja salir del Centro con el hasta guardarlo:
+   * quien decide cual deja en la computadora es su dueno.
    */
   tiposRepetidos?: ReadonlySet<number>;
   /**
@@ -198,6 +198,9 @@ const Ficha = ({
     sobra > 0 ? 'ficha--pasado' : '',
     // Un muerto en pie se apaga igual: para el reto no se puede usar.
     revivido ? 'ficha--pasado' : '',
+    // Y el que repite tipo primario entre los dos equipos: hay que guardarlo,
+    // y no se deja salir del Centro con el.
+    tipoRepetido ? 'ficha--pasado' : '',
   ]
     .filter(Boolean)
     .join(' ');

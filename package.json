@@ -64,7 +64,7 @@
     "test:dificultad": "npx tsx tools/tests/test-dificultad.mjs",
     "test:mando:fisico": "npx tsx tools/tests/test-mando-fisico.mjs",
     "test:mapas": "npx tsx tools/tests/test-mapas.mjs",
-    "test:centro": "npx tsx tools/tests/test-centro.mjs",
+    "test:reglas:vivo": "npx tsx tools/tests/test-reglas-en-vivo.mjs",
     "test:paneles": "npx tsx tools/tests/test-paneles.mjs",
     "test:resumen": "npx tsx tools/tests/test-resumen.mjs",
     "test:texto": "npx tsx tools/tests/test-texto.mjs",

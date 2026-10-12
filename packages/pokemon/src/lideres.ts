@@ -121,7 +121,11 @@ const buscarVarios = (rom: Uint8Array, patrones: readonly Uint8Array[]): number[
  * en un dialogo -y no en la tabla- en un candidato descartado, en vez de en un
  * numero sacado de bytes cualesquiera.
  */
-const topeDelEquipo = (rom: Uint8Array, registro: number): number | null => {
+/** Un Pokemon del equipo de un entrenador, tal y como esta en la ROM. */
+export type PokemonDeEntrenador = { especie: number; nivel: number };
+
+/** El equipo de ese entrenador, o null si no lo parece. Ver `topeDelEquipo`. */
+const equipoDelRegistro = (rom: Uint8Array, registro: number): PokemonDeEntrenador[] | null => {
   if (registro < 0 || registro + TAMANO_ENTRENADOR > rom.length) return null;
 
   const cuantos = rom[registro + CUANTOS] ?? 0;
@@ -134,7 +138,7 @@ const topeDelEquipo = (rom: Uint8Array, registro: number): number | null => {
   // Con movimientos propios cada Pokemon ocupa el doble. Ver la cabecera.
   const paso = ((rom[registro] ?? 0) & 1) === 1 ? 16 : 8;
 
-  let tope = 0;
+  const equipo: PokemonDeEntrenador[] = [];
   for (let i = 0; i < cuantos; i += 1) {
     const donde = base + i * paso;
     if (donde + 6 > rom.length) return null;
@@ -142,8 +146,15 @@ const topeDelEquipo = (rom: Uint8Array, registro: number): number | null => {
     const especie = leerU16(rom, donde + 4);
     if (nivel < 1 || nivel > NIVEL_MAXIMO) return null;
     if (especie < 1 || especie > ESPECIE_MAXIMA) return null;
-    if (nivel > tope) tope = nivel;
+    equipo.push({ especie, nivel });
   }
+  return equipo;
+};
+
+const topeDelEquipo = (rom: Uint8Array, registro: number): number | null => {
+  const equipo = equipoDelRegistro(rom, registro);
+  if (!equipo) return null;
+  const tope = Math.max(...equipo.map((p) => p.nivel));
   return tope > 0 ? tope : null;
 };
 
@@ -176,6 +187,41 @@ export const topesDeLosLideres = (rom: Uint8Array): number[] | null => {
 
   return topes;
 };
+
+/**
+ * El equipo de cada lider, en orden de medalla.
+ *
+ * El del gimnasio: de los que salen varias veces se coge el mas fuerte, igual
+ * que en `topesDeLosLideres`. Sirve para reconocer el combate contra el lider
+ * por lo que saca, que es lo que se ve en la memoria durante el combate.
+ */
+export const equiposDeLosLideres = (rom: Uint8Array): PokemonDeEntrenador[][] | null => {
+  const patrones = LIDERES_KANTO.map((nombre) =>
+    Uint8Array.from([...codificar(nombre), FIN]),
+  );
+  const encontrados = buscarVarios(rom, patrones);
+
+  const equipos: PokemonDeEntrenador[][] = [];
+  for (const sitios of encontrados) {
+    let mejor: PokemonDeEntrenador[] | null = null;
+    let mejorTope = 0;
+    for (const donde of sitios) {
+      const equipo = equipoDelRegistro(rom, donde - NOMBRE);
+      if (!equipo) continue;
+      const tope = Math.max(...equipo.map((p) => p.nivel));
+      if (tope > mejorTope) [mejor, mejorTope] = [equipo, tope];
+    }
+    if (!mejor) return null;
+    equipos.push(mejor);
+  }
+  return equipos;
+};
+
+/** Si el rival que se tiene delante es uno del equipo de ese lider. */
+export const esDelLider = (
+  rival: { especie: number; nivel: number },
+  equipo: readonly PokemonDeEntrenador[] | null | undefined,
+): boolean => (equipo ?? []).some((p) => p.especie === rival.especie && p.nivel === rival.nivel);
 
 export type TopeDeNivel = {
   /** Contra quien toca, para poder decirlo. */

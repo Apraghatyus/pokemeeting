@@ -26,6 +26,7 @@ import {
 } from '../core/partidas';
 import { apuntarDescartada } from '../core/historial';
 import { olvidarReglas } from '../core/reglasNuzlocke';
+import { olvidarEncuentros } from '../core/reglasEnVivo';
 import { AVISO_ESPACIO, cabeOtra, enPalabras, useEspacio } from '../core/espacio';
 import { yaTermino } from '../core/useFinDePartida';
 import { codificarSemilla } from '../core/semilla';
@@ -286,6 +287,7 @@ export const PartidasGuardadas = ({
                     onBorrarFichero(partida.fichero);
                     olvidar(partida.id);
                     olvidarReglas(partida.fichero);
+                    olvidarEncuentros(partida.fichero);
                     releer();
                   }}
                 >

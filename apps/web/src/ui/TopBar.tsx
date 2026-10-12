@@ -26,8 +26,6 @@ type Props = {
   cuentaOpen: boolean;
   /** Abre el ranking. */
   onOpenRanking: () => void;
-  /** Abre el mapa de rutas. Sin partida no hay mapa, y no se ofrece. */
-  onOpenMapa?: () => void;
 };
 
 /**
@@ -61,7 +59,6 @@ export const TopBar = ({
   onOpenCuenta,
   cuentaOpen,
   onOpenRanking,
-  onOpenMapa,
 }: Props) => {
   // Reconectando es un estado distinto de "caido": el jugador necesita saber
   // que se esta intentando solo, para no dar la partida por perdida.
@@ -151,23 +148,6 @@ export const TopBar = ({
             las cosas que se miran a mitad de partida -"como voy contra el"- y
             no al final de ella. Se puede abrir sin tener cuenta: es una tabla
             de resultados, no datos de nadie. */}
-        {/* El mapa: que rutas quedan y donde anda cada uno. */}
-        {onOpenMapa && (
-          <button
-            type="button"
-            className="iconbutton iconbutton--mapa"
-            onClick={onOpenMapa}
-            title="Mapa de rutas"
-            aria-label="Mapa de rutas"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-              strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z" />
-              <path d="M9 4v14M15 6v14" />
-            </svg>
-          </button>
-        )}
-
         <button
           type="button"
           className="iconbutton iconbutton--ranking"

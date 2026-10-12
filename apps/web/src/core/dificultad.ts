@@ -35,7 +35,7 @@ export const DIFICULTADES: readonly InfoDeDificultad[] = [
     nombre: 'Nuzlocke',
     coletilla: '3 reglas',
     reglas: [
-      'Solo el primer Pokemon de cada ruta',
+      'Solo el primer encuentro de cada ruta (si fallas, se pierde; un repetido no cuenta)',
       'Debilitado = muerto (PC o liberado)',
       'No curar ni salir del Centro con debilitados en el equipo',
       'Sin Revivir en las tiendas',
@@ -47,8 +47,8 @@ export const DIFICULTADES: readonly InfoDeDificultad[] = [
     coletilla: 'La mas dura',
     reglas: [
       'Todo lo de Nuzlocke',
-      'Tope de nivel del proximo lider',
-      'Sin repetir tipo primario (ambos jugadores)',
+      'No pelear con el lider por encima de su tope',
+      'Sin repetir tipo primario (ambos jugadores): al PC',
     ],
   },
 ];
