@@ -1,13 +1,15 @@
 // Pokemeeting para Android.
 //
-// Dos pantallas: elegir la ROM y jugar. Jugando se ve la consola, el equipo de
-// los dos y el mando, y desde ahi se entra en una sala de la web.
+// Dos pantallas: elegir la partida y jugar. Jugando se ve la consola, el
+// equipo de los dos, las medallas y el mando, y desde ahi se entra en una sala
+// de la web. Lo que pasa mientras se juega (reglas, Soul Link, fin de partida,
+// intercambios...) esta en src/partidaViva.ts y es el mismo codigo que la web.
 //
 // LA ROM NO SALE DEL TELEFONO. Se copia a la carpeta privada de la app para
 // poder abrirla y de ahi no se mueve: por la sala viaja su huella -titulo,
 // codigo y CRC-, igual que en la web.
 
-import {useEffect, useMemo, useState} from 'react';
+import {useEffect, useState} from 'react';
 import {
   AppState,
   Pressable,
@@ -16,41 +18,46 @@ import {
   StatusBar,
   StyleSheet,
   Text,
-  TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
 import {RTCView} from 'react-native-webrtc';
-import type {RomFingerprint} from '@emupoke/protocol';
-import {motesDebilitados} from '@emupoke/pokemon';
+import type {Dificultad, PokemonResumen} from '@emupoke/protocol';
+import {parseGameCode} from '@emupoke/pokemon';
 import {readRomHeader} from '../apps/web/src/core/romHeader';
+import {DIFICULTADES} from '../apps/web/src/core/dificultad';
+import {registrar, todasLasPartidas} from '../apps/web/src/core/partidas';
+import {Aviso} from './src/Aviso';
 import {desdeBase64} from './src/base64';
+import {Boton} from './src/Boton';
 import {Equipo} from './src/Equipo';
-import {useEquipo} from './src/equipo';
-import {leerEspecies, SIN_ESPECIES, type Especies} from './src/especies';
+import {leerEspecies, SIN_ESPECIES} from './src/especies';
 import {Mando} from './src/Mando';
+import {Medallas} from './src/Medallas';
 import {eventosDelEmulador, Mgba, Pantalla, type Rom} from './src/nativo';
 import {PanelDelMando} from './src/PanelDelMando';
-import {MAX_REINTENTOS, useSala} from './src/sala';
-
-type Partida = {rom: Rom; huella: RomFingerprint; especies: Especies};
+import {PanelDeSala} from './src/PanelDeSala';
+import {usePartidaViva, type DatosDePartida} from './src/partidaViva';
+import {CambiarMote, FinDePartida, IntercambioVentana, PreguntaSoulLink} from './src/Ventanas';
 
 const App = () => {
-  const [partida, setPartida] = useState<Partida | null>(null);
+  const [partida, setPartida] = useState<DatosDePartida | null>(null);
   const [problema, setProblema] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
+  /** Una ROM abierta que todavia no tiene reglas elegidas. */
+  const [eligiendo, setEligiendo] = useState<DatosDePartida | null>(null);
 
   const abrir = async (rom: Rom) => {
     setCargando(true);
     setProblema(null);
     try {
-      // La ROM entera se lee una vez: de ella salen la huella para la sala y
-      // los nombres y tipos de cada especie.
+      // La ROM entera se lee una vez: de ella salen la huella para la sala,
+      // los nombres y tipos de cada especie y lo que necesitan las reglas.
       const bytes = desdeBase64(await Mgba.leerBase64(rom.ruta));
       const cabecera = readRomHeader(bytes);
-      if (!(await Mgba.cargar(rom.ruta))) throw new Error('El emulador no reconoce ese fichero como un juego.');
-      setPartida({
-        rom,
+      const datos: DatosDePartida = {
+        fichero: rom.nombre,
+        rom: bytes,
         huella: {
           title: cabecera.title,
           gameCode: cabecera.gameCode,
@@ -59,12 +66,36 @@ const App = () => {
           fileName: rom.nombre,
         },
         especies: cabecera.platform === 'gba' ? leerEspecies(bytes) : SIN_ESPECIES,
-      });
+      };
+      if (!(await Mgba.cargar(rom.ruta))) throw new Error('El emulador no reconoce ese fichero como un juego.');
+      // Una partida sin apuntar: se pregunta con que reglas se juega, una vez.
+      if (todasLasPartidas().some(p => p.fichero === rom.nombre)) setPartida(datos);
+      else setEligiendo(datos);
     } catch (error) {
       setProblema(error instanceof Error ? error.message : String(error));
     } finally {
       setCargando(false);
     }
+  };
+
+  const apuntar = (datos: DatosDePartida, dificultad: Dificultad) => {
+    const juego = parseGameCode(datos.huella.gameCode).game;
+    registrar({
+      soullink: false,
+      dificultad,
+      fichero: datos.fichero,
+      baseNombre: datos.fichero,
+      baseCrc32: datos.huella.crc32,
+      semilla: null,
+      ajustes: null,
+      crc32: datos.huella.crc32,
+      cambiado: [],
+      nombre: null,
+      juego: juego?.label ?? null,
+      generacion: juego?.generacion ?? null,
+    });
+    setEligiendo(null);
+    setPartida(datos);
   };
 
   return (
@@ -78,12 +109,35 @@ const App = () => {
             setPartida(null);
           }}
         />
+      ) : eligiendo ? (
+        <ElegirDificultad onElegir={d => apuntar(eligiendo, d)} />
       ) : (
         <Inicio onAbrir={rom => void abrir(rom)} cargando={cargando} problema={problema} />
       )}
     </SafeAreaView>
   );
 };
+
+/** Con que reglas se juega una partida nueva. Se elige una vez y no cambia. */
+const ElegirDificultad = ({onElegir}: {onElegir: (d: Dificultad) => void}) => (
+  <ScrollView contentContainerStyle={estilos.inicio}>
+    <Text style={estilos.seccion}>¿Con qué reglas juegas esta partida?</Text>
+    <Text style={estilos.nota}>Se elige ahora y no se cambia después: es parte de la partida.</Text>
+    {DIFICULTADES.map(d => (
+      <View key={d.id} style={estilos.tarjeta}>
+        <Text style={estilos.tarjetaTitulo}>
+          {d.nombre} · {d.coletilla}
+        </Text>
+        {d.reglas.map(r => (
+          <Text key={r} style={estilos.nota}>
+            › {r}
+          </Text>
+        ))}
+        <Boton texto={`Jugar en ${d.nombre}`} principal={d.id === 'nuzlocke'} onPress={() => onElegir(d.id)} />
+      </View>
+    ))}
+  </ScrollView>
+);
 
 const Inicio = ({
   onAbrir,
@@ -122,13 +176,16 @@ const Inicio = ({
   );
 };
 
-const Juego = ({partida, onSalir}: {partida: Partida; onSalir: () => void}) => {
-  const {equipo, derrota} = useEquipo(true, partida.especies);
-  const sala = useSala(partida.huella);
+const Juego = ({partida, onSalir}: {partida: DatosDePartida; onSalir: () => void}) => {
+  const viva = usePartidaViva(partida, false);
+  const {sala, lectura, intercambio} = viva;
+  const {equipo} = lectura;
   const [verSala, setVerSala] = useState(false);
   const [verLoSuyo, setVerLoSuyo] = useState(false);
   const [menu, setMenu] = useState(false);
   const [verMando, setVerMando] = useState(false);
+  const [verTrato, setVerTrato] = useState(false);
+  const [moteDe, setMoteDe] = useState<PokemonResumen | null>(null);
   // Con un mando fisico en la mano el tactil sobra, como en la web: se aparta
   // al usarlo y vuelve en cuanto se toca la pantalla.
   const [conMandoFisico, setConMandoFisico] = useState(false);
@@ -146,23 +203,13 @@ const Juego = ({partida, onSalir}: {partida: Partida; onSalir: () => void}) => {
   const {width, height} = useWindowDimensions();
   const horizontal = width > height;
 
-  // Mandarle el equipo al companero cada vez que cambia, y al abrirse el canal.
-  const {enviarEquipo} = sala;
-  useEffect(() => {
-    if (equipo) enviarEquipo(equipo, derrota);
-  }, [equipo, derrota, enviarEquipo, sala.estado.fase]);
-
-  const caidosMios = useMemo(() => motesDebilitados(equipo), [equipo]);
-  const caidosSuyos = useMemo(() => motesDebilitados(sala.estado.equipoCompanero), [sala.estado.equipoCompanero]);
   const conCompanero = sala.estado.fase === 'conectada';
   const suPantalla = sala.estado.pantallaCompanero;
-  // La pantalla y el equipo que se ven son la misma decision, como en la web:
-  // al mirar lo suyo se ve su partida y su equipo.
+  // La pantalla y el equipo que se ven son la misma decision, como en la web.
   const mirandoLoSuyo = verLoSuyo && conCompanero;
-  const nombreDelOtro = sala.estado.companero ?? 'tu compañero';
+  const nombreDelOtro = viva.nombreDelCompanero;
 
-  // Al salir de la app el juego se para y deja de sonar; al volver sigue. Sin
-  // esto seguia corriendo de fondo con la pantalla apagada.
+  // Al salir de la app el juego se para y deja de sonar; al volver sigue.
   useEffect(() => {
     const sub = AppState.addEventListener('change', estado => Mgba.pausar(estado !== 'active'));
     return () => sub.remove();
@@ -179,6 +226,67 @@ const Juego = ({partida, onSalir}: {partida: Partida; onSalir: () => void}) => {
           <Text style={estilos.nota}>{nombreDelOtro} no manda su pantalla: su móvil va justo.</Text>
         </View>
       )}
+    </>
+  );
+
+  // Las reglas sobre el equipo propio, para las etiquetas.
+  const marcasPropias = {
+    tope: viva.tope?.nivel ?? null,
+    tiposRepetidos: viva.tiposRepetidos,
+    infracciones: viva.infracciones,
+  };
+
+  const ventanas = (
+    <>
+      <Aviso aviso={viva.aviso} onCerrar={viva.cerrarAviso} />
+      <FinDePartida
+        fin={viva.fin}
+        medallas={lectura.medallas.cuantas}
+        especies={partida.especies}
+        nombreDelCompanero={nombreDelOtro}
+      />
+      <PreguntaSoulLink abierta={viva.preguntarSoullink} nombreDelCompanero={nombreDelOtro} onElegir={viva.elegirSoullink} />
+      <CambiarMote
+        pokemon={moteDe}
+        especies={partida.especies}
+        conPareja={viva.enSoulLink ? nombreDelOtro : null}
+        onCerrar={() => setMoteDe(null)}
+        onCambiar={nuevo => (moteDe ? viva.cambiarMote(moteDe, nuevo) : Promise.resolve(null))}
+      />
+      <IntercambioVentana
+        abierta={verTrato}
+        onCerrar={() => setVerTrato(false)}
+        intercambio={intercambio}
+        equipo={equipo}
+        especies={partida.especies}
+        conCompanero={conCompanero}
+      />
+    </>
+  );
+
+  const opcionesDelMenu = (cerrar: () => void) => (
+    <>
+      <Boton texto={conCompanero ? `Sala · ${nombreDelOtro}` : 'Sala'} onPress={() => setVerSala(true)} />
+      {conCompanero && (
+        <Boton
+          texto={mirandoLoSuyo ? 'Ver mi partida' : `Ver la partida de ${nombreDelOtro}`}
+          onPress={() => {
+            setVerLoSuyo(v => !v);
+            cerrar();
+          }}
+        />
+      )}
+      {(conCompanero || intercambio.estado.aMedias) && (
+        <Boton
+          texto="Intercambiar"
+          onPress={() => {
+            setVerTrato(true);
+            cerrar();
+          }}
+        />
+      )}
+      <Boton texto="Mando físico" onPress={() => setVerMando(true)} />
+      <Boton texto="Salir del juego" onPress={onSalir} />
     </>
   );
 
@@ -203,7 +311,8 @@ const Juego = ({partida, onSalir}: {partida: Partida; onSalir: () => void}) => {
             titulo={mirandoLoSuyo ? `Equipo de ${nombreDelOtro}` : 'Tu equipo'}
             equipo={mirandoLoSuyo ? sala.estado.equipoCompanero : equipo}
             especies={partida.especies}
-            caidosDelOtro={mirandoLoSuyo ? caidosMios : caidosSuyos}
+            caidosDelOtro={mirandoLoSuyo ? viva.caidosMios : viva.caidosSuyos}
+            {...(mirandoLoSuyo ? {} : marcasPropias)}
           />
         </Pressable>
 
@@ -230,27 +339,15 @@ const Juego = ({partida, onSalir}: {partida: Partida; onSalir: () => void}) => {
                 }}
               />
             ) : (
-              <View style={estilos.menu}>
+              <ScrollView contentContainerStyle={estilos.menu}>
                 <Boton texto="Volver al juego" principal onPress={() => setMenu(false)} />
-                <Boton
-                  texto={conCompanero ? `Sala · ${nombreDelOtro}` : 'Sala'}
-                  onPress={() => setVerSala(true)}
-                />
-                {conCompanero && (
-                  <Boton
-                    texto={mirandoLoSuyo ? 'Ver mi partida' : `Ver la partida de ${nombreDelOtro}`}
-                    onPress={() => {
-                      setVerLoSuyo(v => !v);
-                      setMenu(false);
-                    }}
-                  />
-                )}
-                <Boton texto="Mando físico" onPress={() => setVerMando(true)} />
-                <Boton texto="Salir del juego" onPress={onSalir} />
-              </View>
+                <Medallas medallas={lectura.medallas} topes={viva.topes} siguiente={viva.tope} />
+                {opcionesDelMenu(() => setMenu(false))}
+              </ScrollView>
             )}
           </View>
         )}
+        {ventanas}
       </View>
     );
   }
@@ -259,8 +356,8 @@ const Juego = ({partida, onSalir}: {partida: Partida; onSalir: () => void}) => {
     <View style={estilos.juego} onTouchStart={alTocarLaPantalla}>
       <StatusBar hidden={false} />
       <View style={estilos.barra}>
-        <Pressable onPress={onSalir} hitSlop={10}>
-          <Text style={estilos.barraBoton}>‹ Salir</Text>
+        <Pressable onPress={() => setMenu(m => !m)} hitSlop={10}>
+          <Text style={estilos.barraBoton}>☰ Menú</Text>
         </Pressable>
         <Text style={estilos.barraTitulo} numberOfLines={1}>
           {partida.huella.title}
@@ -285,118 +382,42 @@ const Juego = ({partida, onSalir}: {partida: Partida; onSalir: () => void}) => {
         )}
       </View>
 
-      {verMando ? (
+      {menu ? (
+        <ScrollView contentContainerStyle={estilos.panel}>
+          {opcionesDelMenu(() => setMenu(false))}
+          <Boton texto="Volver al juego" principal onPress={() => setMenu(false)} />
+        </ScrollView>
+      ) : verMando ? (
         <PanelDelMando onCerrar={() => setVerMando(false)} />
       ) : verSala ? (
         <PanelDeSala sala={sala} onCerrar={() => setVerSala(false)} />
       ) : (
         <>
-          <Equipo titulo="Tu equipo" equipo={equipo} especies={partida.especies} caidosDelOtro={caidosSuyos} />
+          <Medallas medallas={lectura.medallas} topes={viva.topes} siguiente={viva.tope} />
+          <Equipo
+            titulo="Tu equipo · toca uno para cambiarle el mote"
+            equipo={equipo}
+            especies={partida.especies}
+            caidosDelOtro={viva.caidosSuyos}
+            onElegir={setMoteDe}
+            {...marcasPropias}
+          />
           {conCompanero && (
             <Equipo
               titulo={`Equipo de ${nombreDelOtro}`}
               equipo={sala.estado.equipoCompanero}
               especies={partida.especies}
-              caidosDelOtro={caidosMios}
+              caidosDelOtro={viva.caidosMios}
+              tiposRepetidos={viva.tiposRepetidos}
             />
           )}
           {!conMandoFisico && <Mando />}
         </>
       )}
+      {ventanas}
     </View>
   );
 };
-
-const PanelDeSala = ({sala, onCerrar}: {sala: ReturnType<typeof useSala>; onCerrar: () => void}) => {
-  const [codigo, setCodigo] = useState('');
-  const [clave, setClave] = useState('');
-  const [apodo, setApodo] = useState('');
-  const {estado} = sala;
-
-  if (estado.fase !== 'sin-sala') {
-    const {reconexion} = estado;
-    const nombre = estado.companero ?? 'tu compañero';
-    return (
-      <ScrollView contentContainerStyle={estilos.panel}>
-        <Text style={estilos.seccion}>
-          {estado.fase === 'conectada'
-            ? `Jugando con ${nombre}`
-            : reconexion.intentando
-              ? `Reconectando… (intento ${reconexion.intentos} de ${MAX_REINTENTOS})`
-              : estado.fase === 'perdida'
-                ? 'Se perdio la conexion'
-                : estado.fase === 'conectando'
-                  ? 'Conectando…'
-                  : 'Esperando a tu compañero…'}
-        </Text>
-        {reconexion.agotada && (
-          <>
-            <Text style={estilos.error}>No se pudo volver a entrar. Cuando vuelva la red, reintenta.</Text>
-            <Boton texto="Reintentar ahora" principal onPress={sala.reintentar} />
-          </>
-        )}
-        {estado.codigo && <Text style={estilos.codigo}>{estado.codigo}</Text>}
-        <Text style={estilos.nota}>
-          Tu compañero entra con este codigo y la contraseña, desde otro telefono o desde
-          emupoke.aguaquim.com.
-        </Text>
-
-        {/* La voz y la pantalla, como en la web. */}
-        <Boton
-          texto={
-            estado.micro === 'encendido'
-              ? '🎤 Apagar el micrófono'
-              : estado.micro === 'pidiendo'
-                ? '🎤 Pidiendo permiso…'
-                : '🎤 Encender el micrófono'
-          }
-          principal={estado.micro !== 'encendido'}
-          onPress={() => void sala.cambiarMicro()}
-        />
-        {estado.micro === 'denegado' && (
-          <Text style={estilos.error}>
-            Sin permiso para el micrófono. Puedes darlo en los ajustes de Android, en Pokemeeting.
-          </Text>
-        )}
-        <Boton
-          texto={estado.companeroSilenciado ? `🔈 Volver a oír a ${nombre}` : `🔇 Silenciar a ${nombre}`}
-          onPress={sala.cambiarSilencio}
-        />
-        <Boton
-          texto={estado.enviandoVideo ? 'Dejar de mandar mi pantalla' : 'Volver a mandar mi pantalla'}
-          onPress={() => sala.cambiarEnvioDeVideo(!estado.enviandoVideo)}
-        />
-        {!estado.enviandoVideo && (
-          <Text style={estilos.nota}>
-            Tu compañero no ve tu partida, pero sigue viendo tu equipo y oyéndote. Útil si el móvil va justo.
-          </Text>
-        )}
-
-        <Boton texto="Volver al juego" onPress={onCerrar} />
-        <Boton texto="Salir de la sala" onPress={sala.salir} />
-      </ScrollView>
-    );
-  }
-
-  return (
-    <ScrollView contentContainerStyle={estilos.panel}>
-      <TextInput style={estilos.campo} placeholder="Tu apodo" placeholderTextColor="#8b9aab" value={apodo} onChangeText={setApodo} maxLength={17} />
-      <TextInput style={estilos.campo} placeholder="Contraseña de la sala" placeholderTextColor="#8b9aab" value={clave} onChangeText={setClave} secureTextEntry />
-      <Boton texto="Crear sala" principal onPress={() => clave && sala.crear(clave, apodo || null)} />
-      <Text style={estilos.seccion}>O entra en una</Text>
-      <TextInput style={estilos.campo} placeholder="Codigo (6 letras)" placeholderTextColor="#8b9aab" value={codigo} onChangeText={setCodigo} autoCapitalize="characters" maxLength={6} />
-      <Boton texto="Entrar" onPress={() => codigo && clave && sala.unirse(codigo, clave, apodo || null)} />
-      {estado.error && <Text style={estilos.error}>{estado.error}</Text>}
-      <Boton texto="Volver al juego" onPress={onCerrar} />
-    </ScrollView>
-  );
-};
-
-const Boton = ({texto, onPress, principal}: {texto: string; onPress: () => void; principal?: boolean}) => (
-  <Pressable onPress={onPress} style={({pressed}) => [estilos.boton, principal && estilos.principal, pressed && {opacity: 0.7}]}>
-    <Text style={[estilos.botonTexto, principal && estilos.principalTexto]}>{texto}</Text>
-  </Pressable>
-);
 
 const estilos = StyleSheet.create({
   raiz: {flex: 1, backgroundColor: '#0b0f14'},
@@ -405,18 +426,8 @@ const estilos = StyleSheet.create({
   nota: {color: '#8b9aab', fontSize: 14, lineHeight: 20},
   seccion: {color: '#e8eef5', fontSize: 16, fontWeight: '700', marginTop: 12},
   error: {color: '#ee1515', fontSize: 14},
-  boton: {
-    minHeight: 48,
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: '#1c2530',
-    borderWidth: 1,
-    borderColor: '#26313d',
-  },
-  principal: {backgroundColor: '#ffcb05', borderColor: '#ffcb05'},
-  botonTexto: {color: '#e8eef5', fontSize: 15, fontWeight: '600'},
-  principalTexto: {color: '#2a2a2a'},
+  tarjeta: {padding: 14, gap: 6, borderRadius: 14, borderWidth: 1, borderColor: '#26313d', backgroundColor: '#131a22'},
+  tarjetaTitulo: {color: '#e8eef5', fontSize: 16, fontWeight: '700'},
   juego: {flex: 1},
   barra: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, height: 44},
   barraDerecha: {flexDirection: 'row', alignItems: 'center', gap: 16},
@@ -444,19 +455,8 @@ const estilos = StyleSheet.create({
   },
   botonMenuTexto: {color: '#e8eef5', fontSize: 18},
   velo: {position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(11, 15, 20, 0.92)'},
-  menu: {flex: 1, justifyContent: 'center', paddingHorizontal: '25%', gap: 10},
+  menu: {flexGrow: 1, justifyContent: 'center', paddingHorizontal: '25%', paddingVertical: 16, gap: 10},
   panel: {padding: 16, gap: 10},
-  codigo: {color: '#ffcb05', fontSize: 34, fontWeight: '800', letterSpacing: 4},
-  campo: {
-    minHeight: 48,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#26313d',
-    backgroundColor: '#131a22',
-    color: '#e8eef5',
-    fontSize: 15,
-  },
 });
 
 export default App;

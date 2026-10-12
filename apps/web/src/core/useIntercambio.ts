@@ -45,10 +45,7 @@ import {
   prepararOferta,
   TAMANO_ESTADO,
 } from '@emupoke/pokemon';
-import type { MgbaModule } from './mgbaCore';
 
-/** Ranura de estado propia del intercambio, lejos de las del jugador. */
-const RANURA_TRATO = 6;
 
 export type FaseTrato =
   | 'sin-trato'
@@ -159,14 +156,27 @@ export type Intercambio = {
 };
 
 /**
- * @param coreRef   el nucleo, para leer y escribir la partida
+ * Como se lee y se escribe la partida, sea donde sea que corra.
+ *
+ * En la web es el nucleo wasm; en la app de Android, el emulador nativo. Puede
+ * ser asincrono: el intercambio espera.
+ */
+export type PartidaIO = {
+  /** Un estado de la partida tal y como esta ahora mismo, o null. */
+  mirar: () => Uint8Array | null | Promise<Uint8Array | null>;
+  /** Mete un estado modificado en la partida en marcha. */
+  cargar: (bytes: Uint8Array) => boolean | Promise<boolean>;
+};
+
+/**
+ * @param io        como leer y escribir la partida
  * @param romBytes  la ROM propia, para validar y recalcular lo que llega
  * @param partida   con que partida se asocia el diario
  * @param enviar    manda un mensaje al companero; devuelve si pudo
  * @param escuchar  se apunta a los mensajes del companero
  */
-export const useIntercambio = (
-  coreRef: { current: MgbaModule | null },
+export const useIntercambioCon = (
+  io: PartidaIO,
   romBytes: Uint8Array | null,
   partida: string | null,
   enviar: (mensaje: PeerMessage) => boolean,
@@ -189,40 +199,26 @@ export const useIntercambio = (
     return contextoRef.current.contexto;
   }, [romBytes]);
 
-  const rutaDeEstado = (core: MgbaModule): string | null => {
-    const base = core.gameName?.split('/').pop()?.replace(/\.[^.]+$/, '');
-    return base ? `${core.filePaths().saveStatePath}/${base}.ss${RANURA_TRATO}` : null;
-  };
-
   /** Saca un estado de la partida tal y como esta ahora mismo. */
-  const mirarPartida = useCallback((): Uint8Array | null => {
-    const core = coreRef.current;
-    if (!core) return null;
+  const mirarPartida = useCallback(async (): Promise<Uint8Array | null> => {
     try {
-      const ruta = rutaDeEstado(core);
-      if (!ruta || !core.saveStateSlot(RANURA_TRATO, 0)) return null;
-      const bytes = core.FS.readFile(ruta) as Uint8Array;
-      return bytes.length === TAMANO_ESTADO ? bytes : null;
+      const bytes = await io.mirar();
+      return bytes && bytes.length === TAMANO_ESTADO ? bytes : null;
     } catch {
       return null;
     }
-  }, [coreRef]);
+  }, [io]);
 
   /** Mete un estado modificado en la partida en marcha. */
   const cargarPartida = useCallback(
-    (bytes: Uint8Array): boolean => {
-      const core = coreRef.current;
-      if (!core) return false;
+    async (bytes: Uint8Array): Promise<boolean> => {
       try {
-        const ruta = rutaDeEstado(core);
-        if (!ruta) return false;
-        core.FS.writeFile(ruta, bytes);
-        return Boolean(core.loadStateSlot(RANURA_TRATO, 0));
+        return Boolean(await io.cargar(bytes));
       } catch {
         return false;
       }
     },
-    [coreRef],
+    [io],
   );
 
   /**
@@ -236,14 +232,16 @@ export const useIntercambio = (
    * se corrompe una partida.
    */
   const aplicar = useCallback(
-    (diario: Diario): { fallo: string | null; evolucion: { de: string; a: string } | null } => {
+    async (
+      diario: Diario,
+    ): Promise<{ fallo: string | null; evolucion: { de: string; a: string } | null }> => {
       const mal = (que: string) => ({ fallo: que, evolucion: null });
 
       if (!partida) return mal('No se a que partida pertenece esto.');
       const ctx = contexto();
       if (!ctx) return mal('Todavia no tengo tu ROM cargada.');
 
-      const actual = mirarPartida();
+      const actual = await mirarPartida();
       if (!actual) return mal('No he podido leer tu partida.');
 
       let codigo = '';
@@ -274,7 +272,7 @@ export const useIntercambio = (
           ctx,
         );
         evolucion = aplicado.evolucion;
-        if (!cargarPartida(aplicado.estado)) {
+        if (!(await cargarPartida(aplicado.estado))) {
           return { fallo: 'No he podido devolverle la partida al emulador.', evolucion: null };
         }
       } catch (err) {
@@ -293,8 +291,8 @@ export const useIntercambio = (
   }, [partida]);
 
   const ofrecer = useCallback(
-    (ranura: number) => {
-      const actual = mirarPartida();
+    async (ranura: number) => {
+      const actual = await mirarPartida();
       if (!actual) {
         setEstado((previo) => ({ ...previo, aviso: 'No he podido leer tu partida.' }));
         return;
@@ -350,14 +348,14 @@ export const useIntercambio = (
     setEstado((previo) => ({ ...INICIAL, aMedias: previo.aMedias }));
   }, []);
 
-  const rematar = useCallback(() => {
+  const rematar = useCallback(async () => {
     if (!partida) return;
     const diario = leerDiario(partida);
     if (!diario) {
       setEstado((previo) => ({ ...previo, aMedias: false }));
       return;
     }
-    const { fallo, evolucion } = aplicar(diario);
+    const { fallo, evolucion } = await aplicar(diario);
     setEstado((previo) => ({
       ...previo,
       aviso: fallo ?? 'Listo: el intercambio que quedo a medias ya esta aplicado.',
@@ -418,21 +416,21 @@ export const useIntercambio = (
     aplicandoRef.current = true;
     setEstado((previo) => ({ ...previo, fase: 'aplicando' }));
 
-    const { fallo, evolucion } = aplicar({
+    void aplicar({
       trato: mia.trato,
       ranura: mia.ranura,
       recibo: suya.bloque,
       doy: mia.bloque,
+    }).then(({ fallo, evolucion }) => {
+      aplicandoRef.current = false;
+      setEstado((previo) => ({
+        ...previo,
+        fase: fallo === null ? 'hecho' : 'roto',
+        aviso: fallo,
+        aMedias: fallo !== null,
+        evolucion,
+      }));
     });
-    aplicandoRef.current = false;
-
-    setEstado((previo) => ({
-      ...previo,
-      fase: fallo === null ? 'hecho' : 'roto',
-      aviso: fallo,
-      aMedias: fallo !== null,
-      evolucion,
-    }));
   }, [aplicar, estado]);
 
   return { estado, ofrecer, confirmar, cancelar, rematar, olvidar };

@@ -62,7 +62,7 @@ import { Ranking } from './ui/Ranking';
 import { useCuenta } from './core/useCuenta';
 import { latir } from './core/ficha';
 import { IntercambioModal } from './ui/IntercambioModal';
-import { useIntercambio } from './core/useIntercambio';
+import { useIntercambio } from './core/intercambioWasm';
 import { FinModal } from './ui/FinModal';
 import { TOTAL_LIGA, type PasoLiga } from './ui/Liga';
 import { InvitacionModal } from './ui/InvitacionModal';
