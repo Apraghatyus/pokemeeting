@@ -27,16 +27,78 @@
 // Con el catalogo que ya tiene, cada tienda cambia de genero sin inventarse
 // nada.
 //
-// Y LO QUE NO SE TOCA: si una tienda vendia una ball o una pocion, una de sus
-// plazas nuevas sigue siendo esa misma. Sin eso, una Nuzlocke se puede quedar
-// sin forma de comprar balls, que no es dificultad: es no poder jugar.
+// CADA PLAZA SE CAMBIA POR OTRA DE SU MISMO BOLSILLO, Y ESTO NO ES UN ADORNO:
+// es lo que impedia que el juego se colgara.
+//
+// La primera version repartia los objetos a boleo entre las veinte tiendas. El
+// problema es que una de esas veinte -la numero 11 en Rojo Fuego- es la TIENDA
+// DE MT, y el juego la enseña con una pantalla distinta: debajo de la lista
+// pone el movimiento que enseña la MT seleccionada. Al meterle una Pocion, el
+// juego calculaba el movimiento restandole a ese objeto el numero de la MT01,
+// se iba fuera de su tabla y leia basura: se veia "Nº??" con un nombre de
+// letras sueltas, y el juego se colgaba poco despues.
+//
+// Por eso el randomizer se la salta, y por eso hay que saltarsela tambien
+// cuando se reparte. La regla general evita este caso y todos los de su
+// familia: un hueco que vendia una MT seguira vendiendo una MT, uno que vendia
+// una ball seguira vendiendo una ball, y uno de pociones seguira siendo del
+// mismo bolsillo. De paso sale gratis lo que antes habia que forzar a mano: una
+// tienda que vendia balls las sigue vendiendo, que es lo que impide que una
+// Nuzlocke se quede sin forma de comprarlas.
+//
+// EL BOLSILLO SE LEE DE LA ROM, no de una lista: en Rojo Fuego las balls son el
+// bolsillo 3 y las MT el 4, pero en Rubi son el 2 y el 3. Una tabla escrita a
+// mano habria acertado en un juego y roto el otro.
 
 import { inflateRawSync } from 'node:zlib';
 
-/** Los identificadores de ball de tercera generacion, de la Master a la Premier. */
-const BALLS = { primera: 1, ultima: 12 };
-/** La pocion, que es el otro imprescindible del principio. */
-const POCION = 13;
+/* ---------- la tabla de objetos ---------- */
+
+/** Lo que ocupa cada objeto en la tabla del juego. */
+const OBJETO_ENTRADA = 44;
+/** Dentro de esa entrada: 14 bytes de nombre y, justo detras, su propio numero. */
+const OBJETO_INDICE = 14;
+/** Y en el 0x1A, a que bolsillo de la mochila va. */
+const OBJETO_BOLSILLO = 0x1a;
+/** Cuantas entradas seguidas tienen que cuadrar para dar la tabla por buena. */
+const OBJETOS_PARA_FIARSE = 40;
+
+/**
+ * Busca la tabla de objetos por su forma, sin saber donde esta.
+ *
+ * El ancla es que la entrada N lleva N dentro, en su byte 14. Cuarenta seguidas
+ * cumpliendolo no se dan por casualidad en ningun otro sitio de la ROM, y asi
+ * no hace falta una direccion por cada edicion y cada idioma.
+ */
+const tablaDeObjetos = (rom: Buffer): number => {
+  const tope = rom.length - OBJETO_ENTRADA * OBJETOS_PARA_FIARSE;
+  for (let base = 0; base < tope; base += 4) {
+    let cuantas = 0;
+    while (
+      cuantas < OBJETOS_PARA_FIARSE &&
+      rom.readUInt16LE(base + cuantas * OBJETO_ENTRADA + OBJETO_INDICE) === cuantas
+    ) {
+      cuantas += 1;
+    }
+    if (cuantas >= OBJETOS_PARA_FIARSE) return base;
+  }
+  return -1;
+};
+
+/**
+ * En que bolsillo de la mochila va cada objeto, o -1 si no se sabe.
+ *
+ * Es lo que decide con que se puede cambiar cada plaza: una MT solo por otra
+ * MT, una ball solo por otra ball. Ver la cabecera.
+ */
+const bolsilloDe = (rom: Buffer, base: number, id: number): number => {
+  const donde = base + id * OBJETO_ENTRADA;
+  if (base < 0 || donde + OBJETO_ENTRADA > rom.length) return -1;
+  // Si la entrada no se nombra a si misma, ese numero no es un objeto de
+  // verdad: es uno de los huecos de relleno que tiene la tabla.
+  if (rom.readUInt16LE(donde + OBJETO_INDICE) !== id) return -1;
+  return rom.readUInt8(donde + OBJETO_BOLSILLO);
+};
 
 /**
  * Revivir y Max. Revivir, que NO pueden salir en una tienda.
@@ -233,8 +295,6 @@ const plazasDe = (rom: Buffer, donde: number): number[] | null => {
   return null;
 };
 
-const esBall = (id: number) => id >= BALLS.primera && id <= BALLS.ultima;
-
 /**
  * Si el randomizer aleatorizo las tiendas, mirando la ROM y no lo que se pidio.
  *
@@ -294,21 +354,38 @@ export const aleatorizarTiendas = (
   // leyera de todas, las tres que el acaba de aleatorizar meterian en el
   // catalogo lo que el haya decidido, y entonces esto ya no seria "lo que esta
   // ROM vendia" sino "lo que vendia mas lo que se invento otro".
-  const catalogo = new Set<number>();
+  // Sin la tabla de objetos no se sabe de que bolsillo es cada uno, y sin eso
+  // no se puede repartir: antes que arriesgarse a dejar la tienda de MT
+  // vendiendo pociones -que cuelga el juego- se prefiere no tocar nada.
+  const tabla = tablaDeObjetos(rom);
+  if (tabla < 0) return null;
+
+  // Un catalogo POR BOLSILLO, no uno solo. Ver la cabecera: es lo que mantiene
+  // cada tienda vendiendo de lo suyo.
+  const catalogo = new Map<number, Set<number>>();
   const listas = new Map<number, number[]>();
   for (const [indice, donde] of mapa.offsets.entries()) {
     const plazas = plazasDe(rom, donde);
     if (!plazas) continue;
     listas.set(donde, plazas);
-    if (mapa.saltadas.includes(indice)) {
+    if (!mapa.saltadas.includes(indice)) continue;
+    for (const id of plazas) {
       // Los de revivir no entran en el reparto: por eso se quitan aqui, al
       // hacer el catalogo, y no al escribir. Ver `REVIVIR`.
-      for (const id of plazas) if (!sinRevivir || !REVIVIR.includes(id)) catalogo.add(id);
+      if (sinRevivir && REVIVIR.includes(id)) continue;
+      const bolsillo = bolsilloDe(rom, tabla, id);
+      if (bolsillo < 0) continue;
+      if (!catalogo.has(bolsillo)) catalogo.set(bolsillo, new Set());
+      catalogo.get(bolsillo)!.add(id);
     }
   }
 
-  const pool = [...catalogo].sort((a, b) => a - b);
-  if (pool.length < 4) return null;
+  /** Los candidatos de un bolsillo, en orden fijo para que el dado cunda igual. */
+  const deBolsillo = new Map<number, number[]>();
+  for (const [bolsillo, ids] of catalogo) {
+    deBolsillo.set(bolsillo, [...ids].sort((a, b) => a - b));
+  }
+  if (deBolsillo.size === 0) return null;
 
   const dado = dadoDe(`tiendas:${semilla}`);
   let tiendas = 0;
@@ -320,27 +397,15 @@ export const aleatorizarTiendas = (
     const antes = listas.get(donde);
     if (!antes) continue;
 
-    const ahora = antes.map(() => pool[Math.floor(dado() * pool.length)] as number);
-
-    // Lo que no se puede perder: si vendia una ball o una pocion, sigue
-    // vendiendola. Una Nuzlocke sin forma de comprar balls no es mas dificil,
-    // es imposible.
-    //
-    // Cada imprescindible va a una plaza SUYA, y por eso se apuntan las
-    // ocupadas: la primera version los escribia uno detras de otro en plazas al
-    // azar y el segundo caia encima del primero. Medido, cuatro tiendas se
-    // quedaron sin su ball porque la pocion la habia tapado.
-    const imprescindibles = [...new Set(antes.filter((id) => esBall(id) || id === POCION))];
-    const ocupadas = new Set<number>();
-    for (const id of imprescindibles) {
-      if (ocupadas.size >= ahora.length) break;
-      // En una plaza al azar, no siempre la primera: si no, todas las tiendas
-      // acabarian con la ball arriba del todo y se notaria el truco.
-      let plaza = Math.floor(dado() * ahora.length);
-      while (ocupadas.has(plaza)) plaza = (plaza + 1) % ahora.length;
-      ocupadas.add(plaza);
-      ahora[plaza] = id;
-    }
+    // Cada plaza, por otra de SU bolsillo. Si de ese bolsillo no hay de donde
+    // elegir -o el objeto que habia no se reconoce- esa plaza se queda como
+    // estaba: no tocarla siempre es mejor que ponerle algo que no encaja.
+    const ahora = antes.map((id) => {
+      const bolsillo = bolsilloDe(rom, tabla, id);
+      const candidatos = deBolsillo.get(bolsillo);
+      if (!candidatos || candidatos.length === 0) return id;
+      return candidatos[Math.floor(dado() * candidatos.length)] as number;
+    });
 
     for (const [i, id] of ahora.entries()) rom.writeUInt16LE(id, donde + i * 2);
     tiendas += 1;
@@ -363,7 +428,12 @@ export const aleatorizarTiendas = (
     if (!plazas) continue;
     for (const [i, id] of plazas.entries()) {
       if (!REVIVIR.includes(id)) continue;
-      rom.writeUInt16LE(pool[Math.floor(dado() * pool.length)] as number, donde + i * 2);
+      // Revivir es un objeto normal, asi que se cambia por otro normal: su
+      // mismo bolsillo. Si no hubiera de donde elegir se queda, que es peor
+      // regla pero no rompe nada.
+      const candidatos = deBolsillo.get(bolsilloDe(rom, tabla, id));
+      if (!candidatos || candidatos.length === 0) continue;
+      rom.writeUInt16LE(candidatos[Math.floor(dado() * candidatos.length)] as number, donde + i * 2);
       plazasCambiadas += 1;
     }
   }
@@ -386,12 +456,25 @@ export const quitarRevivir = (jar: Buffer, rom: Buffer, semilla: string): Result
   const mapa = tiendasDeLaRom(jar, rom);
   if (!mapa) return null;
 
-  const catalogo = new Set<number>();
+  const tabla = tablaDeObjetos(rom);
+  if (tabla < 0) return null;
+
+  // Por bolsillo, igual que al aleatorizar: Revivir es un objeto normal y se
+  // cambia por otro normal. Meter una MT en su sitio cuelga el juego si esa
+  // tienda resulta ser la de MT. Ver la cabecera.
+  const catalogo = new Map<number, Set<number>>();
   for (const donde of mapa.offsets) {
-    for (const id of plazasDe(rom, donde) ?? []) if (!REVIVIR.includes(id)) catalogo.add(id);
+    for (const id of plazasDe(rom, donde) ?? []) {
+      if (REVIVIR.includes(id)) continue;
+      const bolsillo = bolsilloDe(rom, tabla, id);
+      if (bolsillo < 0) continue;
+      if (!catalogo.has(bolsillo)) catalogo.set(bolsillo, new Set());
+      catalogo.get(bolsillo)!.add(id);
+    }
   }
-  const pool = [...catalogo].sort((a, b) => a - b);
-  if (pool.length < 4) return null;
+  const deBolsillo = new Map<number, number[]>();
+  for (const [bolsillo, ids] of catalogo) deBolsillo.set(bolsillo, [...ids].sort((a, b) => a - b));
+  if (deBolsillo.size === 0) return null;
 
   const dado = dadoDe(`revivir:${semilla}`);
   let tiendas = 0;
@@ -402,7 +485,9 @@ export const quitarRevivir = (jar: Buffer, rom: Buffer, semilla: string): Result
     let tocada = false;
     for (const [i, id] of plazas.entries()) {
       if (!REVIVIR.includes(id)) continue;
-      rom.writeUInt16LE(pool[Math.floor(dado() * pool.length)] as number, donde + i * 2);
+      const candidatos = deBolsillo.get(bolsilloDe(rom, tabla, id));
+      if (!candidatos || candidatos.length === 0) continue;
+      rom.writeUInt16LE(candidatos[Math.floor(dado() * candidatos.length)] as number, donde + i * 2);
       plazasCambiadas += 1;
       tocada = true;
     }
