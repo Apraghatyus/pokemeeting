@@ -87,6 +87,13 @@ export type FinDePartida = {
    */
   porElEnlace: boolean;
   /**
+   * Si lo que te dejo sin equipo fue el tope de nivel.
+   *
+   * Importa para contarlo: el que queda sigue en pie, asi que decir "tu
+   * equipo ha caido al completo" no cuadraria con lo que se ve en pantalla.
+   */
+  porElTope: boolean;
+  /**
    * Como acabo: ganando o perdiendo.
    *
    * Por defecto 'derrota', que es el caso que se decide por regla nuestra. La
@@ -116,6 +123,7 @@ type Guardado = {
   resultado: Resultado;
   /** Si lo que lo acabo fue el Soul Link y no tu propia partida. */
   porElEnlace: boolean;
+  porElTope: boolean;
   /** Personalidades distintas vistas en el equipo. De aquí sale el mínimo. */
   vistos: number[];
   /** Si ya se dio por terminada, para no repetir el cartel en cada lectura. */
@@ -129,6 +137,7 @@ const VACIO: Guardado = {
   continuada: false,
   resultado: 'derrota',
   porElEnlace: false,
+  porElTope: false,
 };
 
 const clave = (partida: string) => `emupoke.fin.${partida}`;
@@ -144,6 +153,7 @@ const leer = (partida: string): Guardado => {
       continuada: guardado.continuada === true,
       resultado: guardado.resultado === 'victoria' ? 'victoria' : 'derrota',
       porElEnlace: guardado.porElEnlace === true,
+      porElTope: guardado.porElTope === true,
     };
   } catch {
     return { ...VACIO };
@@ -195,23 +205,45 @@ const MINIMO_PARA_DEDUCIRLO = 2;
 const equipoCaido = (
   equipo: EquipoResumen | null,
   caidosDelCompanero: ReadonlySet<string>,
-): { caido: boolean; porElEnlace: boolean } => {
+  /**
+   * El tope de nivel que hay que respetar, o null si esa regla no esta.
+   *
+   * En Nivelada, quien se pasa del tope del proximo lider NO se puede usar. No
+   * esta muerto -y por eso no se cuenta como caido en el historial- pero para
+   * seguir jugando es como si no estuviera: si es el unico que queda, no hay
+   * con que pelear y la partida se acabo.
+   *
+   * Lo reporto quien jugaba: dos debilitados y uno pasado de nivel, y no salia
+   * nada. Tenia razon, porque mirando el equipo parecia que le quedaba uno.
+   */
+  tope: number | null,
+): { caido: boolean; porElEnlace: boolean; porElTope: boolean } => {
   const vivos = equipo?.ranuras ?? [];
   // Un huevo no cuenta ni a favor ni en contra: no pelea y no se debilita.
   const pelean = vivos.filter((r) => !r.huevo);
-  if (pelean.length === 0) return { caido: false, porElEnlace: false };
+  if (pelean.length === 0) return { caido: false, porElEnlace: false, porElTope: false };
 
   let porElEnlace = false;
+  let porElTope = false;
   const caido = pelean.every((ranura) => {
     if (ranura.estado === 'debilitado') return true;
     if (parejaCaida(ranura.mote, caidosDelCompanero)) {
       porElEnlace = true;
       return true;
     }
+    // Pasado del tope: no vale para seguir. Va el ultimo a proposito, para que
+    // `porElEnlace` solo se encienda cuando de verdad fue el enlace.
+    if (tope !== null && ranura.nivel > tope) {
+      porElTope = true;
+      return true;
+    }
     return false;
   });
 
-  return { caido, porElEnlace: caido && porElEnlace };
+  // Se apuntan para poder CONTARLO bien: no es lo mismo quedarse sin nadie
+  // porque se murieron todos que porque el ultimo no se puede usar. El cartel
+  // lo dice distinto, y con razon: en el segundo caso sigue en pie.
+  return { caido, porElEnlace: caido && porElEnlace, porElTope: caido && porElTope };
 };
 
 /**
@@ -261,6 +293,13 @@ export const useFinDePartida = (
    */
   companeroPerdio = false,
   /**
+   * El tope de nivel del proximo lider, o null si no hay esa regla.
+   *
+   * Solo lo manda la dificultad Nivelada. En Normal y en Nuzlocke pasarse de
+   * nivel no es nada, asi que aqui llega null y no cambia ninguna cuenta.
+   */
+  topeDeNivel: number | null = null,
+  /**
    * De que juego es, como se jugo y con quien.
    *
    * Nada de esto cambia lo que se ensena: es lo que hace falta para que el
@@ -290,12 +329,22 @@ export const useFinDePartida = (
   // el mismo de antes. En una partida que ya se acabo puede no haber mas
   // lecturas distintas, y entonces el final no llegaria nunca.
   const perdioVisto = useRef(false);
+  // Y el ultimo tope que se miro: al ganar una medalla sube, y con el sube lo
+  // que se puede usar. Sin esto, con el mismo equipo no se volveria a mirar.
+  const topeVisto = useRef<number | null>(null);
 
   useEffect(() => {
     if (!partida || !equipo) return;
-    if (ultimo.current === equipo && perdioVisto.current === companeroPerdio) return;
+    if (
+      ultimo.current === equipo &&
+      perdioVisto.current === companeroPerdio &&
+      topeVisto.current === topeDeNivel
+    ) {
+      return;
+    }
     ultimo.current = equipo;
     perdioVisto.current = companeroPerdio;
+    topeVisto.current = topeDeNivel;
 
     setEstado((previo) => {
       // Se apuntan los que van apareciendo. La personalidad no cambia nunca, asi
@@ -319,7 +368,7 @@ export const useFinDePartida = (
       //
       // Cuando lo dice tu propio juego no hace falta deducir nada, y por eso
       // `derrota` va por su lado: ese camino si vale con un solo Pokemon.
-      const sinNadie = equipoCaido(equipo, caidosDelCompanero);
+      const sinNadie = equipoCaido(equipo, caidosDelCompanero, topeDeNivel);
       const loDeduzco =
         sinNadie.caido &&
         (vistos.size >= MINIMO_PARA_DEDUCIRLO || (sinNadie.porElEnlace && companeroPerdio));
@@ -330,6 +379,7 @@ export const useFinDePartida = (
         vistos: [...vistos],
         terminada: previo.terminada || acabaAhora,
         porElEnlace: previo.terminada ? previo.porElEnlace : sinNadie.porElEnlace,
+        porElTope: previo.terminada ? previo.porElTope : sinNadie.porElTope,
         resultado: previo.terminada
           ? previo.resultado
           : victoria
@@ -391,6 +441,10 @@ export const useFinDePartida = (
     // hay que volver a mirar: si no, el final llegaria con el siguiente cambio
     // de equipo, que en una partida acabada puede no llegar nunca.
     companeroPerdio,
+    // Y lo mismo con el tope: al ganar una medalla sube, y con el sube lo que
+    // se puede usar. Sin esto, un equipo que estaba bloqueado seguiria dandose
+    // por acabado hasta la siguiente lectura.
+    topeDeNivel,
   ]);
 
   // Se guarda aqui y no dentro del updater: un updater tiene que ser puro, y
@@ -441,6 +495,7 @@ export const useFinDePartida = (
     acabada: estado.terminada,
     resultado: estado.resultado,
     porElEnlace: estado.porElEnlace,
+    porElTope: estado.porElTope,
     equipoFinal,
     continuada: estado.continuada,
     continuar,

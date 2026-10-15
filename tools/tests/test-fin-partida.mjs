@@ -42,7 +42,13 @@ check('el modulo de la regla se puede cargar', fuente !== null);
 // COMPORTAMIENTO esperado, para que si alguien cambia la del modulo salte.
 const seAcabo = (
   equipo,
-  { loDiceElJuego = false, vistos = null, caidosSuyos = [], elOtroPerdio = false } = {},
+  {
+    loDiceElJuego = false,
+    vistos = null,
+    caidosSuyos = [],
+    elOtroPerdio = false,
+    tope = null,
+  } = {},
 ) => {
   // Camino bueno: el juego lo ha dicho. No hace falta nada mas.
   if (loDiceElJuego) return true;
@@ -58,6 +64,9 @@ const seAcabo = (
       porElEnlace = true;
       return true;
     }
+    // Pasado del tope: en Nivelada no se puede usar, asi que para seguir
+    // jugando es como si no estuviera.
+    if (tope !== null && r.nivel > tope) return true;
     return false;
   });
   if (!todos) return false;
@@ -217,6 +226,45 @@ check('con dos Pokemon vistos, una pareja caida basta sin preguntar',
 // visto desde el otro lado: lo mismo da que el Pokemon a cero sea el tuyo.
 check('ni tu propio primer combate acaba la tuya',
   seAcabo(equipo(pk(1, 'debilitado')), { elOtroPerdio: true }) === false);
+
+// --- EL TOPE DE NIVEL, QUE TAMBIEN DEJA SIN EQUIPO ---
+//
+// Lo reportado: dos debilitados y uno pasado de nivel, y no salia la pantalla
+// de fin de partida. Tenia razon quien lo dijo. En Nivelada, quien se pasa del
+// tope del proximo lider NO se puede usar; si es el unico que queda, no hay con
+// que pelear y la partida se acabo, aunque ese siga en pie.
+const conNivel = (personalidad, nivel, estado = null) => ({
+  ranura: 0, especie: 1, mote: `P${personalidad}`, nivel, estado,
+  tipos: null, huevo: false, personalidad,
+});
+
+// El caso tal cual: dos caidos y uno de nivel 25 con el tope en 24.
+const comoLoReportaron = equipo(
+  conNivel(1, 18, 'debilitado'),
+  conNivel(2, 25),
+  conNivel(3, 14, 'debilitado'),
+);
+check('dos caidos y el ultimo pasado de nivel: se acabo',
+  seAcabo(comoLoReportaron, { tope: 24 }) === true);
+
+// Y sin esa regla -Normal o Nuzlocke- pasarse de nivel no es nada, asi que ese
+// mismo equipo sigue jugando.
+check('pero sin tope de nivel, ese mismo equipo sigue',
+  seAcabo(comoLoReportaron, { tope: null }) === false);
+
+// Lo que no puede pasar: que un equipo sano se de por acabado porque uno se
+// pase. Mientras quede alguien que SI se puede usar, se sigue.
+check('con uno pasado pero otro utilizable, no se acaba nada',
+  seAcabo(equipo(conNivel(1, 25), conNivel(2, 20)), { tope: 24 }) === false);
+
+// Justo en el tope se puede usar: el tope es "hasta aqui", no "por debajo".
+check('estar justo en el tope no te deja fuera',
+  seAcabo(equipo(conNivel(1, 24), conNivel(2, 18, 'debilitado')), { tope: 24 }) === false);
+
+// Y al ganar una medalla el tope sube, asi que el que estaba bloqueado vuelve:
+// la partida que parecia acabada no lo estaba.
+check('y si el tope sube, se vuelve a poder jugar',
+  seAcabo(comoLoReportaron, { tope: 29 }) === false);
 
 console.log(fallos === 0 ? '\nLA REGLA NO SE INVENTA FINALES' : `\n${fallos} COMPROBACIONES FALLIDAS`);
 process.exit(fallos === 0 ? 0 : 1);

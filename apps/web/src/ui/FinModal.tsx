@@ -39,6 +39,8 @@ type Props = {
   caidosDelCompanero: ReadonlySet<string>;
   /** Si lo que acabo el reto fue el Soul Link y no tu propia partida. */
   porElEnlace: boolean;
+  /** Si lo que te dejo sin equipo fue el tope de nivel, no la muerte. */
+  porElTope: boolean;
   onContinuar: () => void;
   onReiniciar: () => void;
   onDescartar: () => void;
@@ -100,6 +102,7 @@ export const FinModal = ({
   liga,
   caidosDelCompanero,
   porElEnlace,
+  porElTope,
   onContinuar,
   onReiniciar,
   onDescartar,
@@ -137,6 +140,12 @@ export const FinModal = ({
                 <strong>a los que te quedaban se les cayó la pareja</strong> en la partida de tu
                 compañero. En tu juego siguen en pie, pero en un Soul Link esa pareja se acabó, y
                 con ella el reto.
+              </>
+            ) : porElTope ? (
+              <>
+                No te queda ningún Pokémon con el que seguir:{' '}
+                <strong>el que sobrevive se pasó del tope del próximo líder</strong>, así que en
+                una Nivelada no lo puedes usar. Sigue en pie, pero el reto se acaba aquí.
               </>
             ) : (
               <>

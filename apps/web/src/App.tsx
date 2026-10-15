@@ -494,6 +494,13 @@ export const App = () => {
     // uno acababa la partida del otro: su inicial se queda a cero por guion y
     // desde aqui se ve igual que una muerte de verdad.
     enSoulLink && session.state.peerPerdio,
+    // El tope del proximo lider, SOLO en Nivelada. Quien se pasa no se puede
+    // usar, asi que si es el unico que queda no hay con que seguir: eso es el
+    // final de la partida aunque siga en pie.
+    // Se mira la dificultad y no `reglas`, que ademas apaga las reglas cuando la
+    // partida ya acabo: eso se decide AQUI, asi que usarlo seria preguntarle a
+    // la respuesta.
+    dificultad === 'nivelada' ? (topes.siguiente?.nivel ?? null) : null,
     // Y de que juego es, como se jugo y con quien. Esto solo se sabe mientras
     // se juega: cuando la partida guardada se borre -solo caben tres- ya no
     // habria forma de averiguarlo.
@@ -929,6 +936,7 @@ export const App = () => {
           liga={fin.resultado === 'victoria' ? LIGA_COMPLETA : []}
           caidosDelCompanero={caidosSuyos}
           porElEnlace={fin.porElEnlace}
+        porElTope={fin.porElTope}
           onContinuar={fin.continuar}
           onDescartar={fin.descartar}
           /* "Empezar de nuevo" lleva al aleatorizador y no reinicia la ROM que
