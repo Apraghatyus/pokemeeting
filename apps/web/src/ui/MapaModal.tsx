@@ -24,6 +24,13 @@ type Props = {
   gastadasMias: readonly number[];
   /** Que Pokemon del equipo salio de cada zona, para decirlo. */
   capturasMias: ReadonlyMap<number, string>;
+  /**
+   * Y que salvaje fue la OPORTUNIDAD de cada zona, capturado o no.
+   *
+   * Es lo que explica una zona gastada en la que no tienes nada: ahi salio ese
+   * y se quedo sin capturar.
+   */
+  encuentrosMios: ReadonlyMap<number, string>;
   /** Del companero, si hay. Null si no hay nadie o todavia no lo ha dicho. */
   zonaSuya: number | null;
   gastadasSuyas: readonly number[] | null;
@@ -57,6 +64,7 @@ export const MapaModal = ({
   zonaMia,
   gastadasMias,
   capturasMias,
+  encuentrosMios,
   zonaSuya,
   gastadasSuyas,
   nombreSuyo,
@@ -85,10 +93,18 @@ export const MapaModal = ({
   const describir = (zona: number): string => {
     const estado = estadoDe(zona, mias, suyas);
     const quien = capturasMias.get(zona);
+    const salio = encuentrosMios.get(zona);
     if (estado === 'libre') return 'Libre: aquí todavía se puede capturar.';
-    if (estado === 'mia') return `Gastada${quien ? ` por ${quien}` : ''}: ya capturaste aquí.`;
+    if (estado === 'mia') {
+      // Lo primero, lo que se tiene; si no se tiene nada, el que salio y se
+      // perdio, que es justo lo que uno quiere recordar de una ruta gastada.
+      if (quien) return `Gastada por ${quien}: ya capturaste aquí.`;
+      return salio
+        ? `Gastada: tu encuentro aquí fue ${salio} y no lo tienes.`
+        : 'Gastada: ya tuviste tu encuentro aquí.';
+    }
     if (estado === 'suya') return `Gastada por ${nombreSuyo}.`;
-    return `Gastada por los dos${quien ? ` (tu ${quien})` : ''}.`;
+    return `Gastada por los dos${quien ? ` (tu ${quien})` : salio ? ` (el tuyo fue ${salio})` : ''}.`;
   };
 
   return (
@@ -258,8 +274,9 @@ export const MapaModal = ({
         </details>
 
         <p className="hint">
-          Es un esquema, no el mapa del juego. En Nuzlocke una zona se gasta con la primera captura
-          y sigue gastada aunque ese Pokémon se libere o caiga.
+          Es un esquema, no el mapa del juego. En Nuzlocke una zona se gasta con el PRIMER
+          ENCUENTRO: salga lo que salga, es tu única oportunidad ahí, y la zona sigue gastada
+          aunque se escape, lo tumbes o ese Pokémon se libere o caiga después.
         </p>
       </div>
     </Modal>

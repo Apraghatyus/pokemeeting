@@ -2,8 +2,10 @@
 //
 // 1. LA ENFERMERA NO CURA CON UN MUERTO EN EL EQUIPO. Hay que dejarlo en el PC
 //    o liberarlo antes. Revivirlo con un objeto tampoco vale.
-// 2. NO SE SALE DEL CENTRO con un muerto, ni -en Nivelada- con un Pokemon cuyo
-//    tipo primario se repite entre los equipos: ese hay que guardarlo.
+// 2. EN EL CENTRO, LO QUE SOBRA SE GUARDA ANTES DE SEGUIR. Si al entrar hay en
+//    el equipo alguien que no deberia estar -un muerto, o en Nivelada un tipo
+//    primario repetido entre los equipos-, hay que dejarlo en el PC: hasta
+//    entonces la enfermera no atiende y no se sale del Centro.
 // 3. EN NIVELADA NO SE PELEA CONTRA EL LIDER con alguien por encima de su tope.
 // 4. SOLO EL PRIMER ENCUENTRO DE CADA RUTA. El primer Pokemon salvaje que sale
 //    en una zona es la unica oportunidad de esa zona: si no se captura, se
@@ -126,21 +128,78 @@ export const seCuroElEquipo = (antes: Lectura | null, ahora: Lectura): boolean =
   });
 };
 
-/** Quien no puede salir del Centro contigo, y por que. */
-const quienNoPuedeSalir = (lectura: Lectura, reglas: ReglasDelCentro): string | null => {
+/** Las clases de restriccion que obligan a guardar a alguien en el PC. */
+type Restriccion = 'muerto-caido' | 'muerto-en-pie' | 'tipo';
+
+/**
+ * Quien del equipo no deberia estar ahi, y por que.
+ *
+ * Devuelve SOLO EL PRIMERO a proposito: la obligacion es guardar ese, y cuando
+ * se guarde se vuelve a mirar. Enumerarlos todos de golpe seria un parrafo que
+ * nadie lee en mitad de la partida.
+ *
+ * El tope de nivel no esta aqui. Pasarse del tope no impide andar por el mundo:
+ * impide pelear contra el lider, y eso se vigila en `juzgarLider`.
+ */
+const restringido = (
+  lectura: Lectura,
+  reglas: ReglasDelCentro,
+): { quien: PokemonResumen; que: Restriccion } | null => {
   for (const p of vivos(lectura.equipo)) {
     // Muerto aunque ahora este en pie: dejarlo en el PC y sacarlo le devuelve
     // la vida en el juego, pero para el reto sigue muerto.
     if (reglas.muertoEsMuerto && reglas.muertos.includes(p.personalidad)) {
-      return p.estado === 'debilitado'
-        ? `No puedes salir del Centro con ${nombre(p)} debilitado. Déjalo en el PC o libéralo.`
-        : `No puedes salir del Centro con ${nombre(p)}: está muerto aunque lo hayas sacado del PC. Déjalo en el PC o libéralo.`;
+      return { quien: p, que: p.estado === 'debilitado' ? 'muerto-caido' : 'muerto-en-pie' };
     }
     if (reglas.tiposRepetidos && p.tipos && reglas.tiposRepetidos.has(p.tipos[0])) {
-      return `No puedes salir del Centro con ${nombre(p)}: su tipo primario ya lo lleva otro Pokémon de los equipos. Déjalo en el PC.`;
+      return { quien: p, que: 'tipo' };
     }
   }
   return null;
+};
+
+/** La razon, dicha como lo que le pasa A EL: va detras de su nombre. */
+const laRazon = (r: { quien: PokemonResumen; que: Restriccion }): string =>
+  r.que === 'muerto-caido'
+    ? 'está debilitado y en esta dificultad eso no se cura'
+    : r.que === 'muerto-en-pie'
+      ? 'está muerto aunque lo hayas sacado del PC'
+      : 'tiene el tipo primario de otro Pokémon de los equipos';
+
+/** Y como se quita de encima. Liberar vale para un muerto; para un tipo no. */
+const laSalida = (r: { que: Restriccion }): string =>
+  r.que === 'tipo' ? 'Déjalo en el PC' : 'Déjalo en el PC o libéralo';
+
+/** Quien no puede salir del Centro contigo, y por que. */
+const quienNoPuedeSalir = (lectura: Lectura, reglas: ReglasDelCentro): string | null => {
+  const r = restringido(lectura, reglas);
+  if (!r) return null;
+  return `No puedes salir del Centro con ${nombre(r.quien)}: ${laRazon(r)}. ${laSalida(r)}.`;
+};
+
+/**
+ * LO QUE HAY QUE HACER ANTES DE SEGUIR, estando dentro de un Centro.
+ *
+ * No es un veredicto: entrar en el Centro no rompe ninguna regla y no hay nada
+ * que deshacer. Es un DEBER, y por eso se dice mientras siga sin cumplirse en
+ * vez de como un aviso que se va solo: el jugador tiene que poder leerlo
+ * cuando quiera, abrir el PC y guardar.
+ *
+ * Que se cumpla de verdad es cosa de las otras dos reglas del Centro: con
+ * alguien restringido en el equipo la enfermera no atiende y no se sale. Esto
+ * solo lo cuenta ANTES de que el jugador se choque con ellas.
+ */
+export const deberDelCentro = (
+  mapa: MapaInfo | null,
+  equipo: EquipoResumen | null,
+  reglas: ReglasDelCentro,
+): string | null => {
+  if (!mapa || !esCentro(mapa, reglas.disposicionDelCentro)) return null;
+  const r = restringido({ equipo, mapa, rival: null }, reglas);
+  if (!r) return null;
+  return `Antes de seguir tienes que guardar a ${nombre(r.quien)} en el PC: ${laRazon(
+    r,
+  )}. Hasta que lo hagas la enfermera no te atiende y no puedes salir del Centro.`;
 };
 
 /**
@@ -175,40 +234,34 @@ export const juzgarCentro = (
 ): Veredicto | null => {
   if (!antes) return null;
 
-  // --- un muerto que vuelve a estar en pie, por la enfermera ---
-  // Con un Revivir si se puede: eso lo resuelve `revividoConObjeto`, que se
-  // mira antes. Lo que llega aqui es la cura del equipo entero.
-  if (reglas.muertoEsMuerto && seCuroElEquipo(antes, ahora)) {
-    const previos = new Map(vivos(antes.equipo).map((p) => [p.personalidad, p]));
-    const revivido = vivos(ahora.equipo).find((p) => {
-      const previo = previos.get(p.personalidad);
-      return (
-        p.estado !== 'debilitado' &&
-        previo?.estado === 'debilitado' &&
-        reglas.muertos.includes(p.personalidad)
-      );
-    });
-    if (revivido) {
+  // --- la enfermera no atiende con alguien que deberia estar guardado ---
+  //
+  // Vale para las tres: el debilitado, el que esta muerto pero en pie -el PC le
+  // devuelve la vida al sacarlo, asi que ese paso no se ve nunca- y el del tipo
+  // repetido. Curar es SEGUIR, y la obligacion del Centro es guardarlo antes.
+  //
+  // Se mira en la lectura de ANTES porque despues de curar estan todos en pie y
+  // un muerto curado ya no se distingue de uno sano.
+  //
+  // Con un Revivir si se puede volver: eso lo resuelve `revividoConObjeto`, que
+  // se mira primero. Lo que llega aqui es la cura del equipo entero.
+  if (seCuroElEquipo(antes, ahora)) {
+    const r = restringido(antes, reglas);
+    if (r) {
+      const comoArreglarlo =
+        r.que === 'muerto-caido'
+          ? 'Usa un Revivir, o déjalo en el PC o libéralo'
+          : r.que === 'muerto-en-pie'
+            ? 'Solo vuelve con un Revivir; si no, déjalo en el PC o libéralo'
+            : laSalida(r);
       return {
-        motivo: `La enfermera no atiende con ${nombre(revivido)} debilitado en el equipo. Usa un Revivir, o déjalo en el PC o libéralo antes de curar.`,
+        motivo: `La enfermera no atiende con ${nombre(r.quien)} en el equipo: ${laRazon(
+          r,
+        )}. ${comoArreglarlo} antes de curar.`,
         atras: ATRAS_CURA,
         // A la entrada del Centro: ahi es donde se decide si se cura o no.
         punto: 'centro',
       };
-    }
-
-    // Un muerto en el equipo aunque este en pie: el PC le devuelve la vida al
-    // sacarlo, y asi no se veria nunca el paso de debilitado a en pie. La
-    // enfermera no atiende igual.
-    if (seCuroElEquipo(antes, ahora)) {
-      const muerto = vivos(ahora.equipo).find((p) => reglas.muertos.includes(p.personalidad));
-      if (muerto) {
-        return {
-          motivo: `La enfermera no atiende con ${nombre(muerto)} en el equipo: está muerto aunque lo hayas sacado del PC. Solo vuelve con un Revivir; si no, déjalo en el PC o libéralo antes de curar.`,
-          atras: ATRAS_CURA,
-          punto: 'centro',
-        };
-      }
     }
   }
 
@@ -407,6 +460,40 @@ export const juzgarCaptura = (
     };
   }
   return null;
+};
+
+/**
+ * LAS ZONAS GASTADAS: las que ya no pueden dar nada.
+ *
+ * Es lo que pinta el mapa, y sale de tres sitios que hacen falta los tres:
+ *
+ *   1. Las que ya tuvieron su ENCUENTRO. En cuanto sale el primer salvaje la
+ *      oportunidad esta usada: lo captures, se escape o lo tumbes. ESTA ERA LA
+ *      QUE FALTABA, y por eso una ruta ya jugada seguia saliendo libre en el
+ *      mapa aunque las reglas si la contaran como gastada.
+ *   2. Las apuntadas por una captura, que se recuerdan aunque ese Pokemon se
+ *      libere o caiga despues.
+ *   3. El sitio de donde salio cada uno de los que llevas encima, que es lo
+ *      unico que se sabe de una partida que ya venia empezada.
+ *
+ * Lo que llego de un intercambio no gasta tu zona: la oportunidad de esa ruta
+ * la gasto quien lo capturo, en su partida.
+ */
+export const zonasGastadas = (
+  encuentros: MemoriaDeEncuentros['zonas'],
+  rutas: Readonly<Record<string, number>>,
+  equipo: EquipoResumen | null,
+  propio: number | null,
+): number[] => {
+  const zonas = new Set<number>();
+  for (const zona of Object.keys(encuentros)) zonas.add(Number(zona));
+  for (const zona of Object.keys(rutas)) zonas.add(Number(zona));
+  for (const p of equipo?.ranuras ?? []) {
+    if (p.huevo || p.lugar === null || p.lugar === undefined) continue;
+    if (propio !== null && p.entrenador !== propio) continue;
+    zonas.add(zonaCanonica(p.lugar));
+  }
+  return [...zonas].sort((a, b) => a - b);
 };
 
 // -------------------------------------------------- memoria por partida ---

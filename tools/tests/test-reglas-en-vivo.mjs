@@ -1,7 +1,9 @@
 // Comprueba las reglas que se hacen cumplir:
 //
-//   - la enfermera no cura con un muerto en el equipo;
+//   - la enfermera no cura con nadie que deberia estar guardado en el PC;
 //   - no se sale del Centro con un muerto, ni con un tipo primario repetido;
+//   - y se dice al entrar que hay que guardarlo antes de seguir;
+//   - una zona se gasta con el primer encuentro, que es lo que pinta el mapa;
 //   - en Nivelada no se pelea contra el lider con alguien por encima del tope;
 //   - solo el primer encuentro de cada zona, con la excepcion de los repetidos;
 //
@@ -23,6 +25,8 @@ const {
   seCuroElEquipo,
   revividoConObjeto,
   juzgarPokeball,
+  deberDelCentro,
+  zonasGastadas,
   ENCUENTROS_VACIOS,
 } =
   await desde('apps/web/src/core/reglasEnVivo.ts');
@@ -157,6 +161,62 @@ const tipo = juzgarCentro(
   conRepetido,
 );
 check('no se sale con un tipo primario repetido', tipo?.motivo.includes('PSYDUCK') === true, tipo?.motivo);
+
+// --- LO QUE HAY QUE GUARDAR ANTES DE SEGUIR, al entrar en el Centro ---
+//
+// Lo pedido: entrar en el Centro con una restriccion obliga a guardar un
+// Pokemon antes de continuar. Antes solo se sabia al chocarse con la regla
+// -la enfermera que no atiende, la puerta que no deja salir-, asi que se
+// descubria deshaciendo. Ahora se dice en cuanto entras y se queda dicho
+// mientras siga sin cumplirse.
+const deber = deberDelCentro(centro, equipo(pk(1, 'BULBA'), pk(2, 'PIDGEY')), centroReglas);
+check('al entrar en el Centro con un muerto, se dice que hay que guardarlo', deber?.includes('PIDGEY') === true, deber);
+check('y por que no se puede seguir sin eso', deber?.includes('PC') === true && deber?.includes('enfermera') === true);
+check(
+  'con el muerto debilitado, igual',
+  deberDelCentro(centro, equipo(pk(1, 'BULBA'), pk(2, 'PIDGEY', { ps: 0 })), centroReglas)?.includes('PIDGEY') === true,
+);
+check(
+  'ya guardado, nada que hacer',
+  deberDelCentro(centro, equipo(pk(1, 'BULBA')), centroReglas) === null,
+);
+check(
+  'fuera del Centro no se obliga a nada',
+  deberDelCentro(calle, equipo(pk(1, 'BULBA'), pk(2, 'PIDGEY')), centroReglas) === null,
+);
+check(
+  'arriba del Centro tambien cuenta como Centro',
+  deberDelCentro(arriba, equipo(pk(2, 'PIDGEY')), centroReglas) === null,
+);
+check(
+  'en Normal no hay nada que guardar',
+  deberDelCentro(centro, equipo(pk(2, 'PIDGEY')), { ...centroReglas, muertoEsMuerto: false }) === null,
+);
+check(
+  'sin saber cual es el Centro, no se pide nada',
+  deberDelCentro(centro, equipo(pk(2, 'PIDGEY')), { ...centroReglas, disposicionDelCentro: null }) === null,
+);
+check(
+  'sin partida cargada tampoco',
+  deberDelCentro(null, null, centroReglas) === null,
+);
+const deberTipo = deberDelCentro(
+  centro,
+  equipo(pk(1, 'BULBA'), pk(3, 'PSYDUCK', { tipo: 11 })),
+  { ...centroReglas, muertos: [], tiposRepetidos: new Set([11]) },
+);
+check('y en Nivelada, el del tipo repetido tambien hay que guardarlo', deberTipo?.includes('PSYDUCK') === true, deberTipo);
+// Y la enfermera lo hace cumplir: curar es seguir.
+const curaConTipo = juzgarCentro(
+  lectura(centro, [pk(1, 'BULBA', { ps: 5 }), pk(3, 'PSYDUCK', { tipo: 11, ps: 5 })]),
+  lectura(centro, [pk(1, 'BULBA'), pk(3, 'PSYDUCK', { tipo: 11 })]),
+  { ...centroReglas, muertos: [], tiposRepetidos: new Set([11]) },
+);
+check(
+  'la enfermera tampoco atiende con un tipo repetido sin guardar',
+  curaConTipo?.motivo.includes('PSYDUCK') === true && curaConTipo?.punto === 'centro',
+  curaConTipo?.motivo,
+);
 
 // --- el lider, en Nivelada ---
 const brock = { nombre: 'BROCK', tope: 14, equipo: [{ especie: 74, nivel: 12 }, { especie: 95, nivel: 14 }] };
@@ -305,6 +365,43 @@ check(
 );
 const aviso = apuntarEncuentro(tras.memoria, lectura(ruta, equipoBase, salvaje(16, 502)), contexto, nombreDe);
 check('al empezar en una zona gastada se avisa', aviso.aviso?.includes('Poké Balls') === true, aviso.aviso);
+
+// --- LAS ZONAS GASTADAS, que es lo que pinta el mapa ---
+//
+// Lo reportado: ya habia tenido el primer combate de la ruta y el mapa seguia
+// diciendo que ahi se podia capturar. El mapa contaba solo las capturas, y la
+// regla cuenta los encuentros.
+const unEncuentro = { [String(0x67)]: { especie: 19, personalidad: 500 } };
+check(
+  'una ruta con su encuentro ya sale gastada aunque no se capturara nada',
+  zonasGastadas(unEncuentro, {}, equipo(pk(1, 'BULBA')), YO).join() === String(0x67),
+  JSON.stringify(zonasGastadas(unEncuentro, {}, equipo(pk(1, 'BULBA')), YO)),
+);
+check(
+  'sin encuentros ni capturas, ninguna',
+  zonasGastadas({}, {}, equipo(pk(1, 'BULBA')), YO).length === 0,
+);
+check(
+  'la zona apuntada por una captura sigue contando',
+  zonasGastadas({}, { [String(0x68)]: 77 }, null, YO).join() === String(0x68),
+);
+check(
+  'y el sitio de donde salio cada uno del equipo, para las partidas ya empezadas',
+  zonasGastadas({}, {}, equipo(pk(1, 'BULBA', { lugar: 0x69 })), YO).join() === String(0x69),
+);
+check(
+  'lo que llego de un intercambio no gasta tu zona',
+  zonasGastadas({}, {}, equipo(pk(1, 'BULBA', { lugar: 0x69, entrenador: 999 })), YO).length === 0,
+);
+check(
+  'un huevo tampoco',
+  zonasGastadas({}, {}, equipo({ ...pk(1, 'HUEVO', { lugar: 0x69 }), huevo: true }), YO).length === 0,
+);
+check(
+  'las tres fuentes se juntan sin repetir y en orden',
+  zonasGastadas(unEncuentro, { [String(0x67)]: 500, [String(0x66)]: 1 }, equipo(pk(1, 'BULBA', { lugar: 0x68 })), YO).join() ===
+    [0x66, 0x67, 0x68].join(),
+);
 
 // --- el bolsillo de Poke Balls en la memoria ---
 {

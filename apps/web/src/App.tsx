@@ -7,6 +7,7 @@ import { useSession } from './net/useSession';
 import { useEquipo, type Vigilante } from './core/useEquipo';
 import {
   apuntarEncuentro,
+  deberDelCentro,
   guardarDisposicionDelCentro,
   guardarEncuentros,
   juzgarCaptura,
@@ -17,6 +18,7 @@ import {
   leerEncuentros,
   revividoConObjeto,
   seCuroElEquipo,
+  zonasGastadas,
   type MemoriaDeEncuentros,
 } from './core/reglasEnVivo';
 import { nombreDeZona, zonaCanonica } from './core/zonas';
@@ -280,6 +282,16 @@ export const App = () => {
   const vigilanteRef = useRef<Vigilante | null>(null);
   /** Los encuentros apuntados de la partida que corre. */
   const encuentrosRef = useRef<{ partida: string; memoria: MemoriaDeEncuentros } | null>(null);
+  /**
+   * Y los mismos, en estado, para el mapa.
+   *
+   * La ref la lee el juez, que corre en el bucle de lectura y necesita el valor
+   * de ya. Pero una ref no repinta nada, y el mapa tiene que ensenar la zona
+   * como gastada en cuanto pasa el encuentro. De ahi las dos copias.
+   */
+  const [zonasConEncuentro, setZonasConEncuentro] = useState<
+    MemoriaDeEncuentros['zonas']
+  >({});
   /**
    * Lo que las reglas necesitan de la ROM: los equipos de los lideres y las
    * familias evolutivas. Se busca la primera vez que hace falta, una por ROM.
@@ -612,24 +624,38 @@ export const App = () => {
     if (apuntado.memoria !== memoria) {
       encuentrosRef.current = { partida, memoria: apuntado.memoria };
       guardarEncuentros(partida, apuntado.memoria);
+      setZonasConEncuentro(apuntado.memoria.zonas);
     }
     if (apuntado.aviso) setAvisoRegla({ texto: apuntado.aviso, tipo: 'info' });
     return null;
   };
 
-  // Lo que se ve en el mapa: las zonas donde ya se capturo -las apuntadas y
-  // las de quien va en el equipo- y donde se esta.
-  const zonasGastadas = useMemo(() => {
-    const zonas = new Set(Object.keys(infracciones.memoria.rutas).map(Number));
-    for (const p of miEquipo.equipo?.ranuras ?? []) {
-      if (p.huevo || p.lugar === null || p.lugar === undefined) continue;
-      if (infracciones.memoria.propio !== null && p.entrenador !== infracciones.memoria.propio) {
-        continue;
-      }
-      zonas.add(zonaCanonica(p.lugar));
+  // Al cargar una partida se traen sus encuentros: el mapa tiene que ensenar
+  // las zonas gastadas antes de que pase nada, no solo las de esta sesion.
+  useEffect(() => {
+    if (!partidaEnCurso) {
+      encuentrosRef.current = null;
+      setZonasConEncuentro({});
+      return;
     }
-    return [...zonas].sort((a, b) => a - b);
-  }, [infracciones.memoria, miEquipo.equipo]);
+    const memoria = leerEncuentros(partidaEnCurso);
+    encuentrosRef.current = { partida: partidaEnCurso, memoria };
+    setZonasConEncuentro(memoria.zonas);
+  }, [partidaEnCurso]);
+
+  // Lo que se ve en el mapa: las zonas gastadas y donde se esta. La cuenta esta
+  // en `reglasEnVivo` -ver `zonasGastadas`-: es la misma idea de "gastada" que
+  // usan las reglas, y tenerla en dos sitios fue justo lo que la descuadro.
+  const zonasDelMapa = useMemo(
+    () =>
+      zonasGastadas(
+        zonasConEncuentro,
+        infracciones.memoria.rutas,
+        miEquipo.equipo,
+        infracciones.memoria.propio,
+      ),
+    [infracciones.memoria, miEquipo.equipo, zonasConEncuentro],
+  );
   const zonaActual = miEquipo.mapa ? zonaCanonica(miEquipo.mapa.zona) : null;
   // Quien salio de cada zona, para decirlo en el mapa. Solo los que van en el
   // equipo: de los demas solo se sabe que la zona esta gastada.
@@ -642,6 +668,16 @@ export const App = () => {
     }
     return quien;
   }, [miEquipo.equipo]);
+
+  // Y que salvaje fue la oportunidad de cada zona. Es lo que explica una zona
+  // gastada en la que no tienes nada: ahi salio ese y no lo cogiste.
+  const encuentrosMios = useMemo(() => {
+    const cual = new Map<number, string>();
+    for (const [zona, encuentro] of Object.entries(zonasConEncuentro)) {
+      cual.set(Number(zona), especies.nombre(encuentro.especie));
+    }
+    return cual;
+  }, [zonasConEncuentro, especies]);
 
   // El aviso de una regla que se acaba de hacer cumplir. Se va solo.
   const [avisoRegla, setAvisoRegla] = useState<{ texto: string; tipo: 'error' | 'info' } | null>(
@@ -661,10 +697,10 @@ export const App = () => {
 
   // Y se le cuenta al companero, igual que el equipo.
   const { enviarMapa } = session;
-  const clavesMapa = `${zonaActual}|${zonasGastadas.join(',')}`;
+  const clavesMapa = `${zonaActual}|${zonasDelMapa.join(',')}`;
   useEffect(() => {
     if (state.status !== 'running') return;
-    enviarMapa({ zona: zonaActual, gastadas: zonasGastadas });
+    enviarMapa({ zona: zonaActual, gastadas: zonasDelMapa });
     // `clavesMapa` resume las dos cosas: solo se manda cuando cambian.
   }, [clavesMapa, session.state.canalListo, enviarMapa, state.status]);
 
@@ -674,6 +710,33 @@ export const App = () => {
         ? tiposPrimariosRepetidos(miEquipo.equipo, session.state.equipoCompanero)
         : undefined,
     [reglas.tipoPrimarioUnico, miEquipo.equipo, session.state.equipoCompanero],
+  );
+
+  /**
+   * Lo que hay que hacer antes de seguir, estando dentro de un Centro.
+   *
+   * No sale del juez sino de la ultima lectura, a proposito: es un DEBER que
+   * sigue ahi hasta que se cumple, no un aviso de algo que acaba de pasar. Se
+   * queda en pantalla mientras ese Pokemon siga en el equipo y desaparece solo
+   * en cuanto se guarda en el PC.
+   */
+  const deberDelCentroAhora = useMemo(
+    () =>
+      deberDelCentro(miEquipo.mapa, miEquipo.equipo, {
+        muertoEsMuerto: reglas.muertoEsMuerto,
+        muertos: infracciones.memoria.muertos,
+        tiposRepetidos: reglas.tipoPrimarioUnico ? (tiposRepetidos ?? null) : null,
+        disposicionDelCentro: codigoJuego ? leerDisposicionDelCentro(codigoJuego) : null,
+      }),
+    [
+      miEquipo.mapa,
+      miEquipo.equipo,
+      reglas.muertoEsMuerto,
+      reglas.tipoPrimarioUnico,
+      infracciones.memoria.muertos,
+      tiposRepetidos,
+      codigoJuego,
+    ],
   );
 
   // Mandarle el equipo al companero. Se hace desde un solo sitio y no al
@@ -759,18 +822,36 @@ export const App = () => {
        <div className="juego" ref={marcoDeJuego}>
         {/* Dentro del marco que va a pantalla completa: fuera de el no se veria
             jugando a pantalla completa, que es justo cuando salta. */}
-        {avisoRegla && (
-          <div
-            className={`aviso-regla aviso-regla--${avisoRegla.tipo}`}
-            role={avisoRegla.tipo === 'error' ? 'alert' : 'status'}
-          >
-            <span className="aviso-regla__marca" aria-hidden="true">
-              {avisoRegla.tipo === 'error' ? '!' : 'i'}
-            </span>
-            <span>{avisoRegla.texto}</span>
-            <button type="button" onClick={() => setAvisoRegla(null)}>
-              Entendido
-            </button>
+        {/* Los dos carteles van en una columna y no cada uno pegado al borde:
+            con los textos largos del Centro en una pantalla estrecha ocupan
+            varias lineas cada uno y se pisaban. */}
+        {(deberDelCentroAhora || avisoRegla) && (
+          <div className="avisos">
+            {/* El deber del Centro no se puede quitar: no es un aviso de algo
+                que paso, es lo que falta por hacer. Se va al cumplirse. */}
+            {deberDelCentroAhora && (
+              <div className="aviso-regla aviso-regla--deber" role="alert">
+                <span className="aviso-regla__marca" aria-hidden="true">
+                  PC
+                </span>
+                <span>{deberDelCentroAhora}</span>
+              </div>
+            )}
+
+            {avisoRegla && (
+              <div
+                className={`aviso-regla aviso-regla--${avisoRegla.tipo}`}
+                role={avisoRegla.tipo === 'error' ? 'alert' : 'status'}
+              >
+                <span className="aviso-regla__marca" aria-hidden="true">
+                  {avisoRegla.tipo === 'error' ? '!' : 'i'}
+                </span>
+                <span>{avisoRegla.texto}</span>
+                <button type="button" onClick={() => setAvisoRegla(null)}>
+                  Entendido
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -1105,8 +1186,9 @@ export const App = () => {
         onClose={() => setMapaOpen(false)}
         codigoJuego={state.header?.gameCode ?? null}
         zonaMia={zonaActual}
-        gastadasMias={zonasGastadas}
+        gastadasMias={zonasDelMapa}
         capturasMias={capturasMias}
+        encuentrosMios={encuentrosMios}
         zonaSuya={conCompanero ? (session.state.mapaCompanero?.zona ?? null) : null}
         gastadasSuyas={conCompanero ? (session.state.mapaCompanero?.gastadas ?? []) : null}
         nombreSuyo={nombreDelCompanero}

@@ -1691,11 +1691,21 @@ Excepción a "se avisa, no se impide", pedida a propósito. Con el reto vivo:
 
 | Regla | Dificultad | Qué pasa si se rompe |
 |---|---|---|
-| La enfermera no cura con un muerto en el equipo, aunque esté en pie porque se sacó del PC. La única forma de que vuelva es un Revivir: entonces deja de estar muerto | Nuzlocke, Nivelada | Se vuelve a antes de hablar con ella |
+| Al entrar en el Centro con alguien que no deberías llevar, hay que dejarlo en el PC antes de seguir. Se dice al entrar y se queda dicho hasta que se cumple | Nuzlocke, Nivelada | Nada que deshacer: entrar no rompe nada. Lo hacen cumplir las dos de abajo |
+| La enfermera no atiende con alguien así en el equipo: un muerto -aunque esté en pie porque se sacó del PC- o, en Nivelada, un tipo primario repetido. De un muerto, la única forma de que vuelva es un Revivir: entonces deja de estar muerto | Nuzlocke, Nivelada | Se vuelve a la entrada del Centro |
 | No se sale del Centro con un muerto, también si está en pie por haberlo sacado del PC | Nuzlocke, Nivelada | Se vuelve a justo antes de salir |
 | No se sale del Centro con un Pokémon de tipo primario repetido entre los equipos (su ficha sale apagada) | Nivelada | Se vuelve a justo antes de salir |
 | No se pelea contra el siguiente líder con alguien por encima de su tope | Nivelada | Se vuelve a antes del combate |
-| Solo el primer encuentro de cada zona: si no se captura, se pierde. Si es de una familia que ya llevas en el equipo, no cuenta y vale el siguiente | Nuzlocke, Nivelada | Al empezar el combate se avisa; lanzar una Poké Ball (o capturar) se deshace volviendo a antes de ese combate |
+| Solo el primer encuentro de cada zona: si no se captura, se pierde. Si es de una familia que ya llevas en el equipo, no cuenta y vale el siguiente | Nuzlocke, Nivelada | Al empezar el combate se avisa; lanzar una Poké Ball (o capturar) se deshace volviendo al principio de ese combate |
+
+El **mapa** pinta gastada una zona en cuanto tiene su encuentro, se capture o
+no: es la misma cuenta que usan las reglas (`zonasGastadas`, en
+`reglasEnVivo.ts`). Estuvo contando solo las capturas, y por eso una ruta ya
+jugada seguía saliendo libre.
+
+El **tope de nivel no obliga a guardar nada** en el Centro: pasarse del tope no
+impide andar por el mundo, impide pelear contra el líder. Eso se decidió al
+mover la regla al combate y sigue así.
 
 **Cómo se impide.** El equipo se mira cada tres segundos guardando un estado, y
 se conservan los del último minuto. Al romperse una regla se carga uno de esos,
@@ -1706,7 +1716,8 @@ también a pantalla completa. No se escribe nada en la partida.
 **Cómo se sabe cada cosa**, sin direcciones a mano salvo la de combate:
 
 - **El Centro**: todos comparten disposición por dentro; se aprende en la
-  primera cura de la enfermera. Hasta entonces la regla de salir no se vigila.
+  primera cura de la enfermera. Hasta entonces no se vigila ni la de salir ni la
+  obligación de guardar al entrar.
 - **El rival del combate**: la copia de combate que va justo después de la tuya
   (`rivalEnCombate`). Salvaje si lleva tu número de entrenador, que es como el
   juego crea a los salvajes.

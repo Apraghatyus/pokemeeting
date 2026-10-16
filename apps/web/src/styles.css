@@ -6377,15 +6377,38 @@ details.partidas[open] > summary::before {
 
 /* ------------------------------------------------- aviso de una regla --- */
 
-/* Sale encima de la partida cuando se deshace algo por romper una regla del
-   Centro Pokemon: el jugador acaba de aparecer donde estaba hace un momento y
-   tiene que saber por que. */
-.aviso-regla {
+/* Salen encima de la partida: el aviso de una regla que se ha hecho cumplir
+   -el jugador acaba de aparecer donde estaba hace un momento y tiene que saber
+   por que- y el deber del Centro, que se queda hasta que se cumple. */
+
+/* La columna: los carteles se apilan y crecen hacia arriba. Cada uno pegado
+   al borde por su cuenta se pisaba con el otro en cuanto los textos ocupaban
+   varias lineas. */
+.avisos {
   position: fixed;
-  left: 50%;
+  /* De borde a borde, y los carteles centrados dentro. Anclada solo por el
+     medio -left: 50%- el ancho disponible era medio pantalla, y los carteles
+     salian estrechos y larguisimos en el movil. */
+  left: 0;
+  right: 0;
   bottom: 24px;
   z-index: 60;
-  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  max-height: calc(100vh - 48px);
+  /* La columna ocupa todo el ancho, asi que no puede comerse los clics de la
+     partida que hay debajo: solo los carteles los reciben. */
+  pointer-events: none;
+}
+
+.avisos > * {
+  pointer-events: auto;
+}
+
+.aviso-regla {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -6427,7 +6450,25 @@ details.partidas[open] > summary::before {
 @keyframes aviso-regla-entra {
   from {
     opacity: 0;
-    transform: translate(-50%, 8px);
+    transform: translateY(8px);
+  }
+}
+
+/* En una pantalla estrecha el boton le robaba el ancho al texto -se queda con
+   su tamano, `flex: none`- y el cartel crecia a lo alto sin parar. Que baje a
+   su propia linea y el texto se quede con el ancho entero. */
+@media (max-width: 520px) {
+  .aviso-regla {
+    flex-wrap: wrap;
+  }
+
+  /* El texto se queda arriba con la marca y encoge; lo que baja es el boton. */
+  .aviso-regla > span:not(.aviso-regla__marca) {
+    flex: 1 1 140px;
+  }
+
+  .aviso-regla button {
+    margin-left: auto;
   }
 }
 
@@ -6440,6 +6481,23 @@ details.partidas[open] > summary::before {
 .aviso-regla--info .aviso-regla__marca {
   background: var(--accent);
   color: var(--accent-ink);
+}
+
+/* El DEBER del Centro: lo que falta por hacer para poder seguir. No se puede
+   quitar -no hay boton- porque no es un aviso de algo que paso: otro color para
+   que no se confunda con una regla recien rota. */
+.aviso-regla--deber {
+  border-color: var(--wait);
+}
+
+.aviso-regla--deber .aviso-regla__marca {
+  width: auto;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--wait);
+  color: #101216;
+  font-size: 11px;
+  letter-spacing: 0.04em;
 }
 
 /* ------------------------------------------- pregunta de Soul Link --- */

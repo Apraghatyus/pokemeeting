@@ -66,6 +66,7 @@
     "test:mapas": "npx tsx tools/tests/test-mapas.mjs",
     "test:mote": "npx tsx tools/tests/test-mote.mjs",
     "test:reglas:vivo": "npx tsx tools/tests/test-reglas-en-vivo.mjs",
+    "test:deber": "node tools/tests/test-deber-centro.mjs",
     "test:paneles": "npx tsx tools/tests/test-paneles.mjs",
     "test:resumen": "npx tsx tools/tests/test-resumen.mjs",
     "test:texto": "npx tsx tools/tests/test-texto.mjs",

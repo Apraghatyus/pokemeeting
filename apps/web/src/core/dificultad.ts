@@ -37,7 +37,7 @@ export const DIFICULTADES: readonly InfoDeDificultad[] = [
     reglas: [
       'Solo el primer encuentro de cada ruta (si fallas, se pierde; un repetido no cuenta)',
       'Debilitado = muerto: solo vuelve con un Revivir (si no, PC o liberado)',
-      'No curar ni salir del Centro con debilitados en el equipo',
+      'En el Centro, al PC lo que no puedas usar antes de seguir: si no, no curas ni sales',
       'Sin Revivir en las tiendas',
     ],
   },
