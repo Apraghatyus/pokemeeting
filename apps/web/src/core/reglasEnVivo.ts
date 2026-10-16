@@ -67,6 +67,22 @@ export type Veredicto = {
   motivo: string;
   atras: number;
   antesDe?: number;
+  /**
+   * A que PUNTO SEGURO volver, si lo hay.
+   *
+   * POR QUE EXISTE. Deshacer contando segundos hacia atras es una aproximacion:
+   * tres segundos a veces se quedan cortos y a veces se llevan por delante algo
+   * que estaba bien. Y en una ocasion el juego se colgo deshaciendo.
+   *
+   * Un punto seguro es un estado guardado en el momento exacto en que empieza
+   * algo: al entrar en un combate, o al entrar en un Centro Pokemon. Volver ahi
+   * es volver a un sitio que existe de verdad en la partida, no a "hace unos
+   * segundos".
+   *
+   * Si no hay punto guardado de ese tipo se vuelve contando segundos, que es lo
+   * que se hacia antes. Mejor una aproximacion que no deshacer nada.
+   */
+  punto?: 'combate' | 'centro';
 };
 
 const vivos = (equipo: EquipoResumen | null): PokemonResumen[] =>
@@ -176,6 +192,8 @@ export const juzgarCentro = (
       return {
         motivo: `La enfermera no atiende con ${nombre(revivido)} debilitado en el equipo. Usa un Revivir, o déjalo en el PC o libéralo antes de curar.`,
         atras: ATRAS_CURA,
+        // A la entrada del Centro: ahi es donde se decide si se cura o no.
+        punto: 'centro',
       };
     }
 
@@ -188,6 +206,7 @@ export const juzgarCentro = (
         return {
           motivo: `La enfermera no atiende con ${nombre(muerto)} en el equipo: está muerto aunque lo hayas sacado del PC. Solo vuelve con un Revivir; si no, déjalo en el PC o libéralo antes de curar.`,
           atras: ATRAS_CURA,
+          punto: 'centro',
         };
       }
     }
@@ -230,6 +249,8 @@ export const juzgarLider = (
     motivo: `No puedes pelear contra ${lider.nombre} con ${nombre(pasado)} en nivel ${pasado.nivel}: el tope es ${lider.tope}. Déjalo en el PC o libéralo.`,
     atras: ATRAS_LIDER,
     antesDe: rival.personalidad,
+    // Al principio del combate: es donde se decide si se pelea o no.
+    punto: 'combate',
   };
 };
 
@@ -347,6 +368,7 @@ export const juzgarPokeball = (
     motivo: `En ${nombreDeZona(zona)} ya tuviste tu encuentro: no puedes lanzar Poké Balls ahí.`,
     atras: 0,
     antesDe: rival.personalidad,
+    punto: 'combate',
   };
 };
 
@@ -381,6 +403,7 @@ export const juzgarCaptura = (
       motivo: `En ${nombreDeZona(zona)} ya tuviste tu encuentro: no puedes capturar otro ahí.`,
       atras: 0,
       antesDe: p.personalidad,
+      punto: 'combate',
     };
   }
   return null;

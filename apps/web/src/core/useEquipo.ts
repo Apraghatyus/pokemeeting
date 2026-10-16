@@ -130,6 +130,14 @@ export const useEquipo = (
   especies: Especies,
   romBytesRef: { current: Uint8Array | null } = { current: null },
   vigilanteRef: { current: Vigilante | null } = { current: null },
+  /**
+   * La disposicion de los Centros Pokemon de este juego, si ya se aprendio.
+   *
+   * Hace falta aqui para saber cuando se ENTRA en uno y guardar el punto
+   * seguro. Viene de fuera porque lo que se ha aprendido de cada juego se
+   * guarda en la pagina, no aqui.
+   */
+  disposicionDelCentroRef: { current: number | null } = { current: null },
 ): EstadoEquipo => {
   const [equipo, setEquipo] = useState<EquipoResumen | null>(null);
   const [disponible, setDisponible] = useState(true);
@@ -147,6 +155,29 @@ export const useEquipo = (
   const pistaMochilaRef = useRef<number | null>(null);
   /** Las ultimas lecturas que no rompian ninguna regla, con su estado. */
   const historialRef = useRef<{ lectura: Lectura; estado: Uint8Array; momento: number }[]>([]);
+
+  /**
+   * EL PUNTO SEGURO: el estado justo al empezar algo que tiene reglas.
+   *
+   * Se guarda uno solo, el ultimo, y se pisa cada vez. Son dos momentos:
+   *
+   *   - Al EMPEZAR UN COMBATE, que es donde se decide si se pelea contra el
+   *     lider o si se le lanza una ball a un encuentro que no tocaba.
+   *   - Al ENTRAR EN UN CENTRO, que es donde se decide si se cura.
+   *
+   * POR QUE HACE FALTA. Deshacer contando segundos hacia atras es una
+   * aproximacion: a veces se queda corta y a veces se lleva por delante algo
+   * que estaba bien. Volver al punto es volver a un sitio que existe de verdad
+   * en la partida.
+   *
+   * De la entrada del gimnasio no hay punto porque no se sabe reconocer un
+   * gimnasio: no tienen nada en comun por dentro, al reves que los Centros, que
+   * comparten la disposicion. El principio del combate contra el lider hace el
+   * mismo papel, que es donde se decide pelear.
+   */
+  const puntoRef = useRef<{ tipo: 'combate' | 'centro'; estado: Uint8Array; momento: number } | null>(
+    null,
+  );
   /** La ultima vez que se deshizo algo, para ir mas atras si se repite. */
   const ultimoDeshechoRef = useRef<{ motivo: string; momento: number; veces: number } | null>(null);
 
@@ -243,10 +274,49 @@ export const useEquipo = (
       // a un estado bueno de antes y aqui se acaba: lo leido ya no es la partida.
       const ahora: Lectura = { equipo: leido, mapa: donde, rival, balls: mochila?.firma ?? null };
       const historial = historialRef.current;
+      const anterior = historial.at(-1)?.lectura ?? null;
+
+      // El punto seguro se guarda ANTES de juzgar nada: lo que se quiere
+      // conservar es el estado de la lectura PASADA -la de justo antes de
+      // entrar- y no el de ahora, que ya esta dentro.
+      const empiezaCombate =
+        ahora.equipo?.enCombate === true && anterior?.equipo?.enCombate !== true;
+      const entraEnCentro =
+        disposicionDelCentroRef.current !== null &&
+        donde?.disposicion === disposicionDelCentroRef.current &&
+        anterior?.mapa?.disposicion !== disposicionDelCentroRef.current;
+
+      if (empiezaCombate || entraEnCentro) {
+        const guardado = historial.at(-1)?.estado;
+        if (guardado) {
+          puntoRef.current = {
+            tipo: empiezaCombate ? 'combate' : 'centro',
+            estado: guardado,
+            momento: Date.now(),
+          };
+        }
+      }
       const veredicto =
         vigilanteRef.current?.(historial.at(-1)?.lectura ?? null, ahora, tabla) ?? null;
       if (veredicto && historial.length > 0) {
         const momento = Date.now();
+
+        // Si la regla pide un punto y el que hay es de ese tipo, se vuelve
+        // ahi. Si no lo hay -o es de otro tipo- se cuenta hacia atras como
+        // antes: una aproximacion es mejor que no deshacer nada.
+        const punto = puntoRef.current;
+        if (veredicto.punto && punto && punto.tipo === veredicto.punto) {
+          core.FS.writeFile(ruta, punto.estado);
+          if (core.loadStateSlot(RANURA_ESPIA, 0)) {
+            // El historial se queda como estaba hasta el punto: lo de despues
+            // ya no es la partida.
+            historialRef.current = historial.filter((h) => h.momento <= punto.momento);
+            ultimoDeshechoRef.current = { motivo: veredicto.motivo, momento, veces: 0 };
+            setDeshecho({ motivo: veredicto.motivo, momento });
+            return;
+          }
+        }
+
         // La misma regla otra vez enseguida: lo de antes no fue bastante atras.
         const previo = ultimoDeshechoRef.current;
         const veces =

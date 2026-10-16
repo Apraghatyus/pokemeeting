@@ -302,6 +302,13 @@ export const App = () => {
     }
     return datosRomRef.current;
   };
+  // La disposicion de los Centros de este juego, para saber cuando se entra en
+  // uno. Se aprende jugando y se guarda por juego, asi que aqui solo se mira.
+  const disposicionDelCentroRef = useRef<number | null>(null);
+  disposicionDelCentroRef.current = state.header?.gameCode
+    ? leerDisposicionDelCentro(state.header.gameCode)
+    : null;
+
   const miEquipo = useEquipo(
     emulator.coreRef,
     state.status === 'running',
@@ -309,6 +316,7 @@ export const App = () => {
     especies,
     emulator.romBytesRef,
     vigilanteRef,
+    disposicionDelCentroRef,
   );
 
   // El panel no sigue el orden de la memoria: el juego sube al que sale a pelear
