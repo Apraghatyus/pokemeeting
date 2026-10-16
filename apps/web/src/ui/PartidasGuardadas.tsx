@@ -27,7 +27,6 @@ import {
 import { apuntarDescartada } from '../core/historial';
 import { olvidarReglas } from '../core/reglasNuzlocke';
 import { olvidarEncuentros } from '../core/reglasEnVivo';
-import { AVISO_ESPACIO, cabeOtra, enPalabras, useEspacio } from '../core/espacio';
 import { yaTermino } from '../core/useFinDePartida';
 import { codificarSemilla } from '../core/semilla';
 
@@ -162,7 +161,6 @@ export const PartidasGuardadas = ({
   const [borrando, setBorrando] = useState<string | null>(null);
   // Se relee al abrir y cada vez que cambia la lista: crear o borrar una
   // partida mueve dieciseis megas.
-  const espacio = useEspacio(`${visible}:${partidas.length}`);
 
   useEffect(() => {
     if (visible) return;
@@ -371,23 +369,6 @@ export const PartidasGuardadas = ({
           + Crear partida
         </button>
       ))}
-
-      {/* Lo que ocupa, para que nadie descubra que se acabo el sitio cuando
-          falla un guardado. Sin datos del navegador no se dice nada. */}
-      {espacio && espacio.cuota > 0 && (
-        <p
-          className={
-            espacio.usado / espacio.cuota >= AVISO_ESPACIO || !cabeOtra(espacio) ? 'warn' : 'hint'
-          }
-        >
-          Ocupa {enPalabras(espacio.usado)} de {enPalabras(espacio.cuota)} que deja el navegador.
-          {!cabeOtra(espacio) && ' No cabe otra partida: borra alguna antes de crear otra.'}
-          {cabeOtra(espacio) &&
-            espacio.usado / espacio.cuota >= AVISO_ESPACIO &&
-            ' Queda poco sitio: si se llena, lo que falla es el siguiente guardado.'}
-        </p>
-      )}
-
       {pie}
     </div>
   );

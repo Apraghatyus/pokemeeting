@@ -225,11 +225,6 @@ export const AjustesModal = ({
           {/* Un mando por Bluetooth o USB funciona solo, sin configurar nada.
               Se dice cual se ha reconocido y como van los botones, porque
               cada fabricante pone otras letras. */}
-          <p className="hint">
-            {mandoFisico.conectado
-              ? `Mando conectado: ${mandoFisico.conectado.replace(/\s*\(.*$/, '')}. El botón de la derecha es A y el de abajo B, como en la consola.`
-              : 'Puedes conectar un mando por Bluetooth o USB: pulsa cualquier botón para que el navegador lo reconozca.'}
-          </p>
 
           {/* Sus botones, reasignables igual que las teclas: se pulsa la fila
               y luego el boton del mando. Solo con un mando conectado, que sin

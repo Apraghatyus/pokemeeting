@@ -743,8 +743,7 @@ export const RandomizerModal = ({
                   </div>
 
                   <p className="hint">
-                    Hace falta la misma ROM original con la que se creo. La semilla sola no sirve
-                    de nada: no lleva el juego dentro.
+                    Hace falta la misma ROM original con la que se creo.
                   </p>
 
                   {/* Lo mismo pero con el fichero entero, que ademas trae el
