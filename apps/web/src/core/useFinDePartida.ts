@@ -202,7 +202,15 @@ const MINIMO_PARA_DEDUCIRLO = 2;
  * "tu equipo ha caido al completo" mientras el panel ensena un Pokemon con
  * todos sus PS es lo que confunde a quien lo ve.
  */
-const equipoCaido = (
+/**
+ * Exportada SOLO para probarla: `test:fin` la ejecuta tal cual.
+ *
+ * Antes la prueba se traia una copia de esta condicion escrita a mano, asi que
+ * fijaba lo que se esperaba pero no miraba lo que hace el programa. Paso lo que
+ * tenia que pasar: salio una pantalla de fin de partida con dos Pokemon en pie
+ * y las comprobaciones en verde.
+ */
+export const equipoCaido = (
   equipo: EquipoResumen | null,
   caidosDelCompanero: ReadonlySet<string>,
   /**
@@ -210,8 +218,8 @@ const equipoCaido = (
    *
    * En Nivelada, quien se pasa del tope del proximo lider NO se puede usar. No
    * esta muerto -y por eso no se cuenta como caido en el historial- pero para
-   * seguir jugando es como si no estuviera: si es el unico que queda, no hay
-   * con que pelear y la partida se acabo.
+   * seguir jugando es como si no estuviera: si es el unico que QUEDA EN PIE
+   * despues de que caiga el resto, no hay con que pelear y la partida se acabo.
    *
    * Lo reporto quien jugaba: dos debilitados y uno pasado de nivel, y no salia
    * nada. Tenia razon, porque mirando el equipo parecia que le quedaba uno.
@@ -225,10 +233,17 @@ const equipoCaido = (
 
   let porElEnlace = false;
   let porElTope = false;
+  // Si ha caido alguno DE VERDAD: debilitado, o con su pareja caida. Pasarse
+  // del tope no cuenta aqui, y en eso esta media regla (ver abajo).
+  let algunoCaido = false;
   const caido = pelean.every((ranura) => {
-    if (ranura.estado === 'debilitado') return true;
+    if (ranura.estado === 'debilitado') {
+      algunoCaido = true;
+      return true;
+    }
     if (parejaCaida(ranura.mote, caidosDelCompanero)) {
       porElEnlace = true;
+      algunoCaido = true;
       return true;
     }
     // Pasado del tope: no vale para seguir. Va el ultimo a proposito, para que
@@ -240,10 +255,28 @@ const equipoCaido = (
     return false;
   });
 
-  // Se apuntan para poder CONTARLO bien: no es lo mismo quedarse sin nadie
-  // porque se murieron todos que porque el ultimo no se puede usar. El cartel
-  // lo dice distinto, y con razon: en el segundo caso sigue en pie.
-  return { caido, porElEnlace: caido && porElEnlace, porElTope: caido && porElTope };
+  // EL TOPE REMATA, PERO NO MATA. (Cuarta vez que esta regla se equivoca.)
+  //
+  // Lo reportado: dos Pokemon en pie, los dos pasados del tope del primer
+  // lider, y salto la pantalla de fin de partida. No era un final, y no se
+  // habia caido nadie. Pasarse del tope no te quita a nadie: siguen siendo
+  // tuyos, al ganar una medalla el tope sube y vuelven a servir, y entre tanto
+  // quedan rutas por jugar con las que criar a alguien por debajo. Eso no es
+  // una partida acabada, es una partida mal llevada.
+  //
+  // Lo que acaba una partida es QUE TE TUMBEN. El tope solo decide si el que
+  // sigue en pie sirve para seguir, que es el caso del primer reporte: dos
+  // debilitados y el ultimo pasado de nivel.
+  const seAcabo = caido && algunoCaido;
+
+  // Se apunta por que, para poder CONTARLO bien: no es lo mismo quedarse sin
+  // nadie porque se murieron todos que porque el ultimo no se puede usar. El
+  // cartel lo dice distinto, y con razon: en el segundo caso sigue en pie.
+  return {
+    caido: seAcabo,
+    porElEnlace: seAcabo && porElEnlace,
+    porElTope: seAcabo && porElTope,
+  };
 };
 
 /**

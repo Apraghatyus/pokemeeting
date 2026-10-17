@@ -143,9 +143,9 @@ export const FinModal = ({
               </>
             ) : porElTope ? (
               <>
-                No te queda ningún Pokémon con el que seguir:{' '}
-                <strong>el que sobrevive se pasó del tope del próximo líder</strong>, así que en
-                una Nivelada no lo puedes usar. Sigue en pie, pero el reto se acaba aquí.
+                Tu equipo ha caído y no te queda nadie con quien seguir:{' '}
+                <strong>quien sigue en pie se pasó del tope del próximo líder</strong>, así que
+                en una Nivelada no lo puedes usar. El reto se acaba aquí.
               </>
             ) : (
               <>

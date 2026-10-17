@@ -23,8 +23,14 @@
 // Uso: npx tsx tools/tests/test-fin-partida.mjs
 import { pathToFileURL } from 'node:url';
 
-// El hook usa React y localStorage; aquí se prueba la regla en si, que es lo
-// que puede equivocarse. Se replica la condicion tal cual la escribe el modulo.
+// El hook usa React y localStorage, pero la regla en si -`equipoCaido`- es una
+// funcion pura y se llama DE VERDAD desde aqui. Antes esta prueba se traia una
+// copia de la condicion escrita a mano: fijaba lo que se esperaba, pero no
+// miraba lo que hace el programa, y asi salto una pantalla de fin de partida
+// con dos Pokemon en pie mientras esto seguia todo en verde.
+//
+// Lo que queda replicado abajo es solo lo que vive DENTRO del hook -los dos
+// caminos, y el minimo de dos Pokemon-, que no se puede llamar sin React.
 const fuente = await import(
   pathToFileURL(`${process.cwd()}/apps/web/src/core/useFinDePartida.ts`).href
 ).catch(() => null);
@@ -36,10 +42,9 @@ const check = (nombre, ok, detalle = '') => {
 };
 
 check('el modulo de la regla se puede cargar', fuente !== null);
+check('y trae la condicion del equipo caido', typeof fuente?.equipoCaido === 'function');
 
-// --- la condicion, replicada desde el modulo ---
-// Se copia a proposito en vez de exportarla: lo que se quiere fijar aqui es el
-// COMPORTAMIENTO esperado, para que si alguien cambia la del modulo salte.
+// --- la condicion, la del modulo mas lo que vive dentro del hook ---
 const seAcabo = (
   equipo,
   {
@@ -53,27 +58,17 @@ const seAcabo = (
   // Camino bueno: el juego lo ha dicho. No hace falta nada mas.
   if (loDiceElJuego) return true;
 
+  // Y aqui la condicion de verdad, la del modulo: si queda alguien con quien
+  // seguir. Debilitado, con la pareja caida o -solo para rematar- pasado del
+  // tope de nivel.
   const sinPareja = new Set(caidosSuyos.map((m) => m.trim().toUpperCase()));
-  const pelean = (equipo?.ranuras ?? []).filter((r) => !r.huevo);
-  if (pelean.length === 0) return false;
-
-  let porElEnlace = false;
-  const todos = pelean.every((r) => {
-    if (r.estado === 'debilitado') return true;
-    if (r.mote && sinPareja.has(r.mote.trim().toUpperCase())) {
-      porElEnlace = true;
-      return true;
-    }
-    // Pasado del tope: en Nivelada no se puede usar, asi que para seguir
-    // jugando es como si no estuviera.
-    if (tope !== null && r.nivel > tope) return true;
-    return false;
-  });
-  if (!todos) return false;
+  const sinNadie = fuente.equipoCaido(equipo, sinPareja, tope);
+  if (!sinNadie.caido) return false;
 
   // Camino de respaldo: dos Pokemon distintos vistos alguna vez. Por defecto,
   // los que hay ahora mismo. Dos es la forma de decir "esto no es el combate
   // del laboratorio" sin tener que reconocerlo.
+  const pelean = (equipo?.ranuras ?? []).filter((r) => !r.huevo);
   const conocidos = vistos ?? new Set(pelean.map((r) => r.personalidad));
   if (conocidos.size >= 2) return true;
 
@@ -81,7 +76,7 @@ const seAcabo = (
   // persona se lo dijo SU juego. Que su Pokemon este a cero no basta: en el
   // laboratorio se queda a cero por guion, y eso le acababa la partida al de
   // enfrente en el minuto dos.
-  return porElEnlace && elOtroPerdio;
+  return sinNadie.porElEnlace && elOtroPerdio;
 };
 
 const pk = (personalidad, estado = null, huevo = false) => ({
@@ -265,6 +260,30 @@ check('estar justo en el tope no te deja fuera',
 // la partida que parecia acabada no lo estaba.
 check('y si el tope sube, se vuelve a poder jugar',
   seAcabo(comoLoReportaron, { tope: 29 }) === false);
+
+// --- Y EL TOPE, SOLO, NO ACABA NADA ---
+//
+// Lo reportado la segunda vez: dos Pokemon EN PIE, los dos de nivel 15 con el
+// tope en 14, y salto la pantalla de fin de partida. No se habia caido nadie.
+// Pasarse del tope no te quita a nadie: siguen siendo tuyos, el tope sube con
+// la proxima medalla y quedan rutas con las que criar a alguien por debajo.
+const sanosYPasados = equipo(conNivel(1, 15), conNivel(2, 15));
+check('dos en pie pasados del tope NO es un final',
+  seAcabo(sanosYPasados, { tope: 14 }) === false);
+check('ni uno solo en pie y pasado',
+  seAcabo(equipo(conNivel(1, 15)), { tope: 14 }) === false);
+check('ni con el equipo entero pasado',
+  seAcabo(equipo(conNivel(1, 30), conNivel(2, 31), conNivel(3, 40)), { tope: 24 }) === false);
+
+// Pero en cuanto cae uno de verdad y el que queda no se puede usar, si: eso es
+// justo el primer reporte, y tiene que seguir funcionando.
+check('uno caido y el otro pasado del tope: se acabo',
+  seAcabo(equipo(conNivel(1, 15, 'debilitado'), conNivel(2, 15)), { tope: 14 }) === true);
+
+// Y lo de siempre sigue valiendo: con todos debilitados se acabo, haya tope o
+// no, porque ahi el tope no pinta nada.
+check('con todos debilitados se acabo igual, con tope puesto',
+  seAcabo(equipo(conNivel(1, 15, 'debilitado'), conNivel(2, 15, 'debilitado')), { tope: 14 }) === true);
 
 console.log(fallos === 0 ? '\nLA REGLA NO SE INVENTA FINALES' : `\n${fallos} COMPROBACIONES FALLIDAS`);
 process.exit(fallos === 0 ? 0 : 1);
