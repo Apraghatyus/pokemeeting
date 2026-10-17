@@ -385,6 +385,28 @@ const lanzar = juzgarPokeball(
 );
 check('lanzar una Poke Ball en una zona gastada se deshace', lanzar?.motivo.includes('Poké Balls') === true, lanzar?.motivo);
 check('volviendo a antes del combate', lanzar?.antesDe === 501);
+// LA ULTIMA BALL. Al gastarla el bolsillo se queda sin nada y desaparece: no
+// hay bolsillo de Poke Balls sin Poke Balls. Eso se veia como "no se sabe" y la
+// ultima se escapaba de la regla, que es justo la que mas se nota porque es la
+// que se lanza a la desesperada.
+const laUltima = juzgarPokeball(
+  enCombate(equipoBase, otroSalvaje, 'aa'),
+  enCombate(equipoBase, otroSalvaje, null),
+  tras.memoria,
+  contexto,
+  () => 'Ruta 3',
+);
+check('gastar la ULTIMA ball tambien se deshace', laUltima?.motivo.includes('Ruta 3') === true, laUltima?.motivo);
+check(
+  'pero si no se sabia que balls habia, no se deshace nada',
+  juzgarPokeball(
+    enCombate(equipoBase, otroSalvaje, null),
+    enCombate(equipoBase, otroSalvaje, 'aa'),
+    tras.memoria,
+    contexto,
+    () => 'Ruta 3',
+  ) === null,
+);
 check(
   'al primero de la zona si se le puede lanzar',
   juzgarPokeball(
@@ -489,6 +511,21 @@ escribirCopia(copia + 0x58, 19, 4, 4321, YO);
 const rival = rivalEnCombate(estado, equipo(pk(1, 'BULBA', { especie: 1, nivel: 12 })));
 check('se lee el rival junto a tu copia', rival?.especie === 19 && rival?.nivel === 4, JSON.stringify(rival));
 check('con su entrenador', rival?.entrenador === YO && rival?.personalidad === 4321);
+
+// EN LA MEMORIA HAY MAS DE UNA COPIA QUE CUADRA, y la buena no es la primera.
+// Medido en un estado de combate de verdad: la primera llevaba detras ochenta
+// y ocho bytes a cero y la del rival estaba treinta y cuatro mil bytes mas
+// adelante. Rendirse en la primera dejaba el rival en null, y sin rival la
+// regla de no lanzar Poke Balls no saltaba nunca.
+const senuelo = 0x12000;
+escribirCopia(senuelo, 1, 12, 1, YO);
+estado.fill(0, ewram + senuelo + 0x58, ewram + senuelo + 0xb0);
+const conSenuelo = rivalEnCombate(estado, equipo(pk(1, 'BULBA', { especie: 1, nivel: 12 })));
+check(
+  'una copia tuya con basura detras no esconde al rival: se sigue buscando',
+  conSenuelo?.especie === 19 && conSenuelo?.personalidad === 4321,
+  JSON.stringify(conSenuelo),
+);
 estado.fill(0, ewram + copia + 0x58, ewram + copia + 0xb0);
 check('sin rival que cuadre, null', rivalEnCombate(estado, equipo(pk(1, 'BULBA', { especie: 1 }))) === null);
 

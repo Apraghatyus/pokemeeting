@@ -204,7 +204,13 @@ export type Rival = {
  *
  * Lo que sale de ahi se comprueba antes de creerselo: una especie que existe,
  * un nivel de 1 a 100 y una vida que no pase de su maximo. Si algo no cuadra,
- * null.
+ * SE SIGUE BUSCANDO, que es lo que costo averiguar: en la memoria hay MAS DE
+ * UNA copia que cuadra con el mismo Pokemon tuyo, y la buena no tiene por que
+ * ser la primera. En un estado de combate de verdad, la primera llevaba detras
+ * ochenta y ocho bytes a cero y la segunda, treinta y cuatro mil bytes mas
+ * adelante, al rival. Rendirse en la primera dejaba el rival en null, y con el
+ * la regla de no lanzar Poke Balls donde ya tuviste tu encuentro: esa mira al
+ * rival, y sin rival no saltaba nunca.
  *
  * Igual que `quienPelea`: al acabar el combate la copia se queda ahi con lo
  * ultimo que hubo. Quien lo use tiene que mirar si el rival es NUEVO (otra
@@ -235,14 +241,16 @@ export const rivalEnCombate = (
 
       // La siguiente copia es la del rival.
       const rival = inicio + TAMANO_COMBATIENTE;
-      if (rival + TAMANO_COMBATIENTE > memoria.length) return null;
+      if (rival + TAMANO_COMBATIENTE > memoria.length) continue;
       const especie = vista.getUint16(rival + ESPECIE, true);
       const nivel = memoria[rival + NIVEL]!;
       const ps = vista.getUint16(rival + PS, true);
       const psMaximos = vista.getUint16(rival + PS_MAXIMOS, true);
-      if (especie < 1 || especie > ESPECIE_MAXIMA) return null;
-      if (nivel < 1 || nivel > 100) return null;
-      if (psMaximos === 0 || ps > psMaximos) return null;
+      // Si lo que hay detras no es un Pokemon, esta no era la copia buena:
+      // se sigue mirando. Ver la nota de arriba.
+      if (especie < 1 || especie > ESPECIE_MAXIMA) continue;
+      if (nivel < 1 || nivel > 100) continue;
+      if (psMaximos === 0 || ps > psMaximos) continue;
       return {
         especie,
         nivel,

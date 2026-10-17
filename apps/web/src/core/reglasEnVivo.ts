@@ -418,8 +418,14 @@ const zonaCerradaPara = (
  * Lanzar una Poke Ball en una zona que ya tuvo su encuentro.
  *
  * Se ve en que el bolsillo de Poke Balls cambia en mitad de un combate salvaje.
- * Se vuelve a antes de ese combate, igual que con una captura, pero sin
- * esperar a ver si entra: lanzarla ya es intentarlo.
+ * Se vuelve al principio de ese combate SIN ESPERAR A VER SI ENTRA: lanzarla ya
+ * es intentarlo, y en una zona gastada el intento no se puede hacer. Vale para
+ * cualquier tipo de ball, porque lo que se mira es el bolsillo entero.
+ *
+ * GASTAR LA ULTIMA tambien cuenta. Al quedarse a cero el bolsillo desaparece
+ * -no hay bolsillo de Poke Balls sin Poke Balls- y eso se veia como "no se
+ * sabe" en vez de como una ball lanzada, asi que la ultima se escapaba de la
+ * regla: justo la que mas se nota, porque es la que se lanza a la desesperada.
  *
  * Solo con la bandera de combate (`equipo.enCombate`): fuera de un combate el
  * bolsillo cambia por comprar o por recoger del suelo, y eso no es lanzar.
@@ -435,7 +441,8 @@ export const juzgarPokeball = (
   if (!antes || !rival || !ahora.mapa || contexto.propio === null) return null;
   if (rival.entrenador !== contexto.propio || ahora.equipo?.enCombate !== true) return null;
   if (antes.equipo?.enCombate !== true || antes.rival?.personalidad !== rival.personalidad) return null;
-  if (!antes.balls || !ahora.balls || antes.balls === ahora.balls) return null;
+  // Antes habia balls y ahora el bolsillo es otro (o ya no hay): se ha lanzado.
+  if (!antes.balls || antes.balls === ahora.balls) return null;
 
   const zona = zonaCanonica(ahora.mapa.zona);
   if (!zonaCerradaPara(zona, rival, memoria, contexto)) return null;
