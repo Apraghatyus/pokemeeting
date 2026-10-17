@@ -1765,6 +1765,66 @@ que hace falta, y no puede cambiarla por su cuenta.
 
 ---
 
+## Los avisos, con cara de Pokémon
+
+**Pedido:** que los avisos se parezcan al juego y no a una alerta del
+navegador. Hoy son una tarjeta oscura con un círculo rojo y un botón
+"Entendido" -lenguaje de aplicación-, encima de una pantalla que es puro píxel.
+Lo que se dice está bien; lo que desentona es cómo se dice.
+
+**Dónde está:** `.aviso-regla` y `.avisos` en `styles.css`, y el bloque que los
+pinta en `App.tsx`. Son tres y conviene no mezclarlos, porque no dicen lo mismo:
+
+1. **Una regla que se acaba de hacer cumplir** (`--error`). Acabas de aparecer
+   donde estabas hace un momento y tienes que saber por qué.
+2. **Información** (`--info`): el primer encuentro de una zona, un Revivir que
+   devuelve a alguien, "sin Poké Balls esto no cuenta".
+3. **El deber del Centro** (`--deber`): lo que falta por hacer para poder
+   seguir. Este no se puede quitar y se queda hasta que se cumple.
+
+**La idea:** la caja de texto del juego. Marco doble claro sobre fondo azul o
+crema, la tipografía de píxel que ya usa el programa, el texto saliendo a la
+velocidad a la que escribe el juego si se quiere ir fino, y el triángulo ▼ en
+vez de un botón "Entendido" -se cierra con A o pulsando, como un diálogo-. La
+marca de la izquierda, en vez de un círculo con "!", puede ser una Poké Ball
+(regla rota), un Poké Ball abierto o un icono de ruta (información) y el PC
+(el deber).
+
+**Lo que no se puede perder por el camino**, que es lo que costó dejar bien:
+
+- Se lee **a pantalla completa**: va dentro del marco del juego a propósito.
+- Los tres caben a la vez en una columna que crece hacia arriba, y en un móvil
+  de 390 píxeles cada uno ocupa varias líneas. No pueden volver a pisarse.
+- `role="alert"` en los que interrumpen y `role="status"` en los que informan:
+  quien use lector de pantalla se entera igual.
+- El deber **no lleva botón de cerrar**. Si se le pone el ▼ del juego, que sea
+  solo en los otros dos.
+- Los de regla rota duran 9 segundos y los de información 6. Con la caja del
+  juego, igual pide pulsar para cerrar en vez de irse solos; entonces hay que
+  mirar que no se amontonen al encadenar varios.
+
+`test:deber` fija hoy que los dos carteles se vean a la vez y no se pisen, en
+ordenador y en móvil. Ese es el contrato: puede cambiar el color y la forma,
+pero esas comprobaciones tienen que seguir en verde.
+
+---
+
+## Pendientes sueltos de las reglas
+
+- **Marcar una ruta a mano como gastada, desde el mapa.** El programa no lo ve
+  todo -una ruta jugada antes de que la regla funcionara, un encuentro perdido
+  mientras la página estaba cerrada- y hoy no hay forma de decírselo. Un botón
+  en la zona enfocada del mapa lo arregla. Que se pueda desmarcar **solo si la
+  marcaste tú**: una zona gastada por un encuentro de verdad no se libera.
+- **Un Pokémon regalado puede deshacerse como si fuera una segunda captura.**
+  El Eevee de Azulona, el Magikarp del vendedor, los fósiles: llegan con el
+  sitio donde te los dan, así que si esa zona ya tuvo su encuentro,
+  `juzgarCaptura` los toma por una captura prohibida y deshace. Se arregla
+  exigiendo que la captura ocurra dentro de un combate salvaje (`enCombate` y
+  el rival), que es lo que separa capturar de recibir.
+
+---
+
 ## Biblioteca de ROMs
 
 Hoy hay que volver a elegir el fichero en cada sesión. Guardarlo en IndexedDB
