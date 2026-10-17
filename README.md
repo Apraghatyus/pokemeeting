@@ -179,3 +179,5 @@ vosotros, el programa no las impone.
 - [docs/capacidad.md](docs/capacidad.md) — qué consume y qué hace falta para
   1000 jugadores
 - [docs/ideas-pendientes.md](docs/ideas-pendientes.md) — lo que falta
+- [docs/completado.md](docs/completado.md) — lo que ya está hecho, con la
+  prueba que lo vigila, y la historia de lo que se arregló
