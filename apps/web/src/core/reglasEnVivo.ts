@@ -9,9 +9,11 @@
 // 3. EN NIVELADA NO SE PELEA CONTRA EL LIDER con alguien por encima de su tope.
 // 4. SOLO EL PRIMER ENCUENTRO DE CADA RUTA. El primer Pokemon salvaje que sale
 //    en una zona es la unica oportunidad de esa zona: si no se captura, se
-//    pierde. Con una excepcion: si ese primero es de una familia que ya llevas
-//    en el equipo (el mismo o una de sus evoluciones), no cuenta y el siguiente
-//    si.
+//    pierde. Con dos excepciones: si ese primero es de una familia que ya
+//    llevas en el equipo (el mismo o una de sus evoluciones), no cuenta y el
+//    siguiente si; y SIN POKE BALLS tampoco cuenta ninguno, porque al empezar
+//    la partida no te dan ninguna y el camino hasta conseguirlas esta lleno de
+//    combates que no se pueden intentar.
 //
 // COMO SE IMPIDE, sin tocar el juego. El equipo se mira cada pocos segundos
 // guardando un estado, y se conservan los ultimos estados BUENOS. Si una
@@ -358,6 +360,26 @@ export const apuntarEncuentro = (
     return {
       memoria: siguiente,
       aviso: `Esta zona ya tuvo su encuentro: no le lances Poké Balls a ${nombreDe(rival.especie)}.`,
+    };
+  }
+
+  // SIN POKE BALLS NO HAY OPORTUNIDAD, asi que la zona no se gasta.
+  //
+  // Al empezar la partida no te dan ninguna: desde que sales de casa hasta que
+  // Oak manda las suyas hay combates que no se pueden intentar, y gastar la
+  // ruta con uno de esos seria quitarle al jugador su unica captura sin que
+  // pudiera hacer nada. El que cuenta es el primero al que SI puedes tirarle
+  // algo.
+  //
+  // `balls` es null cuando no hay ninguna en la mochila -y tambien, por como se
+  // busca el bolsillo, cuando no se encuentra-. Las dos cosas van al mismo
+  // sitio a proposito: si no se sabe, no se gasta la ruta. Equivocarse hacia
+  // este lado deja capturar de mas; hacia el otro, le quita la ruta a alguien
+  // que no habia hecho nada.
+  if (!ahora.balls) {
+    return {
+      memoria: siguiente,
+      aviso: `Sin Poké Balls, ${nombreDe(rival.especie)} no cuenta como el encuentro de la zona: contará el primero que puedas intentar capturar.`,
     };
   }
 

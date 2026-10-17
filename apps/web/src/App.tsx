@@ -606,8 +606,15 @@ export const App = () => {
     }
 
     // --- solo el primer encuentro de cada zona ---
-    // Empieza a contar con la primera captura: antes no hay Poke Balls.
-    if (!reglas.primeraCaptura || !partida || infracciones.memoria.vistos.length < 2) return null;
+    //
+    // Antes esto esperaba a tener DOS Pokemon vistos, para no contar lo del
+    // laboratorio y porque hasta ahi no hay Poke Balls. Las dos cosas estaban
+    // mal resueltas: en una Nuzlocke el segundo Pokemon ES la primera captura,
+    // asi que la regla no empezaba a mirar hasta despues de lo unico que tenia
+    // que vigilar en la primera ruta. Lo del laboratorio ya queda fuera por si
+    // solo -es un combate contra un entrenador, no contra un salvaje- y lo de
+    // las Poke Balls se mira donde se puede mirar: en la mochila.
+    if (!reglas.primeraCaptura || !partida) return null;
     const contexto = {
       propio,
       rutas: infracciones.memoria.rutas,

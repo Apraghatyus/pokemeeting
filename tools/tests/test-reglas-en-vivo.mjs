@@ -65,7 +65,15 @@ const pk = (personalidad, mote, o = {}) => {
   };
 };
 const equipo = (...ranuras) => ({ juego: 'BPRS', ranuras, momento: 0 });
-const lectura = (mapa, ranuras, rival = null) => ({ mapa, equipo: equipo(...ranuras), rival });
+// `balls` son los bytes del bolsillo: null es "no hay ninguna" (o no se sabe
+// cual es el bolsillo, que para la regla es lo mismo). Por defecto se juega con
+// balls encima, que es lo normal; el caso de ir sin ellas tiene sus pruebas.
+const lectura = (mapa, ranuras, rival = null, balls = 'aa') => ({
+  mapa,
+  equipo: equipo(...ranuras),
+  rival,
+  balls,
+});
 
 const centroReglas = {
   muertoEsMuerto: true,
@@ -302,6 +310,45 @@ check('un repetido de familia no gasta la zona', repetido.memoria.zonas[String(0
 check('y se dice', repetido.aviso?.includes('no cuenta') === true, repetido.aviso);
 const siguiente = apuntarEncuentro(repetido.memoria, lectura(ruta, conPidgeotto, salvaje(19, 801)), contexto, nombreDe);
 check('el siguiente si es el de la zona', siguiente.memoria.zonas[String(0x67)]?.personalidad === 801);
+
+// SIN POKE BALLS NO SE GASTA LA RUTA.
+//
+// Lo reportado: al empezar no te dan ninguna, y de camino a por ellas salieron
+// dos combates que no se podian intentar. El tercero, ya con balls, fue un
+// EXEGGUTOR que se le resistio -gasto todas y no lo capturo- y la ruta no se
+// marco como gastada en el mapa.
+const sinBalls = apuntarEncuentro(
+  ENCUENTROS_VACIOS,
+  lectura(ruta, equipoBase, salvaje(19, 400), null),
+  contexto,
+  nombreDe,
+);
+check('sin Poke Balls, el salvaje no gasta la zona', sinBalls.memoria.zonas[String(0x67)] === undefined);
+check('y se dice por que', sinBalls.aviso?.includes('Sin Poké Balls') === true, sinBalls.aviso);
+// Pero se apunta que ese combate ya se vio, para no repetir el aviso.
+check('aunque el combate queda visto', sinBalls.memoria.ultimoRival === 400);
+
+// Y en cuanto hay balls, el siguiente SI es el encuentro de la ruta.
+const yaConBalls = apuntarEncuentro(
+  sinBalls.memoria,
+  lectura(ruta, equipoBase, salvaje(103, 401)),
+  contexto,
+  nombreDe,
+);
+check('con balls, el siguiente si es el encuentro de la zona',
+  yaConBalls.memoria.zonas[String(0x67)]?.personalidad === 401);
+
+// Y una vez apuntado, que se escape no devuelve la ruta: el siguiente ya no
+// se puede intentar.
+const trasEscaparse = juzgarPokeball(
+  { ...lectura(ruta, equipoBase, salvaje(19, 402), 'aa'), equipo: { ...equipo(...equipoBase), enCombate: true } },
+  { ...lectura(ruta, equipoBase, salvaje(19, 402), 'ab'), equipo: { ...equipo(...equipoBase), enCombate: true } },
+  yaConBalls.memoria,
+  contexto,
+  () => 'Ruta 1',
+);
+check('y si se escapa, al siguiente ya no se le tira nada',
+  trasEscaparse?.motivo.includes('Ruta 1') === true, trasEscaparse?.motivo);
 
 // Un combate contra un entrenador no es un encuentro.
 const entrenador = apuntarEncuentro(
