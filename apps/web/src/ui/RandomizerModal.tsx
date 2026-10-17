@@ -803,10 +803,6 @@ export const RandomizerModal = ({
               </div>
             </div>
           )}
-
-          {yaAleatorizada && partidas.length === 0 && (
-            <p className="hint">Ya estas jugando una copia aleatorizada.</p>
-          )}
         </div>
       )}
     </Modal>
