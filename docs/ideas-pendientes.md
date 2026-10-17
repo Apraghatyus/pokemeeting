@@ -33,8 +33,10 @@ ejecútala en vez de fiarte de esta lista.
   y no por qué aparato es, con tres modos (auto, siempre, nunca). `test:mando`
 - **Teclas reasignables**, guardadas por posición física del teclado y no por la
   letra. Z es A y X es B, como en cualquier emulador. `test:controles`
-- **Avance rápido** conmutable: espacio en escritorio, botón propio en el mando.
-  `test:controles`
+- **Avance rápido** conmutable: espacio en escritorio, botón propio en el mando
+  táctil y el gatillo LT en uno físico. `test:controles`, `test:mando:fisico`
+- **El mando físico hace también lo que la consola no tenía**: LT adelanta y RT
+  abre el mapa, reasignables como el resto. `test:mando:fisico`
 - **Pantalla completa** que incluye partida, mando y equipo. `test:movil:mando`
 - **Mandos físicos** por la Gamepad API, por posición y no por letra: el botón
   de la derecha es A y el de abajo B, como en la consola. Se reasignan desde
@@ -1825,6 +1827,99 @@ pero esas comprobaciones tienen que seguir en verde.
 
 ---
 
+## Los otros juegos: qué funciona hoy y qué falta para cada uno
+
+Esto no es una lista de deseos: es el reparto real del trabajo que queda, con
+lo que ya está hecho por debajo de cada juego. El orden de abajo es el del
+esfuerzo, de menos a más.
+
+**Lo que es común y ya sirve para los cinco de GBA:** leer el equipo, especies,
+tipos, movimientos, motes, intercambios, la tabla de evoluciones, la Pokédex
+nacional, la tabla de objetos y de tiendas, la tabla de mapas (comprobada
+contra las cinco ROMs en `test:mapas`) y el bolsillo de Poké Balls, que tiene
+sus distancias para `BPR`, `BPG`, `BPE`, `AXV` y `AXP`.
+
+**Lo que está atado a un juego concreto**, y es lo que hay que repetir:
+
+| Qué | Dónde | Hoy solo |
+|---|---|---|
+| La bandera de "hay combate" | `combate.ts`, `MARCAS_DE_COMBATE` | `BPRS` (Rojo Fuego español) |
+| Las medallas | `medallas.ts` | `BPR` |
+| Los líderes y el tope de nivel | `lideres.ts` | Kanto |
+| El esquema del mapa | `zonas.ts` | Kanto y Hoenn, los dos hechos |
+
+### Rojo Fuego y Verde Hoja — al 90%
+
+Es el juego de referencia y lo que de verdad está probado. Funciona el
+aleatorizador entero, las reglas de las tres dificultades, el mapa, los
+intercambios, el Soul Link y el ranking.
+
+Lo que le falta para el 100%:
+
+- **Verde Hoja no tiene confirmadas las medallas.** Usa el mismo formato casi
+  con total seguridad, pero "casi" no basta: con una partida suya y su tarjeta
+  de entrenador se confirma en un minuto (ver `medallas.ts`).
+- **La bandera de combate solo se conoce del español.** En Verde Hoja -y en
+  Rojo Fuego en inglés- el rival se reconoce igual por su personalidad, pero
+  con menos certeza, y la regla de la Poké Ball necesita la bandera.
+- **Bugs visuales sueltos.** Están vistos jugando y hay que irlos apuntando
+  aquí según salgan: sin el caso concreto no se puede arreglar ninguno.
+
+### Rubí, Zafiro y Esmeralda — el salto más corto
+
+Son los más parecidos a Rojo Fuego y buena parte ya está: se aleatorizan hoy,
+se les lee el equipo, se les encuentra la tabla de mapas y el bolsillo de
+balls, y el esquema de Hoenn está dibujado en `zonas.ts`.
+
+Lo que falta es exactamente lo de la tabla de arriba:
+
+1. **La bandera de combate de cada uno.** Son punteros a código, así que cambian
+   por juego Y por idioma. El método está escrito en `combate.ts` y se tarda lo
+   que se tarde en comparar dos estados, uno en combate y otro fuera.
+2. **Las medallas.** Mismo trabajo que costó una tarde en Rojo Fuego: buscar en
+   dos estados de la misma partida el puntero que lleva al bloque.
+3. **Los ocho líderes de Hoenn y sus topes**, que hoy solo están los de Kanto.
+   En Esmeralda el orden de gimnasios cambia respecto a Rubí y Zafiro.
+
+Con eso quedan al nivel de Rojo Fuego sin tocar nada más.
+
+### Game Boy y Game Boy Color: Rojo, Azul, Amarillo, Oro, Plata y Cristal
+
+**Se juegan ya**: el mismo núcleo mGBA emula GB, GBC y GBA, y está comprobado
+con una ROM de Game Boy Color escrita a mano (`test:gbc`).
+
+**Segunda generación ya se aleatoriza**: Oro, Plata y Cristal están en la lista
+por su código de cuatro letras (`AAU`, `AAX`, `BYT`, `BXT`), español incluido.
+
+**Primera generación no, y el motivo es pequeño:** aquellos cartuchos no traen
+código de cuatro letras, así que no se les puede reconocer como a los demás. El
+aleatorizador SÍ los sabe hacer -su fichero de posiciones trae Rojo, Azul y
+Amarillo, también en español-, pero identifica la ROM por el título interno
+("POKEMON RED") más la versión. Nosotros ya leemos ese título de la cabecera
+(`romHeader.ts`), así que el trabajo es reconocerlos por título cuando no hay
+código, y filtrar las opciones que en primera generación no existen (no hay
+habilidades, ni naturalezas, ni objetos equipados, y los tipos son otros).
+
+**Lo que no habría ni así: leer la memoria.** Ni de primera ni de segunda
+generación se sabe leer el equipo, así que no hay panel, ni reglas, ni
+intercambios, ni Soul Link: solo jugar y aleatorizar. Las estructuras de
+segunda generación están descritas en "Segunda generación por dentro", más
+arriba; las de primera son otras y más simples, pero hay que escribirlas.
+
+### Nintendo DS: Diamante, Perla, Platino, HeartGold, SoulSilver y Blanco/Negro
+
+**Aquí lo que falta no es el aleatorizador.** El jar ya trae las posiciones de
+cuarta y quinta generación, con Diamante, Perla, Platino, HeartGold, SoulSilver
+y los Blanco/Negro, en varios idiomas. Lo que no hay es con qué jugarlos.
+
+Todo lo del núcleo -la prueba que ya se hizo, la licencia, las dos pantallas y
+los intercambios- está más abajo, en **Nintendo DS**, y no se repite aquí para
+no acabar con dos versiones distintas de lo mismo. Resumido: el núcleo arrancó
+en el navegador en una prueba aparte, y lo que decide si se mete o no es la
+licencia, no la técnica.
+
+---
+
 ## Biblioteca de ROMs
 
 Hoy hay que volver a elegir el fichero en cada sesión. Guardarlo en IndexedDB
@@ -1870,6 +1965,9 @@ compañero no llega nunca.
 ---
 
 ## Nintendo DS
+
+Que juegos serian y por que el aleatorizador no es el problema: ver **Los otros
+juegos**, mas arriba. Esto es el nucleo.
 
 Hay una prueba hecha que no toca la aplicación
 ([tools/nds/LEEME.md](../tools/nds/LEEME.md)): el núcleo arranca en el
