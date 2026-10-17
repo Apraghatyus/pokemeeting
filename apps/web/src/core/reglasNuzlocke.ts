@@ -55,6 +55,42 @@ export type Infracciones = {
 
 export const MEMORIA_VACIA: MemoriaDeReglas = { propio: null, rutas: {}, muertos: [], vistos: [] };
 
+/**
+ * Si lo que se esta leyendo es OTRA PARTIDA en el mismo fichero.
+ *
+ * Se puede empezar un juego nuevo sin crear otra partida aqui: desde la
+ * pantalla de titulo del propio juego. El fichero entonces es el mismo, y como
+ * todo lo apuntado se guarda POR FICHERO, lo de la partida anterior seguia
+ * mandando. Lo que se veia, y es bastante:
+ *
+ *   - El numero de entrenador cambia con cada partida nueva, asi que el inicial
+ *     no era "tuyo": contaba como regalado o intercambiado, y ningun salvaje se
+ *     reconocia como salvaje. Con eso, ninguna ruta se gastaba.
+ *   - Las rutas de la partida vieja salian gastadas en el mapa.
+ *   - Y como ya habia dos Pokemon vistos, la caida del laboratorio contaba como
+ *     muerte y daba la partida por perdida en el primer combate.
+ *
+ * DOS CONDICIONES A LA VEZ, para no vaciarle la memoria a nadie por error:
+ *
+ *   1. No se reconoce a ninguno de los que lleva encima.
+ *   2. Y ninguno es tuyo: ninguno lleva tu numero de entrenador.
+ *
+ * Una partida que sigue cumple casi siempre alguna de las dos -o reconoces a
+ * alguien, o al menos uno de los que llevas lo capturaste tu-. Las dos a la vez
+ * practicamente solo pasan al empezar de cero.
+ */
+export const esOtraPartida = (
+  memoria: MemoriaDeReglas,
+  equipo: EquipoResumen | null,
+): boolean => {
+  const pokemon = (equipo?.ranuras ?? []).filter((p) => !p.huevo);
+  // Sin equipo no hay nada que comparar, y sin memoria no hay nada que tirar.
+  if (pokemon.length === 0 || memoria.propio === null || memoria.vistos.length === 0) return false;
+  const conocido = pokemon.some((p) => memoria.vistos.includes(p.personalidad));
+  const mio = pokemon.some((p) => p.entrenador === memoria.propio);
+  return !conocido && !mio;
+};
+
 const SIN_INFRACCIONES: Infracciones = { rutaRepetida: new Set(), revividos: new Set() };
 
 /** Pasado esto se deja de apuntar a quien se ha visto: con dos ya basta. */
@@ -176,6 +212,8 @@ export const useReglasNuzlocke = (
 ): Infracciones & {
   memoria: MemoriaDeReglas;
   resucitar: (personalidad: number) => void;
+  /** Tirar lo apuntado y empezar de cero. Para cuando esto es otra partida. */
+  olvidar: () => void;
 } => {
   // La memoria va atada a SU partida. Al cambiar de partida hay un render en
   // el que todavia se tiene la de la anterior; sin esta marca se aplicaria a la
@@ -230,11 +268,25 @@ export const useReglasNuzlocke = (
     [partida],
   );
 
+  /**
+   * Tirar lo apuntado. Lo llama quien reconoce que esto es OTRA partida.
+   *
+   * No lo decide el hook: con el reto ya dado por acabado -aunque sea por un
+   * final de la partida anterior- las reglas estan apagadas y aqui no se mira
+   * nada. Por eso lo mira la pantalla, que lo ve todo, y aqui solo se obedece.
+   */
+  const olvidar = useCallback(() => {
+    if (!partida) return;
+    olvidarReglas(partida);
+    setGuardada({ partida, memoria: MEMORIA_VACIA });
+  }, [partida]);
+
   return {
     ...(resultado?.infracciones ?? SIN_INFRACCIONES),
     // Lo apuntado: que zonas se gastaron y quien ha caido. Lo usan el mapa y
     // las reglas del Centro Pokemon.
     memoria: resultado?.memoria ?? memoria,
     resucitar,
+    olvidar,
   };
 };

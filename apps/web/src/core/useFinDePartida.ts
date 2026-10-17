@@ -114,6 +114,8 @@ export type FinDePartida = {
   continuar: () => void;
   /** Cierra el cartel sin dar nada por terminado. Para un falso positivo. */
   descartar: () => void;
+  /** Olvidar que esta partida acabo: lo que se esta jugando es otra. */
+  empezarDeCero: () => void;
 };
 
 export type Resultado = 'victoria' | 'derrota';
@@ -168,6 +170,15 @@ const leer = (partida: string): Guardado => {
  * Apuntarla otra vez como descartada contaria dos veces el mismo final.
  */
 export const yaTermino = (partida: string): boolean => leer(partida).terminada;
+
+/** Para cuando lo guardado es de otra partida: ver `empezarDeCero`. */
+export const olvidarFin = (partida: string): void => {
+  try {
+    globalThis.localStorage?.removeItem(clave(partida));
+  } catch {
+    // Si no se puede, se queda; lo que manda es el estado en memoria.
+  }
+};
 
 const escribir = (partida: string, estado: Guardado): void => {
   try {
@@ -521,6 +532,22 @@ export const useFinDePartida = (
     setEquipoFinal(null);
   }, []);
 
+  /**
+   * Empezar de cero: esto es otra partida en el mismo fichero.
+   *
+   * Lo de antes no vale para nada -ni el final, ni los Pokemon vistos- y
+   * ademas estorba: con la partida dada por acabada las reglas se apagan, asi
+   * que un juego nuevo empezaba sin ninguna.
+   */
+  const empezarDeCero = useCallback(() => {
+    decidido.current = false;
+    apuntado.current = null;
+    setDescartada(false);
+    setEquipoFinal(null);
+    setEstado({ ...VACIO });
+    if (partida) olvidarFin(partida);
+  }, [partida]);
+
   return {
     // Ya decidido, no se vuelve a preguntar: `continuada` sobrevive a recargar
     // la pagina, y sin mirarlo el cartel salia otra vez en cada arranque.
@@ -533,5 +560,6 @@ export const useFinDePartida = (
     continuada: estado.continuada,
     continuar,
     descartar,
+    empezarDeCero,
   };
 };

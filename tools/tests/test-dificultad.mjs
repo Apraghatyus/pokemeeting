@@ -17,7 +17,9 @@ const desde = (ruta) => import(pathToFileURL(`${process.cwd()}/${ruta}`).href);
 const { codificarSemilla, descodificarSemilla } = await desde('apps/web/src/core/semilla.ts');
 const { reglasActivas, tiposPrimariosRepetidos } = await desde('apps/web/src/core/dificultad.ts');
 const { sinRevivirDe } = await desde('apps/web/src/core/partidas.ts');
-const { aplicarReglas, MEMORIA_VACIA } = await desde('apps/web/src/core/reglasNuzlocke.ts');
+const { aplicarReglas, esOtraPartida, MEMORIA_VACIA } = await desde(
+  'apps/web/src/core/reglasNuzlocke.ts',
+);
 
 let fallos = 0;
 const check = (nombre, ok, detalle = '') => {
@@ -185,6 +187,40 @@ check(
   'leer el mismo equipo dos veces no cambia la memoria',
   JSON.stringify(aplicarReglas(una, equipo(inicial, p(2))).memoria) === JSON.stringify(una),
 );
+
+// --- OTRA PARTIDA EN EL MISMO FICHERO ---
+//
+// Lo reportado: empezar un juego nuevo desde la pantalla de titulo del propio
+// juego. El fichero es el mismo y lo apuntado se guarda por fichero, asi que
+// mandaba lo de la partida anterior: el inicial no era "tuyo" -el numero de
+// entrenador cambia con cada partida- y, con dos Pokemon ya vistos, la caida
+// del laboratorio daba la partida por perdida en el primer combate.
+const deAntes = jugar(equipo(inicial, p(2)), equipo(inicial, p(2), p(3, { lugar: RUTA_2 }))).memoria;
+check('la memoria de la partida anterior tiene lo suyo',
+  deAntes.propio === YO && deAntes.vistos.length === 3);
+
+// La nueva: otro inicial, otro numero de entrenador, ninguno conocido.
+const DE_LA_NUEVA = 3333;
+const otroInicial = p(77, { lugar: 88, entrenador: DE_LA_NUEVA });
+check('un inicial nuevo con otro entrenador es otra partida',
+  esOtraPartida(deAntes, equipo(otroInicial)) === true);
+
+// Y lo que NO puede pasar: tirar la memoria de una partida que sigue.
+check('reconocer a alguno de los tuyos no es otra partida',
+  esOtraPartida(deAntes, equipo(inicial)) === false);
+check('ni llevar uno nuevo tuyo que aun no se ha visto',
+  esOtraPartida(deAntes, equipo(p(9, { lugar: RUTA_2 }))) === false);
+check('ni un equipo entero de intercambios si reconoces a uno',
+  esOtraPartida(deAntes, equipo(p(2), p(50, { entrenador: OTRO }))) === false);
+check('sin equipo no se decide nada',
+  esOtraPartida(deAntes, null) === false && esOtraPartida(deAntes, equipo()) === false);
+check('y sin memoria previa tampoco hay nada que tirar',
+  esOtraPartida(MEMORIA_VACIA, equipo(otroInicial)) === false);
+// Un huevo no dice de quien es: no cuenta ni para reconocer ni para descartar.
+check('un huevo solo no decide',
+  esOtraPartida(deAntes, equipo(pokemon([NORMAL, NORMAL], {
+    personalidad: 90, lugar: null, entrenador: DE_LA_NUEVA, huevo: true,
+  }))) === false);
 
 console.log(fallos === 0 ? '\nTodo bien.' : `\n${fallos} fallo(s).`);
 process.exit(fallos === 0 ? 0 : 1);

@@ -8,6 +8,7 @@ import { useEquipo, type Vigilante } from './core/useEquipo';
 import {
   apuntarEncuentro,
   deberDelCentro,
+  ENCUENTROS_VACIOS,
   guardarDisposicionDelCentro,
   guardarEncuentros,
   juzgarCaptura,
@@ -16,6 +17,7 @@ import {
   juzgarPokeball,
   leerDisposicionDelCentro,
   leerEncuentros,
+  olvidarEncuentros,
   revividoConObjeto,
   seCuroElEquipo,
   zonasGastadas,
@@ -24,7 +26,7 @@ import {
 import { nombreDeZona, zonaCanonica } from './core/zonas';
 import { useTopeDeNivel } from './core/useTopeDeNivel';
 import { reglasActivas, tiposPrimariosRepetidos } from './core/dificultad';
-import { useReglasNuzlocke } from './core/reglasNuzlocke';
+import { esOtraPartida, useReglasNuzlocke } from './core/reglasNuzlocke';
 import { useFinDePartida } from './core/useFinDePartida';
 import { useEquipoOrdenado } from './core/ordenEquipo';
 import { useEsEstrecha } from './core/useEsEstrecha';
@@ -685,6 +687,44 @@ export const App = () => {
     }
     return cual;
   }, [zonasConEncuentro, especies]);
+
+  /**
+   * OTRA PARTIDA EN EL MISMO FICHERO: se olvida todo lo de la anterior.
+   *
+   * Se puede empezar un juego nuevo sin crear otra partida aqui, desde la
+   * pantalla de titulo del propio juego. Como lo apuntado se guarda por
+   * fichero, lo de antes seguia mandando: el inicial no era "tuyo" -el numero
+   * de entrenador cambia- asi que ningun salvaje se reconocia y ninguna ruta se
+   * gastaba, las rutas viejas salian gastadas en el mapa, y con dos Pokemon ya
+   * vistos la caida del laboratorio daba la partida por perdida en el primer
+   * combate.
+   *
+   * Se mira AQUI y no dentro de las reglas porque con el reto dado por acabado
+   * -aunque fuera el final de la partida anterior- las reglas estan apagadas y
+   * no miran nada. Esto hay que verlo precisamente entonces.
+   */
+  const olvidarReglasDeAntes = infracciones.olvidar;
+  const empezarFinDeCero = fin.empezarDeCero;
+  useEffect(() => {
+    if (!partidaEnCurso) return;
+    if (!esOtraPartida(infracciones.memoria, miEquipo.equipo)) return;
+    olvidarReglasDeAntes();
+    empezarFinDeCero();
+    olvidarEncuentros(partidaEnCurso);
+    encuentrosRef.current = { partida: partidaEnCurso, memoria: ENCUENTROS_VACIOS };
+    setZonasConEncuentro({});
+    setAvisoRegla({
+      texto:
+        'Esto es una partida nueva: se olvida lo apuntado de la anterior y las reglas empiezan de cero.',
+      tipo: 'info',
+    });
+  }, [
+    partidaEnCurso,
+    infracciones.memoria,
+    miEquipo.equipo,
+    olvidarReglasDeAntes,
+    empezarFinDeCero,
+  ]);
 
   // El aviso de una regla que se acaba de hacer cumplir. Se va solo.
   const [avisoRegla, setAvisoRegla] = useState<{ texto: string; tipo: 'error' | 'info' } | null>(
