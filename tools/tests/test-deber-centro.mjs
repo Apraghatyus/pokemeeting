@@ -49,7 +49,6 @@ const medirEn = (hoja) =>
         </div>
         <div class="aviso-regla aviso-regla--error">
           <span class="aviso-regla__marca">!</span><span>${textoAviso}</span>
-          <button type="button">Entendido</button>
         </div>`;
       document.body.append(columna);
       const [elDeber, elAviso] = columna.querySelectorAll('.aviso-regla');

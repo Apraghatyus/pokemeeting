@@ -904,9 +904,6 @@ export const App = () => {
                   {avisoRegla.tipo === 'error' ? '!' : 'i'}
                 </span>
                 <span>{avisoRegla.texto}</span>
-                <button type="button" onClick={() => setAvisoRegla(null)}>
-                  Entendido
-                </button>
               </div>
             )}
           </div>
