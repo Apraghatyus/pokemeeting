@@ -8,11 +8,58 @@
 // vez de inventarse un sitio. Falta confirmarlo con una ROM real.
 //
 // Uso: npx tsx tools/tests/test-mapas.mjs
+import { readdirSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 const desde = (ruta) => import(pathToFileURL(`${process.cwd()}/${ruta}`).href);
-const { encontrarTablaMapas, mapaActual, aprenderCentro, esCentro, TAMANO_ESTADO, REGIONES } =
+const {
+  encontrarTablaMapas,
+  mapaActual,
+  aprenderCentro,
+  esCentro,
+  MIN_CENTROS,
+  TAMANO_ESTADO,
+  REGIONES,
+} =
   await desde('packages/pokemon/src/index.ts');
+
+/**
+ * Las ROMs de verdad, si estan. No se distribuyen con el proyecto -ver
+ * `roms/`- asi que si no hay ninguna, esa parte se salta y se dice.
+ *
+ * Que esto no existiera es lo que dejo pasar el fallo de los guiones: la ROM
+ * fabricada salia mas limpia que cualquiera de verdad, y la cabecera de la
+ * prueba ya avisaba de que faltaba confirmarlo con una ROM real.
+ */
+const romsDeVerdad = () => {
+  const dadas = process.argv.slice(2);
+  if (dadas.length > 0) return dadas;
+  const base = new URL('../../roms/', import.meta.url);
+  let carpeta;
+  try {
+    carpeta = readdirSync(base, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const encontradas = [];
+  for (const entrada of carpeta) {
+    const dentro = new URL(`${encodeURIComponent(entrada.name)}/`, base);
+    if (entrada.isDirectory()) {
+      try {
+        for (const hijo of readdirSync(dentro)) {
+          if (hijo.toLowerCase().endsWith('.gba')) {
+            encontradas.push(new URL(encodeURIComponent(hijo), dentro));
+          }
+        }
+      } catch {
+        // Una carpeta que no se puede leer no es un fallo de la prueba.
+      }
+    } else if (entrada.name.toLowerCase().endsWith('.gba')) {
+      encontradas.push(new URL(encodeURIComponent(entrada.name), base));
+    }
+  }
+  return encontradas;
+};
 
 let fallos = 0;
 const check = (nombre, ok, detalle = '') => {
@@ -51,7 +98,13 @@ for (let g = 0; g < GRUPOS; g += 1) {
     escribir32(disposicion - ROM, 20);
     escribir32(cab, disposicion);
     escribir32(cab + 4, ROM + 0xc0000 + 0x10 * cabeceras.length); // eventos
-    escribir32(cab + 8, ROM + 0xd0000 + 0x10 * cabeceras.length); // guiones
+    // Los GUIONES, a proposito, SIN ALINEAR a cuatro: en las ROMs de verdad
+    // apuntan a datos de guion, que van byte a byte, y cuatro de cada cinco
+    // caen descolocados. Esta prueba los ponia alineados y por eso no vio que
+    // la busqueda los exigia alineados: en Rojo Fuego espanol eso tiraba 41 de
+    // los 43 grupos, no se encontraba la tabla y el programa no supo nunca en
+    // que zona estaba el jugador.
+    escribir32(cab + 8, ROM + 0xd0000 + 0x10 * cabeceras.length + 1 + (cabeceras.length % 3)); // guiones
     escribir32(cab + 12, n === 0 ? 0 : ROM + 0xe0000); // conexiones
     vista.setUint16(cab + 0x10, 300 + g, true); // musica
     vista.setUint16(cab + 0x12, 1 + cabeceras.length, true); // disposicion
@@ -64,6 +117,10 @@ for (let g = 0; g < GRUPOS; g += 1) {
 
 const tabla = encontrarTablaMapas(rom);
 check('encuentra la tabla de mapas', tabla !== null);
+check(
+  'aunque los guiones no esten alineados, como en las ROMs de verdad',
+  cabeceras.every(({ cab }) => (vista.getUint32(cab + 8, true) & 3) !== 0),
+);
 check('en su sitio', tabla?.offset === tablaEn, String(tabla?.offset));
 check('con todos sus grupos', tabla?.grupos === GRUPOS, String(tabla?.grupos));
 check('sin leer el primer mapa de un grupo como el ultimo del anterior', tabla?.mapa(0, 3) === null);
@@ -112,6 +169,34 @@ check('si se mueve, lo vuelve a encontrar', mapaActual(estado, tabla, aqui?.dire
 estado.fill(0, ewram, ewram + REGIONES.ewram.tamano);
 check('sin cabecera en memoria, no se sabe', mapaActual(estado, tabla) === null);
 check('una ROM sin tabla, tampoco', encontrarTablaMapas(new Uint8Array(0x10000)) === null);
+
+// --- LAS ROMs DE VERDAD ---
+//
+// Lo de arriba es una ROM fabricada: dice que la busqueda funciona sobre algo
+// con la forma que se espera. Esto dice que las ROMs tienen esa forma, que es
+// otra cosa y es la que fallaba.
+const reales = romsDeVerdad();
+if (reales.length === 0) {
+  console.log('\n(sin ROMs en roms/: la parte de las ROMs de verdad se salta)');
+} else {
+  console.log('');
+  for (const ruta of reales) {
+    const nombre = decodeURIComponent(String(ruta).split('/').pop());
+    const bytes = new Uint8Array(readFileSync(ruta));
+    const suya = encontrarTablaMapas(bytes);
+    check(`${nombre}: se encuentra la tabla`, suya !== null);
+    if (!suya) continue;
+    // Los cinco juegos tienen de 33 grupos para arriba y cientos de mapas.
+    check(`  con sus grupos y sus mapas`,
+      suya.grupos >= 33 && suya.porCabecera.size >= 300,
+      `${suya.grupos} grupos, ${suya.porCabecera.size} mapas`);
+    // Y la costumbre de la que cuelga reconocer un Centro Pokemon: una
+    // disposicion que comparten muchos mapas.
+    const compartidas = [...suya.usosDeDisposicion.values()].filter((n) => n >= MIN_CENTROS).length;
+    check(`  con disposiciones compartidas, que es como se reconoce un Centro`,
+      compartidas >= 1, `${compartidas}`);
+  }
+}
 
 console.log(fallos === 0 ? '\nTodo bien.' : `\n${fallos} fallos.`);
 process.exit(fallos === 0 ? 0 : 1);

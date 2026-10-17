@@ -74,22 +74,40 @@ const u32 = (bytes: Uint8Array, offset: number): number =>
   ((bytes[offset]! | (bytes[offset + 1]! << 8) | (bytes[offset + 2]! << 16)) >>> 0) +
   bytes[offset + 3]! * 0x1000000;
 
-/** Si un numero es un puntero dentro de esta ROM. */
-const enRom = (rom: Uint8Array, valor: number): boolean =>
-  valor >= ROM_BASE && valor < ROM_BASE + rom.length && (valor & 3) === 0;
+/**
+ * Si un numero es un puntero dentro de esta ROM.
+ *
+ * `alineado` es lo normal: casi todo lo que apunta una cabecera son estructuras,
+ * y el compilador las pone en multiplos de cuatro. Los GUIONES no: apuntan a
+ * datos de guion, que van byte a byte, y cuatro de cada cinco quedan sin
+ * alinear.
+ *
+ * COSTO CARO SABERLO. Exigir la alineacion tambien ahi tiraba casi todos los
+ * grupos de la tabla -en Rojo Fuego espanol, 41 de 43-, asi que la tabla no se
+ * encontraba y el programa no sabia nunca en que zona estaba el jugador. Con
+ * eso caia todo lo que cuelga del mapa: las zonas gastadas, saber que esto es
+ * un Centro Pokemon y, desde que el primer encuentro mira la zona, tambien la
+ * regla de la captura. Las pruebas no lo vieron porque usaban una ROM
+ * fabricada, y al fabricarla los guiones salian alineados.
+ */
+const enRom = (rom: Uint8Array, valor: number, alineado = true): boolean =>
+  valor >= ROM_BASE && valor < ROM_BASE + rom.length && (!alineado || (valor & 3) === 0);
 
 /** Si en ese sitio de un bloque hay algo con forma de cabecera de mapa. */
 const formaDeCabecera = (
   bytes: Uint8Array,
   offset: number,
   esRom: (valor: number) => boolean,
+  esRomSuelto: (valor: number) => boolean,
 ): boolean => {
   if (offset < 0 || offset + ANCHO_CABECERA > bytes.length) return false;
   const disposicion = u32(bytes, offset);
   const eventos = u32(bytes, offset + 4);
   const guiones = u32(bytes, offset + 8);
   const conexiones = u32(bytes, offset + 12);
-  if (!esRom(disposicion) || !esRom(eventos) || !esRom(guiones)) return false;
+  if (!esRom(disposicion) || !esRom(eventos)) return false;
+  // Los guiones son los unicos que pueden no estar alineados: ver `enRom`.
+  if (!esRomSuelto(guiones)) return false;
   if (conexiones !== 0 && !esRom(conexiones)) return false;
   const idDisposicion = bytes[offset + 0x12]! | (bytes[offset + 0x13]! << 8);
   if (idDisposicion === 0 || idDisposicion > 0x400) return false;
@@ -119,13 +137,14 @@ const llave = (bytes: Uint8Array, offset: number): string => {
  */
 export const encontrarTablaMapas = (rom: Uint8Array): TablaMapas | null => {
   const esRom = (valor: number) => enRom(rom, valor);
+  const esRomSuelto = (valor: number) => enRom(rom, valor, false);
   const aOffset = (puntero: number) => puntero - ROM_BASE;
 
   /** Si en ese sitio empieza un grupo: su primera entrada apunta a una cabecera. */
   const empiezaGrupo = (offset: number): boolean => {
     if (offset < 0 || offset + 4 > rom.length) return false;
     const primera = u32(rom, offset);
-    return esRom(primera) && formaDeCabecera(rom, aOffset(primera), esRom);
+    return esRom(primera) && formaDeCabecera(rom, aOffset(primera), esRom, esRomSuelto);
   };
 
   for (let offset = 0; offset + 4 * MIN_GRUPOS <= rom.length; offset += 4) {
@@ -158,7 +177,7 @@ export const encontrarTablaMapas = (rom: Uint8Array): TablaMapas | null => {
         const puntero = u32(rom, donde);
         if (!esRom(puntero)) break;
         const cabecera = aOffset(puntero);
-        if (!formaDeCabecera(rom, cabecera, esRom)) break;
+        if (!formaDeCabecera(rom, cabecera, esRom, esRomSuelto)) break;
 
         const info: MapaInfo = {
           grupo,
@@ -205,10 +224,12 @@ export const mapaActual = (
   if (estado.length !== TAMANO_ESTADO) return null;
   const { inicio, tamano } = REGIONES.ewram;
   const memoria = estado.subarray(inicio, inicio + tamano);
+  // Aqui no se pide alineacion a nadie: no se sabe cuanto mide la ROM que
+  // corre, asi que lo unico que se puede mirar es que caiga en el rango.
   const esRom = (valor: number) => valor >= ROM_BASE && valor < ROM_BASE + 0x2000000;
 
   const probar = (offset: number): MapaEnMemoria | null => {
-    if (!formaDeCabecera(memoria, offset, esRom)) return null;
+    if (!formaDeCabecera(memoria, offset, esRom, esRom)) return null;
     const info = tabla.porCabecera.get(llave(memoria, offset));
     return info ? { ...info, direccion: 0x02000000 + offset } : null;
   };

@@ -163,7 +163,6 @@ export const RandomizerModal = ({
   onClose,
   baseRom,
   gameCode,
-  yaAleatorizada,
   onRandomized,
   onContinuar,
   onBorrar,

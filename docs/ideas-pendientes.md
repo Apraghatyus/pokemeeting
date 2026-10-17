@@ -1715,6 +1715,13 @@ también a pantalla completa. No se escribe nada en la partida.
 
 **Cómo se sabe cada cosa**, sin direcciones a mano salvo la de combate:
 
+- **El mapa**: la tabla de mapas se busca por forma. Ojo con los punteros: los
+  de GUIONES no están alineados a cuatro (apuntan a datos de guion, byte a
+  byte), y exigirles alineación tiraba 41 de los 43 grupos de Rojo Fuego. Con
+  eso la tabla no se encontraba y el programa no supo nunca en qué zona estaba
+  el jugador, así que no funcionaba nada de lo que cuelga del mapa. La prueba
+  no lo vio porque la ROM fabricada salía más limpia que las de verdad; ahora
+  `test:mapas` las usa si están en `roms/`.
 - **El Centro**: todos comparten disposición por dentro; se aprende en la
   primera cura de la enfermera. Hasta entonces no se vigila ni la de salir ni la
   obligación de guardar al entrar.
