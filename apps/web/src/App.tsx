@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { EquipoResumen, PokemonResumen, RomFingerprint } from '@emupoke/protocol';
 import { useTeclas } from './core/useTeclas';
 import { useEmulator } from './core/useEmulator';
@@ -34,6 +34,7 @@ import { usePantallaCompleta } from './core/usePantallaCompleta';
 import { useEspecies } from './core/useEspecies';
 import { useMandoTactil } from './core/useMandoTactil';
 import { useMandoFisico } from './core/useMandoFisico';
+import type { Accion } from './core/mandoFisico';
 import { apodoGuardado, comoSeLlama } from './core/apodo';
 import { codificarSemilla, type Semilla } from './core/semilla';
 import { leerInvitacion, olvidarInvitacion, type Invitacion } from './core/invitacion';
@@ -145,6 +146,15 @@ export const App = () => {
     emulator.coreRef,
     state.status === 'running',
     mando.apartar,
+    // Lo que el mando hace que no es de la consola. Un GBA tiene diez botones
+    // y un mando de hoy tiene mas: los que sobran sirven para esto.
+    useCallback(
+      (accion: Accion) => {
+        if (accion === 'Turbo') emulator.toggleFastForward();
+        if (accion === 'Mapa') setMapaOpen((abierto) => !abierto);
+      },
+      [emulator],
+    ),
   );
 
   // Con el modal o el menu abiertos el teclado es de la interfaz aunque el foco

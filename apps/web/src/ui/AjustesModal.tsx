@@ -14,7 +14,7 @@
 // para encontrar una cosa.
 
 import type { MandoFisico } from '../core/useMandoFisico';
-import { nombreDeBoton } from '../core/mandoFisico';
+import { ACCIONES, nombreDeBoton } from '../core/mandoFisico';
 import { useCallback, useEffect, useState, type ReactNode, type RefObject } from 'react';
 import {
   MAX_PARTIDAS,
@@ -197,8 +197,9 @@ export const AjustesModal = ({
               </div>
             ))}
 
-            {/* El avance rapido se enseña pero no se reasigna: no es una tecla
-                del mando, es una velocidad, y vive fuera de este mapa. */}
+            {/* Del teclado, el avance rapido se enseña pero no se reasigna: no
+                es una tecla del mando, es una velocidad, y vive fuera de este
+                mapa. En el mando SI se reasigna, mas abajo. */}
             <div className="teclas__fila">
               <span className="teclas__que">Avance rapido</span>
               <span className="tecla tecla--fija">Espacio</span>
@@ -251,6 +252,35 @@ export const AjustesModal = ({
                   </div>
                 ))}
               </div>
+
+              {/* Lo que el mando hace y la consola no tenia. Un GBA tiene diez
+                  botones y un mando de hoy tiene mas: los que sobran sirven
+                  para esto, y por eso van de fabrica en los gatillos, que no
+                  le quitan el sitio a nada. */}
+              <p className="hint">
+                Y lo que el mando puede hacer y la consola no. Se reasignan igual.
+              </p>
+              <div className="teclas">
+                {ACCIONES.map(({ accion, etiqueta }) => (
+                  <div className="teclas__fila" key={accion}>
+                    <span className="teclas__que">{etiqueta}</span>
+                    <button
+                      type="button"
+                      className={`tecla${mandoFisico.esperando === accion ? ' tecla--esperando' : ''}`}
+                      onClick={() =>
+                        mandoFisico.esperando === accion
+                          ? mandoFisico.cancelar()
+                          : mandoFisico.aprender(accion)
+                      }
+                    >
+                      {mandoFisico.esperando === accion
+                        ? 'Pulsa…'
+                        : mandoFisico.mapa[accion].map(nombreDeBoton).join(' · ') || '—'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+
               <button type="button" className="boton-fantasma" onClick={mandoFisico.restaurar}>
                 Restablecer el mando
               </button>

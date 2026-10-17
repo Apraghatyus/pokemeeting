@@ -11,12 +11,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MgbaModule } from './mgbaCore';
 import {
+  ACCIONES,
   algoPulsado,
   asignarBoton,
   entradasDelMando,
+  esAccion,
   MAPA_POR_DEFECTO,
   primerBotonPulsado,
-  type EntradaGba,
+  type Accion,
+  type EntradaMando,
   type MapaMando,
 } from './mandoFisico';
 
@@ -26,8 +29,8 @@ export type MandoFisico = {
   /** Que botones van a cada entrada. */
   mapa: MapaMando;
   /** La entrada que espera a que se pulse un boton para quedarselo, o null. */
-  esperando: EntradaGba | null;
-  aprender: (entrada: EntradaGba) => void;
+  esperando: EntradaMando | null;
+  aprender: (entrada: EntradaMando) => void;
   cancelar: () => void;
   restaurar: () => void;
 };
@@ -42,12 +45,22 @@ const leerMapa = (): MapaMando => {
     const datos = JSON.parse(crudo) as Partial<MapaMando>;
     // Lo que falte o no se entienda, de fabrica: un mapa a medias no puede
     // dejar una entrada sin boton.
-    const mapa = { ...MAPA_POR_DEFECTO };
-    for (const entrada of Object.keys(MAPA_POR_DEFECTO) as EntradaGba[]) {
+    let mapa = { ...MAPA_POR_DEFECTO };
+    for (const entrada of Object.keys(MAPA_POR_DEFECTO) as EntradaMando[]) {
       const botones = datos[entrada];
       if (Array.isArray(botones) && botones.every((b) => Number.isInteger(b) && b >= 0 && b < 64)) {
         mapa[entrada] = botones;
       }
+    }
+
+    // Un mapa guardado antes de que existieran las acciones no las trae, y sus
+    // gatillos estan dados a la L y la R de la consola. Se les quitan al
+    // ponerles la accion: un boton que hace dos cosas a la vez es justo lo que
+    // no se quiere. Quien ya los habia reasignado a mano no nota nada, porque
+    // entonces si vienen en lo guardado.
+    for (const { accion } of ACCIONES) {
+      if (Array.isArray(datos[accion])) continue;
+      for (const indice of MAPA_POR_DEFECTO[accion]) mapa = asignarBoton(mapa, accion, indice);
     }
     return mapa;
   } catch {
@@ -67,23 +80,27 @@ const guardarMapa = (mapa: MapaMando): void => {
  * @param coreRef   el nucleo
  * @param activo    sin partida no se manda nada
  * @param alUsarlo  se llama cuando se juega con el: el mando tactil se aparta
+ * @param alAccion  lo que no es un boton de la consola: avance rapido y mapa
  */
 export const useMandoFisico = (
   coreRef: { current: MgbaModule | null },
   activo: boolean,
   alUsarlo: () => void,
+  alAccion: (accion: Accion) => void = () => {},
 ): MandoFisico => {
   const [conectado, setConectado] = useState<string | null>(null);
   const [mapa, setMapa] = useState<MapaMando>(leerMapa);
-  const [esperando, setEsperando] = useState<EntradaGba | null>(null);
+  const [esperando, setEsperando] = useState<EntradaMando | null>(null);
   const mapaRef = useRef(mapa);
   mapaRef.current = mapa;
   const esperandoRef = useRef(esperando);
   esperandoRef.current = esperando;
-  const pulsadas = useRef(new Set<EntradaGba>());
+  const pulsadas = useRef(new Set<EntradaMando>());
   const avisado = useRef(false);
   const alUsarloRef = useRef(alUsarlo);
   alUsarloRef.current = alUsarlo;
+  const alAccionRef = useRef(alAccion);
+  alAccionRef.current = alAccion;
 
   useEffect(() => {
     const leerConectado = () => {
@@ -112,13 +129,16 @@ export const useMandoFisico = (
 
     const soltarTodo = () => {
       const core = coreRef.current;
-      for (const entrada of pulsadas.current) core?.buttonUnpress(entrada);
+      // Las acciones no se sueltan: no existen para el nucleo.
+      for (const entrada of pulsadas.current) {
+        if (!esAccion(entrada)) core?.buttonUnpress(entrada);
+      }
       pulsadas.current = new Set();
     };
 
     const mirar = () => {
       const core = coreRef.current;
-      const ahora = new Set<EntradaGba>();
+      const ahora = new Set<EntradaMando>();
       const aprendiendo = esperandoRef.current;
       if (aprendiendo) {
         // Lo que estuviera pulsado en el juego se suelta antes de nada.
@@ -148,9 +168,18 @@ export const useMandoFisico = (
           alUsarloRef.current();
         }
       }
-      if (core && activo) {
-        for (const entrada of ahora) if (!pulsadas.current.has(entrada)) core.buttonPress(entrada);
-        for (const entrada of pulsadas.current) if (!ahora.has(entrada)) core.buttonUnpress(entrada);
+      if (activo) {
+        for (const entrada of ahora) {
+          if (pulsadas.current.has(entrada)) continue;
+          // Las acciones se avisan UNA VEZ, al pulsar: las dos encienden y
+          // apagan, asi que repetirlas mientras se mantiene el boton seria
+          // encender y apagar sesenta veces por segundo.
+          if (esAccion(entrada)) alAccionRef.current(entrada);
+          else core?.buttonPress(entrada);
+        }
+        for (const entrada of pulsadas.current) {
+          if (!esAccion(entrada) && !ahora.has(entrada)) core?.buttonUnpress(entrada);
+        }
       }
       pulsadas.current = ahora;
       vuelta = requestAnimationFrame(mirar);
@@ -164,7 +193,7 @@ export const useMandoFisico = (
     };
   }, [mirando, activo, coreRef]);
 
-  const aprender = useCallback((entrada: EntradaGba) => setEsperando(entrada), []);
+  const aprender = useCallback((entrada: EntradaMando) => setEsperando(entrada), []);
   const cancelar = useCallback(() => setEsperando(null), []);
   const restaurar = useCallback(() => {
     guardarMapa(MAPA_POR_DEFECTO);
